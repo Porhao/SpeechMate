@@ -40,7 +40,7 @@ Pages (`app/(app)/`): `home`, `practice`, `session` (the live coaching session),
 
 - **FastAPI** on Python 3.13, **SQLAlchemy** (async, SQLite via `aiosqlite`) with **Alembic** migrations
 - JWT auth (`python-jose`, `passlib`/`bcrypt`)
-- **OpenAI API** for the AI coaching chat and feedback generation
+- **Gemini API (Gemini Flash)** for the AI coaching chat, conversational training, and feedback generation
 - Routes (`app/api/routes/`): `auth`, `users`, `practice`, `speech`, `analysis`, `vision`, `coach`, `chat`, `tts`, `reports`, `websocket`
 
 ---
@@ -51,7 +51,7 @@ Pages (`app/(app)/`): `home`, `practice`, `session` (the live coaching session),
 
 ```
 Audio + Video → ASR → Speech Analysis → Vision Analysis
-             → Confidence Estimation → Communication Scoring
+             → Multimodal Fusion (Gaze Tunneling) → Communication Scoring
              → Recommendation Engine → Structured Feedback
 ```
 
@@ -61,13 +61,13 @@ Audio + Video → ASR → Speech Analysis → Vision Analysis
   - If Whisper isn't confidently English, the same audio is re-run through **Mesolitica's `wav2vec2-xls-r-300m-mixed`** (`codeswitch_engine.py`) — a model trained specifically on Malay/Singlish/Mandarin-mixed speech (WER 0.132 / CER 0.048 per its model card), loaded directly via `transformers`/PyTorch (the same checkpoint the `malaya-speech` toolkit itself wraps, without needing that package or TensorFlow).
 - `lexicon.py` — a documented ~190-word Bahasa Malaysia/Manglish lexicon used to estimate English/Malay ratio and flag code-switching — an honest word-list heuristic, not a trained language-ID model.
 - `malaysian.py` — language/accent detection and the accent-fair pronunciation tolerance, built on the lexicon above.
-- `fluency.py`, `stuttering.py`, `pronunciation.py`, `fillers.py`, `confidence.py`, `scoring.py` — WPM/pause/continuity analysis, disfluency detection, pronunciation (GOP-based) assessment, filler-word detection, and the cross-modal confidence/communication scores.
+- `fluency.py`, `stuttering.py`, `pronunciation.py`, `fillers.py`, `confidence.py`, `scoring.py` — WPM/pause/continuity analysis, disfluency detection (using a CNN + BiLSTM with attention mechanism trained on UCLASS/SEP-28K and locally augmented data), pronunciation (GOP-based) assessment with relaxed thresholds, filler-word detection, and the cross-modal confidence/communication scores.
 
-**Vision (`app/ai/vision/`)** — `eye_contact.py`, `emotion.py`, `posture.py`, all MediaPipe/OpenCV-based frame analysis.
+**Vision (`app/ai/vision/`)** — `eye_contact.py` (MediaPipe face-mesh landmark extraction mapped to a tri-zone (left/right/slide) gaze-distribution metric), `emotion.py` (MediaPipe Pose with a lightweight facial-expression classifier), `posture.py`, all MediaPipe/OpenCV-based frame analysis.
 
-**Recommendations (`app/ai/recommendation/`)** — turns all of the above into a weekly focus, daily practice targets, and prioritised exercises.
+**Multimodal Fusion & Recommendations (`app/ai/recommendation/`)** — computes the **Gaze Tunneling** metric (correlating gaze aversion and disfluency over a shared timeline) and turns all features into a weekly focus, daily practice targets, and prioritised exercises.
 
-**Coach (`app/ai/llm/`)** — the OpenAI-backed conversational coaching chat.
+**Coach (`app/ai/llm/`)** — the Gemini-backed conversational coaching chat and scenario trainer.
 
 ---
 

@@ -25,3 +25,12 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  db-visualizer:
+    image: ghcr.io/coleifer/sqlite-web:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/data
+    command: speechmate.db
+    restart: unless-stopped
