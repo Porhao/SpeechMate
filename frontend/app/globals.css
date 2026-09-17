@@ -1,0 +1,256 @@
+@import "tailwindcss";
+
+@theme {
+  /* Ink-on-paper palette — one restrained navy accent, warm neutrals instead
+     of cool slate-blue grays. Functional category colors (success/warn/error
+     and chart series) are desaturated to sit quietly inside the same palette
+     rather than reading as a rainbow of SaaS-demo brights. */
+  --color-accent:          #23345C;
+  --color-accent-light:    #E8E9EF;
+  --color-accent-dark:     #17233E;
+  --color-secondary:       #5A5470;
+  --color-secondary-light: #EDEDF1;
+  --color-success:         #3F6B4C;
+  --color-warning:         #8A5A22;
+  --color-error:           #8C3B32;
+  --color-bg-primary:      #FBFAF7;
+  --color-bg-secondary:    #F5F2EB;
+  --color-bg-sidebar:      #FFFFFF;
+  --color-bg-card:         #FFFFFF;
+  --color-text-primary:    #17181C;
+  --color-text-secondary:  #6E6C63;
+  --color-text-disabled:   #CDC9BE;
+  --color-border:          #E6E2D8;
+  --font-sans:             "var(--font-inter)", "Inter", "Segoe UI", sans-serif;
+  --font-serif:            "var(--font-serif)", "Source Serif 4", Georgia, serif;
+  --radius-sm:  6px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --shadow-card:  0px 1px 2px rgba(23,24,28,0.05);
+  --shadow-hover: 0px 8px 20px rgba(23,24,28,0.08);
+  --shadow-modal: 0px 20px 48px rgba(23,24,28,0.16);
+}
+
+:root {
+  --background: #FBFAF7;
+  --foreground: #17181C;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+body {
+  background: #FBFAF7;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html { scroll-behavior: smooth; }
+
+/* Headline typeface — applied deliberately (page titles, hero copy), never
+   to body or UI chrome. Pairing a serif display face with a plain sans body
+   is the single biggest signal that this wasn't stamped out of a template. */
+.font-display {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ── Focus visibility — clear keyboard/interactive feedback everywhere ────── */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #23345C;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Custom scrollbar ────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(35,52,92,0.20); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(35,52,92,0.35); }
+
+/* Hide scrollbar visually while keeping the element scrollable (used as an
+   overflow-x safety net on nav bars that get tight, not for content areas). */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Keyframe animations — kept minimal; no idle glow/shimmer/orbit loops.
+     Motion here is a direct response to something happening, not ambient
+     decoration running whether or not anyone did anything. ─────────────── */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes waveform-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* AI Orb — the live-session orb still breathes gently; it's the one place
+   ambient motion earns its keep (it's standing in for a face). */
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1);    filter: brightness(1); }
+  50%       { transform: scale(1.04); filter: brightness(1.05); }
+}
+
+@keyframes orb-speak-pulse {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(1.03); }
+}
+
+@keyframes page-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── Utility classes ─────────────────────────────────────────────────────── */
+
+/* Card — the one card style used throughout the app. Flat white surface,
+   a hairline border for definition, and only the barest shadow. No blur,
+   no glow, no color-tinted shadow on hover — just a slightly firmer line. */
+.glass-card {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: #C9C4B6;
+}
+
+/* Light glass — kept for the one true overlay use (mobile nav backdrop, in
+   case a future overlay needs it) but no longer saturated/blurred by default. */
+.glass {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid rgba(23,24,28,0.06);
+}
+
+.glass-white {
+  background: rgba(255,255,255,0.98);
+  border: 1px solid rgba(23,24,28,0.06);
+}
+
+/* Dark scope — the live session page stays dark/immersive (like a video-call
+   screen) even though the rest of the app is light. Scopes .glass-card back
+   to its dark form only within this wrapper so the shared light-theme class
+   doesn't leak in and wash out white text on the session page. */
+.session-dark {
+  background: #0B0C10;
+  color: #F1EFE8;
+}
+.session-dark .glass-card {
+  background: rgba(20,21,26,0.92);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: none;
+}
+.session-dark .glass-card:hover {
+  border-color: rgba(255,255,255,0.14);
+}
+
+/* Sidebar active indicator */
+.nav-active-glow {
+  box-shadow: inset 3px 0 0 #23345C;
+}
+
+/* Card hover — a small, honest lift. No shadow blooming in the accent color. */
+.card-lift {
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  border-color: #C9C4B6;
+}
+
+/* Micro interactions — quick compress on press, springy overshoot on release
+   (the "pop" — press down fast, settle past 1.0 then back, like a real button). */
+.press-effect {
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.press-effect:active {
+  transform: scale(0.96);
+  transition: transform 0.08s ease-out;
+}
+
+/* Every clickable control gets this by default, not just the ones
+   explicitly opted in above — a control that doesn't visibly respond to
+   being pressed reads as unfinished. Covers real buttons, role="button",
+   and Next.js <Link>/<a> elements, since most of this app's CTAs are
+   styled links, not <button>s. Opt out with .no-press on the rare control
+   where a scale-down would look wrong (e.g. something already being
+   dragged) or where a whole row/card is clickable and shouldn't jump. */
+button:not(:disabled):not(.no-press),
+[role="button"]:not(.no-press),
+a[href]:not(.no-press) {
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+button:not(:disabled):not(.no-press):active,
+[role="button"]:not(.no-press):active,
+a[href]:not(.no-press):active {
+  transform: scale(0.95);
+  transition: transform 0.08s ease-out;
+}
+
+/* Slide-up reveal */
+.slide-up { animation: slide-up 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+/* Custom range slider — transparent native track (we draw our own fill
+   behind it) with a thumb that grows while dragging, for a tactile feel. */
+.slider-input {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 24px;
+  background: transparent;
+}
+.slider-input::-webkit-slider-runnable-track { background: transparent; height: 6px; }
+.slider-input::-moz-range-track              { background: transparent; height: 6px; }
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  border: 2px solid var(--slider-accent, #23345C);
+  box-shadow: 0 1px 3px rgba(23,24,28,0.25);
+  margin-top: -5px;
+  transform: scale(var(--thumb-scale, 1));
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+.slider-input::-moz-range-thumb {
+  width: 16px; height: 16px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  border: 2px solid var(--slider-accent, #23345C);
+  box-shadow: 0 1px 3px rgba(23,24,28,0.25);
+  transform: scale(var(--thumb-scale, 1));
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+/* Animated waveform bars */
+.waveform-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: 9999px;
+  animation: waveform-bar 0.8s ease-in-out infinite;
+}

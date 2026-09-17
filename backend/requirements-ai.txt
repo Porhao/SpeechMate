@@ -1,0 +1,28 @@
+# Heavy AI/ML packages — install separately (large downloads)
+# CPU-only inference. Install torch first from the CPU wheel index:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-ai.txt
+
+# Speech recognition — two engines, routed per-clip (see app/ai/speech/pipeline.py):
+#   faster-whisper: general/English path, and its own language guess is what
+#     decides whether a clip gets routed to the second engine below.
+#   transformers' Wav2Vec2ForCTC loading mesolitica/wav2vec2-xls-r-300m-mixed
+#     (the same checkpoint malaya_speech.stt.huggingface() wraps): Malay /
+#     code-switched path. No malaya-speech package or TensorFlow needed —
+#     that checkpoint ships native PyTorch weights, loaded straight through
+#     `transformers`, already required below.
+faster-whisper
+
+# Audio decoding/analysis
+librosa
+soundfile
+av              # container/codec decoding (webm/opus etc.) without a system ffmpeg binary
+numpy
+
+# NLP / pronunciation / emotion models
+transformers
+Pillow          # required by the HF image-classification pipeline (emotion.py)
+
+# Computer Vision
+opencv-python
+mediapipe       # face mesh (eye contact), pose (posture), face detection (emotion crop)

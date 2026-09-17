@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"c:\\\\Users\\\\porha\\\\OneDrive - Universiti Teknologi PETRONAS\\\\FYP\\\\04 Code\\\\backend\"; $job = Start-Job { cd \"c:\\\\Users\\\\porha\\\\OneDrive - Universiti Teknologi PETRONAS\\\\FYP\\\\04 Code\\\\backend\"; .\\\\.venv\\\\Scripts\\\\uvicorn app.main:app --host 0.0.0.0 --port 8000 2>&1 }; Start-Sleep -Seconds 5; $out = Receive-Job $job; $job | Stop-Job; $job | Remove-Job; $out)"
+    ]
+  }
+}
