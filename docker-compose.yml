@@ -26,11 +26,29 @@ services:
       - backend
     restart: unless-stopped
 
-  db-visualizer:
-    image: ghcr.io/coleifer/sqlite-web:latest
+
+
+  minio:
+    image: quay.io/minio/minio:latest
     ports:
-      - "8080:8080"
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     volumes:
-      - ./backend:/data
-    command: speechmate.db
+      - ./data/minio:/data
+    command: server /data --console-address ":9001"
     restart: unless-stopped
+
+  minio-setup:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/speechmate || true;
+      /usr/bin/mc anonymous set public myminio/speechmate || true;
+      "
