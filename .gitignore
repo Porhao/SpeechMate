@@ -1,0 +1,126 @@
+# =========================================================================
+# General / OS
+# =========================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# =========================================================================
+# IDEs and Editors
+# =========================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+.history/
+.claude/
+
+# =========================================================================
+# Python / FastAPI Backend
+# =========================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+celerybeat-schedule
+celerybeat.pid
+speechmate.db
+speechmate.db-journal
+*.db
+*.sqlite
+*.sqlite3
+storage/
+
+# =========================================================================
+# Node.js / Next.js Frontend
+# =========================================================================
+node_modules/
+.pnp/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+coverage/
+.next/
+out/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# =========================================================================
+# Environment Variables / Secrets
+# =========================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# =========================================================================
+# Logs
+# =========================================================================
+*.log
