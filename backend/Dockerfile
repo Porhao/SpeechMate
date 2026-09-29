@@ -1,27 +1,37 @@
-FROM python:3.13-slim
+FROM python:3.12-slim
+
+# LibreOffice + poppler: .pptx → PDF → PNG slide rendering
+# ffmpeg: audio normalization, silence detection, video assembly
+# espeak-ng: offline TTS fallback when no AI voice provider is configured
+# fonts: metric-compatible substitutes for Calibri/Cambria/Arial so decks render faithfully
+# libgl1 / libglib2.0-0: runtime libraries MediaPipe/OpenCV need (only used with INSTALL_ML)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-impress \
+    poppler-utils \
+    ffmpeg \
+    espeak-ng \
+    fonts-dejavu \
+    fonts-liberation \
+    fonts-crosextra-carlito \
+    fonts-crosextra-caladea \
+    libgl1 \
+    libglib2.0-0 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install system dependencies required for OpenCV, audio processing, etc.
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    libsndfile1 \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt requirements-ml.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY requirements-core.txt .
-COPY requirements-ai.txt .
-
-# Install PyTorch CPU first as specified in requirements-ai.txt
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -r requirements-core.txt
-RUN pip install --no-cache-dir -r requirements-ai.txt
+# Local models for live-session analysis (faster-whisper, Wav2Vec2, MediaPipe…).
+# Adds ~2 GB; build with --build-arg INSTALL_ML=false for a slim image.
+ARG INSTALL_ML=true
+RUN if [ "$INSTALL_ML" = "true" ]; then pip install --no-cache-dir -r requirements-ml.txt; fi
 
 COPY . .
 
-ENV PYTHONPATH=/app
+RUN mkdir -p /app/storage
 
 EXPOSE 8000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

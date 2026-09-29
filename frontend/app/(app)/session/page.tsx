@@ -10,10 +10,7 @@ import {
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
 import { cn } from "@/lib/utils";
-import { practiceService } from "@/services/practice";
-import { speechService } from "@/services/speech";
-import { visionService } from "@/services/vision";
-import { analysisService } from "@/services/analysis";
+import { liveService, conversationService } from "@/services/live";
 import type { SessionType, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -587,10 +584,13 @@ function SessionContent() {
   const router       = useRouter();
   const mode         = (searchParams.get("mode") ?? "Conversation") as string;
 
-  const { isRecording, isCameraOn, duration, setRecording, setCameraOn, incrementDuration, resetDuration } = useSessionStore();
+  const {
+    isRecording, isCameraOn, duration, setRecording, setCameraOn, incrementDuration, resetDuration,
+    startSession: startLiveSession,
+  } = useSessionStore();
   const {
     liveFeedback, updateLiveFeedback, transcript, appendTranscript, reset,
-    setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setGazeTunneling,
+    setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setGazeTunneling, setAnalysisError,
   } = useFeedbackStore();
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -739,12 +739,7 @@ function SessionContent() {
         setTimeout(() => startSpeechRef.current(), 350);
     };
 
-    fetch("/api/v1/tts/speak", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, 2000), voice: "nova" }),
-    })
-      .then((r) => { if (!r.ok) throw new Error(`TTS ${r.status}`); return r.blob(); })
+    conversationService.speak(text.slice(0, 2000))
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
@@ -774,23 +769,16 @@ function SessionContent() {
 
     // Build conversation history for the API (last 12 msgs + the new user msg)
     const history = [...messagesRef.current, userMsg].slice(-12).map((m) => ({
-      role: m.role === "ai" ? "assistant" : "user",
+      role: (m.role === "ai" ? "assistant" : "user") as "assistant" | "user",
       content: m.text,
     }));
 
     try {
-      const res = await fetch("/api/v1/chat/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: history,
-          mode: modeRef.current,
-          topic: modeRef.current === "Conversation" ? currentTopicRef.current : undefined,
-        }),
-      });
-
-      if (!res.ok) throw new Error(`Chat API ${res.status}`);
-      const { reply } = await res.json() as { reply: string };
+      const { reply } = await conversationService.partnerReply(
+        history,
+        modeRef.current,
+        modeRef.current === "Conversation" ? currentTopicRef.current : undefined,
+      );
 
       setAiTyping(false);
       setMessages((p) => [...p, { role: "ai", text: reply, ts: Date.now() }]);
@@ -848,10 +836,7 @@ function SessionContent() {
   const prefetchBackchannels = useCallback(async () => {
     const urls = await Promise.all(
       BACKCHANNEL_TEXTS.map((text) =>
-        fetch("/api/v1/tts/speak", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice: "nova" }),
-        }).then((r) => r.ok ? r.blob() : null).then((b) => b ? URL.createObjectURL(b) : null).catch(() => null),
+        conversationService.speak(text).then((b) => URL.createObjectURL(b)).catch(() => null),
       ),
     );
     backchannelUrlsRef.current = urls.filter(Boolean) as string[];
@@ -1199,11 +1184,14 @@ function SessionContent() {
     setSessionStarted(true); setRecording(true); setFillerCount(0); setWpm(0);
     resetDuration(); reset();
 
+    // A backend live session (for recording + analysis) needs sign-in; without
+    // it the session still runs, and /assessment shows the client-side results.
     const [backendSession] = await Promise.all([
-      practiceService.startSession(mode as SessionType).catch(() => null),
+      liveService.start(mode as SessionType).catch(() => null),
       startCamera(),
     ]);
     backendSessionIdRef.current = backendSession?.id ?? null;
+    if (backendSession) startLiveSession(backendSession, mode as SessionType);
 
     prefetchBackchannels();
     timerRef.current = setInterval(() => incrementDuration(), 1000);
@@ -1246,14 +1234,10 @@ function SessionContent() {
     const sessionId = backendSessionIdRef.current;
     if (sessionId) {
       try {
-        if (recordedBlob) {
-          await Promise.all([
-            speechService.uploadAudio(sessionId, recordedBlob),
-            visionService.uploadVideo(sessionId, recordedBlob),
-          ]);
-        }
-        await practiceService.endSession(sessionId, duration);
-        const result = await analysisService.run(sessionId);
+        await liveService.end(sessionId, duration);
+        if (!recordedBlob) throw new Error("No recording to analyse");
+        await liveService.uploadRecording(sessionId, recordedBlob);
+        const result = await liveService.analyze(sessionId);
         setFullAnalysis(result);
 
         setSpeechAnalysis({
@@ -1274,24 +1258,29 @@ function SessionContent() {
         setAIFeedback({
           id: "", session_id: sessionId,
           summary:
-            `Overall score: ${result.communication_score.overall_score}% (${result.communication_score.grade}). ` +
+            (result.communication_score.overall_score != null
+              ? `Overall score: ${result.communication_score.overall_score}% (${result.communication_score.grade}). `
+              : "Not enough signals were measured for an overall score. ") +
             `Strengths: ${result.communication_score.strengths.join(", ") || "Keep practicing!"}. ` +
             `Focus areas: ${result.communication_score.improvement_areas.join(", ") || "None identified"}.`,
           recommendations: result.recommendations.exercises.map((e) => e.title),
           created_at: new Date().toISOString(),
         });
+        // Unmeasured scores stay 0, which /assessment treats as "no data"
         updateLiveFeedback({
-          fluency: result.speech.fluency_score,
-          pronunciation: result.speech.pronunciation_score,
-          eye_contact: result.vision.eye_contact_score,
-          confidence: result.vision.confidence_score,
-          speaking_pace: result.speech.speaking_rate,
-          posture: result.vision.posture_score,
+          fluency: result.speech.fluency_score ?? 0,
+          pronunciation: result.speech.pronunciation_score ?? 0,
+          eye_contact: result.vision.eye_contact_score ?? 0,
+          confidence: result.vision.confidence_score ?? 0,
+          speaking_pace: result.speech.speaking_rate ?? 0,
+          posture: result.vision.posture_score ?? 0,
         });
-      } catch {
-        // Real analysis failed (e.g. backend unreachable) — /assessment falls
-        // back to its existing mock data, so the page stays usable.
+      } catch (e) {
+        // /assessment shows this and falls back to sample data for the scores
+        setAnalysisError(e instanceof Error ? e.message : "Analysis failed");
       }
+    } else {
+      setAnalysisError("Sign in to have your session recorded and analysed.");
     }
 
     // Client-side only — doesn't depend on the backend call above, so it's
@@ -1301,7 +1290,7 @@ function SessionContent() {
     router.push("/assessment");
   }, [
     stopSpeech, stopRecording, stopCamera, setRecording, router, duration,
-    setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setGazeTunneling, updateLiveFeedback,
+    setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setAnalysisError, setGazeTunneling, updateLiveFeedback,
   ]);
 
   // ── Silence detection ─────────────────────────────────────────────────────

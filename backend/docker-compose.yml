@@ -1,0 +1,48 @@
+# Backend + Postgres only (for backend development). The full app: ../start.sh
+name: speechmate-backend
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: speechmate
+      POSTGRES_PASSWORD: speechmate_password
+      POSTGRES_DB: speechmate_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U speechmate -d speechmate_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      args:
+        # Local models for live-session analysis (~2 GB); INSTALL_ML=false for a slim image
+        INSTALL_ML: ${INSTALL_ML:-true}
+    # Migrations run on every start (no-op when already up to date)
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - .:/app
+      - storage_data:/app/storage
+    ports:
+      - "8000:8000"
+    environment:
+      # These override .env so the container always talks to the compose database
+      - DATABASE_URL=postgresql+asyncpg://speechmate:speechmate_password@db/speechmate_db
+      - STORAGE_BASE_PATH=/app/storage
+      - DEBUG=true
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  storage_data:

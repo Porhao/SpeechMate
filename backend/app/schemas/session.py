@@ -1,49 +1,51 @@
-from pydantic import BaseModel
+"""Pydantic schemas for session request/response payloads."""
+
+import uuid
 from datetime import datetime
-from typing import Any
+
+from pydantic import BaseModel, ConfigDict
 
 
-class StartSessionRequest(BaseModel):
-    session_type: str
+# --- Responses ---
 
 
-class EndSessionRequest(BaseModel):
-    session_id: str
-    duration: int
+class SlidesProgress(BaseModel):
+    """Fine-grained slide processing progress."""
+    rendered: int = 0
+    scripted: int = 0
+    synthesized: int = 0
+    total: int = 0
 
 
-class SessionResponse(BaseModel):
-    id: str
-    user_id: str
-    session_type: str
-    duration: int
+class SessionCreateResponse(BaseModel):
+    """Response after creating a new session."""
+    session_id: uuid.UUID
+    status: str
+
+
+class SessionStatusResponse(BaseModel):
+    """Response for polling session status."""
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: uuid.UUID
+    status: str
+    slide_count: int | None = None
+    slides_progress: SlidesProgress | None = None
+    error_detail: str | None = None
+    warnings: list[str] = []
+    video_ready: bool = False
+    voice_cloning_used: bool | None = None
+    original_filename: str
     created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class SpeechAnalysisResponse(BaseModel):
-    fluency_score: float
-    pronunciation_score: float
-    stuttering_score: float
-    speaking_rate: float
-    filler_word_count: int
+    updated_at: datetime
 
 
-class VisionAnalysisResponse(BaseModel):
-    eye_contact: float
-    confidence: float
-    posture: float
+class SessionListItem(BaseModel):
+    """Compact session info for listing."""
+    model_config = ConfigDict(from_attributes=True)
 
-
-class AnalyzeRequest(BaseModel):
-    session_id: str
-
-
-class ChatRequest(BaseModel):
-    question: str
-    history: list[dict[str, str]] = []
-
-
-class ChatResponse(BaseModel):
-    answer: str
+    session_id: uuid.UUID
+    original_filename: str
+    status: str
+    slide_count: int | None = None
+    created_at: datetime

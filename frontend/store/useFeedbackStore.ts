@@ -14,12 +14,15 @@ interface FeedbackState {
   // Computed client-side at session end from the live gaze + disfluency
   // samples collected during the session — see computeGazeTunneling.
   gazeTunneling: GazeTunnelingResult | null;
+  // Why the backend analysis didn't produce a result (not signed in, failed…)
+  analysisError: string | null;
   updateLiveFeedback: (data: Partial<LiveFeedback>) => void;
   setSpeechAnalysis: (data: SpeechAnalysis) => void;
   setVisionAnalysis: (data: VisionAnalysis) => void;
   setAIFeedback: (data: AIFeedback) => void;
   setFullAnalysis: (data: FullAnalysisResult) => void;
   setGazeTunneling: (data: GazeTunnelingResult) => void;
+  setAnalysisError: (message: string | null) => void;
   appendTranscript: (text: string) => void;
   reset: () => void;
 }
@@ -41,6 +44,7 @@ export const useFeedbackStore = create<FeedbackState>((set) => ({
   transcript: "",
   fullAnalysis: null,
   gazeTunneling: null,
+  analysisError: null,
 
   updateLiveFeedback: (data) =>
     set((s) => ({ liveFeedback: { ...s.liveFeedback, ...data } })),
@@ -49,11 +53,12 @@ export const useFeedbackStore = create<FeedbackState>((set) => ({
   setAIFeedback: (data) => set({ aiFeedback: data }),
   setFullAnalysis: (data) => set({ fullAnalysis: data }),
   setGazeTunneling: (data) => set({ gazeTunneling: data }),
+  setAnalysisError: (message) => set({ analysisError: message }),
   appendTranscript: (text) =>
     set((s) => ({ transcript: s.transcript + (s.transcript ? " " : "") + text })),
   reset: () =>
     set({
       liveFeedback: defaultLive, speechAnalysis: null, visionAnalysis: null,
-      aiFeedback: null, transcript: "", fullAnalysis: null, gazeTunneling: null,
+      aiFeedback: null, transcript: "", fullAnalysis: null, gazeTunneling: null, analysisError: null,
     }),
 }));

@@ -1,35 +1,36 @@
+"""SQLAlchemy ORM model for user accounts (with their coaching profile)."""
+
 import uuid
-from datetime import datetime
-from sqlalchemy import String, DateTime, JSON, ForeignKey
+from datetime import datetime, timezone
+
+from sqlalchemy import DateTime, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database.base import Base
+
+from app.database import Base
+from app.models.session import JSONType
 
 
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    full_name: Mapped[str] = mapped_column(String(255))
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(50), default="user")
-    language: Mapped[str] = mapped_column(String(50), default="en")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
+    language: Mapped[str] = mapped_column(String(50), nullable=False, default="en")
 
-    profile: Mapped["UserProfile"] = relationship(back_populates="user", uselist=False)
-    sessions: Mapped[list["PracticeSession"]] = relationship(back_populates="user")
-    progress: Mapped[list["ProgressHistory"]] = relationship(back_populates="user")
-    reports: Mapped[list["Report"]] = relationship(back_populates="user")
+    # Coaching profile (set at registration / onboarding, editable on the profile page)
+    age_group: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    communication_goal: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    skill_level: Mapped[str] = mapped_column(String(50), nullable=False, default="Beginner")
+    challenges: Mapped[list | None] = mapped_column(JSONType, nullable=True)
 
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
 
-class UserProfile(Base):
-    __tablename__ = "user_profiles"
-
-    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), index=True)
-    age_group: Mapped[str] = mapped_column(String(50), nullable=True)
-    communication_goal: Mapped[str] = mapped_column(String(100), nullable=True)
-    skill_level: Mapped[str] = mapped_column(String(50), default="Beginner")
-    challenges: Mapped[dict] = mapped_column(JSON, default=list)
-
-    user: Mapped["User"] = relationship(back_populates="profile")
+    live_sessions: Mapped[list["LiveSession"]] = relationship(  # noqa: F821
+        back_populates="user", cascade="all, delete-orphan"
+    )

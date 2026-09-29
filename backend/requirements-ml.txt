@@ -1,0 +1,23 @@
+# Optional local models for live-session analysis. Without these the backend
+# still runs: speech recognition falls back to the OpenAI API, and the metrics
+# that need a model (pronunciation, eye contact, posture, emotion) are reported
+# as unavailable with a warning. Model weights download on first use (~2 GB).
+#
+#   pip install -r requirements-ml.txt      (Docker: build with INSTALL_ML=true)
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# CPU-only PyTorch, for Wav2Vec2 pronunciation / code-switching ASR / the ViT emotion model
+torch==2.4.1
+transformers==4.44.2
+
+# ASR: faster-whisper (English path + language-ID routing signal).
+# The Malay / code-switched path loads mesolitica/wav2vec2-xls-r-300m-mixed through transformers.
+faster-whisper==1.0.3
+
+# Audio features (stuttering prolongation detection)
+librosa==0.10.2.post1
+numpy<2
+
+# Vision: MediaPipe face mesh (eye contact), pose (posture), face detection (emotion crop)
+mediapipe==0.10.14
+opencv-contrib-python-headless==4.10.0.84

@@ -1,0 +1,241 @@
+"""Session endpoints (Ideal Presentation Agent) — upload, status polling, artifacts."""
+
+import logging
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
+from app.models.slide import Slide
+from app.schemas.session import (
+    SessionCreateResponse,
+    SessionListItem,
+    SessionStatusResponse,
+    SlidesProgress,
+)
+from app.schemas.slide import SlideScript, SlideScriptsResponse
+from app.services import tasks
+from app.services.media import SLIDE_GAP_SEC
+from app.services.pipeline import run_ideal_presentation_pipeline
+from app.services.storage import storage_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm", ".ogg", ".oga", ".flac", ".aac", ".mp4", ".mov"}
+
+
+def audio_extension(filename: str | None) -> str:
+    ext = Path(filename or "").suffix.lower()
+    if ext not in AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio format '{ext or '?'}'. Use one of: {', '.join(sorted(AUDIO_EXTENSIONS))}",
+        )
+    return ext
+
+
+async def get_session_or_404(db: AsyncSession, session_id: uuid.UUID) -> Session:
+    session = (await db.execute(select(Session).where(Session.id == session_id))).scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+
+async def get_slides(db: AsyncSession, session_id: uuid.UUID) -> list[Slide]:
+    result = await db.execute(
+        select(Slide).where(Slide.session_id == session_id).order_by(Slide.slide_index)
+    )
+    return list(result.scalars())
+
+
+@router.post("", response_model=SessionCreateResponse, status_code=201)
+async def create_session(
+    pptx: UploadFile = File(..., description="PowerPoint .pptx file"),
+    voice_sample: UploadFile | None = File(None, description="Voice sample for cloning (optional)"),
+    requirement_prompt: str | None = Form(None, description="Audience/purpose context (optional)"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Create a new presentation session and start the Ideal Presentation Agent.
+
+    Returns immediately with `queued`; poll `GET /api/sessions/{id}` for progress.
+    """
+    if not pptx.filename or not pptx.filename.lower().endswith(".pptx"):
+        raise HTTPException(status_code=400, detail="File must be a .pptx PowerPoint file")
+
+    voice_ext = None
+    if voice_sample and voice_sample.filename:
+        voice_ext = audio_extension(voice_sample.filename)
+
+    session_id = uuid.uuid4()
+    pptx_path = await storage_service.save_upload(str(session_id), "original.pptx", await pptx.read())
+
+    voice_path = None
+    if voice_ext:
+        # Keep the real extension; the pipeline converts it to WAV
+        voice_path = await storage_service.save_upload(
+            str(session_id), f"voice_sample_upload{voice_ext}", await voice_sample.read()
+        )
+
+    session = Session(
+        id=session_id,
+        original_filename=pptx.filename,
+        pptx_storage_path=pptx_path,
+        voice_sample_storage_path=voice_path,
+        requirement_prompt=(requirement_prompt or "").strip() or None,
+        status="queued",
+    )
+    db.add(session)
+    await db.commit()  # must be committed before the background job reads it
+
+    tasks.spawn(run_ideal_presentation_pipeline(session_id), name=f"ideal-{session_id}")
+    logger.info("Session %s created for '%s'", session_id, pptx.filename)
+    return SessionCreateResponse(session_id=session_id, status="queued")
+
+
+@router.get("", response_model=list[SessionListItem])
+async def list_sessions(db: AsyncSession = Depends(get_db)):
+    """List all sessions, most recent first."""
+    result = await db.execute(select(Session).order_by(Session.created_at.desc()))
+    return [
+        SessionListItem(
+            session_id=s.id,
+            original_filename=s.original_filename,
+            status=s.status,
+            slide_count=s.slide_count,
+            created_at=s.created_at,
+        )
+        for s in result.scalars()
+    ]
+
+
+@router.get("/{session_id}", response_model=SessionStatusResponse)
+async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Poll session status and per-slide progress."""
+    session = await get_session_or_404(db, session_id)
+
+    slides_progress = None
+    if session.slide_count:
+        slides = await get_slides(db, session_id)
+        statuses = [s.status for s in slides]
+        slides_progress = SlidesProgress(
+            rendered=sum(st in ("rendered", "scripted", "synthesized") for st in statuses),
+            scripted=sum(st in ("scripted", "synthesized") for st in statuses),
+            synthesized=sum(st == "synthesized" for st in statuses),
+            total=session.slide_count,
+        )
+
+    return SessionStatusResponse(
+        session_id=session.id,
+        status=session.status,
+        slide_count=session.slide_count,
+        slides_progress=slides_progress,
+        error_detail=session.error_detail,
+        warnings=session.warnings or [],
+        video_ready=session.status == "complete" and bool(session.video_storage_path),
+        voice_cloning_used=session.voice_cloning_used,
+        original_filename=session.original_filename,
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+    )
+
+
+@router.post("/{session_id}/retry", response_model=SessionCreateResponse, status_code=202)
+async def retry_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Re-run the Ideal Presentation Agent for a failed (or completed) session."""
+    session = await get_session_or_404(db, session_id)
+    if session.status in SESSION_IN_PROGRESS_STATUSES:
+        raise HTTPException(status_code=409, detail=f"Session is still running ({session.status})")
+    session.status = "queued"
+    session.error_detail = None
+    await db.commit()
+    tasks.spawn(run_ideal_presentation_pipeline(session_id), name=f"ideal-retry-{session_id}")
+    return SessionCreateResponse(session_id=session_id, status="queued")
+
+
+@router.delete("/{session_id}", status_code=204)
+async def delete_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Delete a session, its practice runs and all stored files."""
+    session = await get_session_or_404(db, session_id)
+    if session.status in SESSION_IN_PROGRESS_STATUSES:
+        raise HTTPException(status_code=409, detail="Wait for the pipeline to finish before deleting")
+    await db.delete(session)
+    await db.commit()
+    storage_service.delete_session(str(session_id))
+
+
+@router.get("/{session_id}/scripts", response_model=SlideScriptsResponse)
+async def get_session_scripts(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Per-slide narration scripts, with each slide's start time in the ideal video."""
+    await get_session_or_404(db, session_id)
+    slides = await get_slides(db, session_id)
+
+    out, cursor = [], 0.0
+    for s in slides:
+        duration = s.audio_duration_sec + SLIDE_GAP_SEC if s.audio_duration_sec else None
+        out.append(SlideScript(
+            slide_index=s.slide_index,
+            script_text=s.script_text,
+            word_count=s.script_word_count,
+            script_source=s.script_source,
+            audio_source=s.audio_source,
+            start_sec=round(cursor, 3) if duration else None,
+            duration_sec=round(duration, 3) if duration else None,
+            status=s.status,
+        ))
+        cursor += duration or 0.0
+    return SlideScriptsResponse(slides=out)
+
+
+@router.get("/{session_id}/video")
+async def get_session_video(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """The final narrated ideal-presentation video (MP4)."""
+    session = await get_session_or_404(db, session_id)
+    if session.status != "complete" or not session.video_storage_path:
+        raise HTTPException(status_code=409, detail=f"Video not ready (status: {session.status})")
+
+    video_path = storage_service.get_absolute_path(session.video_storage_path)
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="Video file not found on disk")
+    return FileResponse(
+        path=str(video_path),
+        media_type="video/mp4",
+        filename=f"{session.original_filename.rsplit('.', 1)[0]}_ideal.mp4",
+        content_disposition_type="inline",
+    )
+
+
+async def _slide_or_404(db: AsyncSession, session_id: uuid.UUID, slide_index: int) -> Slide:
+    slide = (await db.execute(
+        select(Slide).where(Slide.session_id == session_id, Slide.slide_index == slide_index)
+    )).scalar_one_or_none()
+    if not slide:
+        raise HTTPException(status_code=404, detail="Slide not found")
+    return slide
+
+
+@router.get("/{session_id}/slides/{slide_index}/image")
+async def get_slide_image(session_id: uuid.UUID, slide_index: int, db: AsyncSession = Depends(get_db)):
+    """A slide's rendered PNG."""
+    slide = await _slide_or_404(db, session_id, slide_index)
+    path = storage_service.get_absolute_path(slide.png_storage_path) if slide.png_storage_path else None
+    if not path or not path.exists():
+        raise HTTPException(status_code=404, detail="Slide image not available")
+    return FileResponse(path=str(path), media_type="image/png")
+
+
+@router.get("/{session_id}/slides/{slide_index}/audio")
+async def get_slide_audio(session_id: uuid.UUID, slide_index: int, db: AsyncSession = Depends(get_db)):
+    """A slide's ideal narration audio (WAV) — handy for per-slide practice."""
+    slide = await _slide_or_404(db, session_id, slide_index)
+    path = storage_service.get_absolute_path(slide.audio_storage_path) if slide.audio_storage_path else None
+    if not path or not path.exists():
+        raise HTTPException(status_code=404, detail="Slide audio not available")
+    return FileResponse(path=str(path), media_type="audio/wav")

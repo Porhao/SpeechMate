@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Bell, Zap, Settings, FileText, Menu, X, User } from "lucide-react";
+import { Bell, Zap, Settings, FileText, Menu, X, User, Presentation } from "lucide-react";
 
 // The bottom liquid bar already covers Home / Practice / Analytics /
 // Progress / Coach at every screen size — this "More" menu is only the
 // pages that don't fit in its five tabs.
 const MORE_LINKS = [
+  { href: "/presentations", label: "Presentations", icon: Presentation },
   { href: "/reports",    label: "Reports",   icon: FileText },
   { href: "/settings",   label: "Settings",  icon: Settings },
 ];

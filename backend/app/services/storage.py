@@ -1,50 +1,69 @@
+"""Local file storage service.
+
+Abstracts file I/O so we can swap to S3/Supabase Storage later
+without changing callers.
 """
-Local Disk Storage — session media
-Saves the browser-recorded webm (audio+video together) per session and
-resolves it back for analysis. Swap for a MinIO/S3-backed implementation
-in production; the interface (save_upload / get_media_path) stays the same.
-"""
+
+import shutil
 from pathlib import Path
-from fastapi import UploadFile
 
-STORAGE_ROOT = Path(__file__).resolve().parent.parent.parent / "storage"
-RECORDINGS_DIR = STORAGE_ROOT / "recordings"
+import aiofiles
 
-
-def _ensure_dir() -> None:
-    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
+from app.config import settings
 
 
-def _extension_for(filename: str | None) -> str:
-    if filename and "." in filename:
-        return filename.rsplit(".", 1)[-1].lower()
-    return "webm"
+class StorageService:
+    """Manages file storage for session assets (uploads, PNGs, audio, video)."""
+
+    def __init__(self, base_path: str | None = None):
+        self.base_path = Path(base_path or settings.storage_base_path).resolve()
+
+    def practice_dir(self, session_id: str, practice_id: str) -> Path:
+        path = self._session_dir(session_id) / "practice" / practice_id
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _session_dir(self, session_id: str) -> Path:
+        return self.base_path / session_id
+
+    def ensure_session_dirs(self, session_id: str) -> dict[str, Path]:
+        """Create the per-session directory structure and return paths."""
+        session_dir = self._session_dir(session_id)
+        dirs = {
+            "root": session_dir,
+            "slides": session_dir / "slides",
+            "scripts": session_dir / "scripts",
+            "audio": session_dir / "audio",
+            "practice": session_dir / "practice",
+        }
+        for d in dirs.values():
+            d.mkdir(parents=True, exist_ok=True)
+        return dirs
+
+    async def save_upload(
+        self, session_id: str, filename: str, content: bytes
+    ) -> str:
+        """Save an uploaded file and return its storage path relative to base."""
+        file_path = self._session_dir(session_id) / filename
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
+        return self.relative(file_path)
+
+    def relative(self, path: Path) -> str:
+        """Convert an absolute path under the storage root to a storage-relative path."""
+        return path.relative_to(self.base_path).as_posix()
+
+    def get_absolute_path(self, relative_path: str) -> Path:
+        """Convert a storage-relative path to an absolute path."""
+        return self.base_path / relative_path
+
+    def delete_session(self, session_id: str) -> None:
+        """Remove all stored files for a session."""
+        session_dir = self._session_dir(session_id)
+        if session_dir.exists():
+            shutil.rmtree(session_dir)
 
 
-async def save_upload(session_id: str, file: UploadFile) -> Path:
-    """
-    Save an uploaded recording for a session, overwriting any previous
-    upload for the same session_id (audio and video uploads both land on
-    the same file — a session's recording is a single webm blob containing
-    both tracks).
-    """
-    _ensure_dir()
-    ext = _extension_for(file.filename)
-    dest = RECORDINGS_DIR / f"{session_id}.{ext}"
-
-    # Clear any prior recording under a different extension for this session
-    for existing in RECORDINGS_DIR.glob(f"{session_id}.*"):
-        if existing != dest:
-            existing.unlink(missing_ok=True)
-
-    contents = await file.read()
-    dest.write_bytes(contents)
-    return dest
-
-
-def get_media_path(session_id: str) -> Path | None:
-    """Resolve the saved recording for a session, if any."""
-    if not RECORDINGS_DIR.exists():
-        return None
-    matches = list(RECORDINGS_DIR.glob(f"{session_id}.*"))
-    return matches[0] if matches else None
+# Module-level singleton
+storage_service = StorageService()

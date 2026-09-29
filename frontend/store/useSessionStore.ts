@@ -1,13 +1,13 @@
 import { create } from "zustand";
-import type { PracticeSession, SessionType } from "@/types";
+import type { LiveSession, SessionType } from "@/types";
 
 interface SessionState {
-  activeSession: PracticeSession | null;
+  activeSession: LiveSession | null;
   sessionType: SessionType | null;
   isRecording: boolean;
   isCameraOn: boolean;
   duration: number;
-  startSession: (session: PracticeSession, type: SessionType) => void;
+  startSession: (session: LiveSession, type: SessionType) => void;
   endSession: () => void;
   setRecording: (v: boolean) => void;
   setCameraOn: (v: boolean) => void;

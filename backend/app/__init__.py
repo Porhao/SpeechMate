@@ -1,1 +1,1 @@
-﻿
+# SpeechMate Backend

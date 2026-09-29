@@ -4,7 +4,20 @@ export interface User {
   email: string;
   role: string;
   language: string;
+  age_group: string | null;
+  communication_goal: string | null;
+  skill_level: string;
+  challenges: string[];
   created_at: string;
+}
+
+export interface UserProfileUpdate {
+  full_name?: string;
+  language?: string;
+  age_group?: string;
+  communication_goal?: string;
+  skill_level?: string;
+  challenges?: string[];
 }
 
 export interface UserProfile {
@@ -18,31 +31,38 @@ export interface UserProfile {
 
 export type SessionType = "Conversation" | "Interview" | "Presentation" | "Pronunciation";
 
-export interface PracticeSession {
+// A live practice session (camera + mic with the AI partner) — GET /api/live/{id}
+export interface LiveSession {
   id: string;
-  user_id: string;
   session_type: SessionType;
-  duration: number;
+  duration_sec: number;
+  status: "active" | "analyzing" | "complete" | "failed";
+  has_recording: boolean;
+  error_detail: string | null;
+  warnings: string[];
+  analysis: FullAnalysisResult | null;
   created_at: string;
 }
 
+// Scores are null when the model that measures them wasn't available
+// (see FullAnalysisResult.warnings) — the backend never invents a number.
 export interface SpeechAnalysis {
   id: string;
   session_id: string;
-  fluency_score: number;
-  pronunciation_score: number;
-  speaking_rate: number;
-  filler_word_count: number;
-  stuttering_score: number;
+  fluency_score: number | null;
+  pronunciation_score: number | null;
+  speaking_rate: number | null;
+  filler_word_count: number | null;
+  stuttering_score: number | null;
 }
 
 export interface VisionAnalysis {
   id: string;
   session_id: string;
-  eye_contact_score: number;
-  confidence_score: number;
-  posture_score: number;
-  emotion_label: string;
+  eye_contact_score: number | null;
+  confidence_score: number | null;
+  posture_score: number | null;
+  emotion_label: string | null;
 }
 
 export interface AIFeedback {
@@ -55,7 +75,7 @@ export interface AIFeedback {
 
 export interface ProgressRecord {
   id: string;
-  user_id: string;
+  live_session_id: string;
   metric_name: string;
   metric_value: number;
   recorded_at: string;
@@ -63,9 +83,10 @@ export interface ProgressRecord {
 
 export interface Report {
   id: string;
-  user_id: string;
-  report_url: string;
   report_type: string;
+  report_url: string;
+  content: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface LiveFeedback {
@@ -89,55 +110,61 @@ export interface AuthTokens {
   token_type: string;
 }
 
-// Response shape of POST /analysis/run — the full multimodal pipeline result
+// Result of the live-session analysis (GET /api/live/{id} → analysis).
+// Any score is null when the model that measures it isn't installed or the
+// signal was missing (no transcript, no face in frame) — `warnings` says which.
 export interface FullAnalysisResult {
   session_id: string;
-  transcript: string;
+  transcript: string | null;
+  duration_sec: number;
+  warnings?: string[];
   language: {
     primary_language: string;
     is_code_switching: boolean;
     accent_type: string;
     english_ratio: number;
     malay_ratio: number;
-    // Every flagged pronunciation deviation, pre-sorted into whether it's
-    // consistent Malaysian-English phonology (not an error) or something
-    // that would actually cost the speaker intelligibility. This is the
-    // accent-fair distinction — regional variation is never blended into
-    // the same "wrong" bucket as an error that would trip up a listener.
+    manglish_particles: string[];
+    detected_bm_words: string[];
+    // Pronunciation deviations sorted into consistent Malaysian-English
+    // phonology (regional, not an error) vs. ones that cost intelligibility.
+    // Not produced by the backend yet — the assessment page shows samples.
     pronunciation_flags?: {
       word: string;
       category: "regional" | "intelligibility";
       note: string;
     }[];
-  };
+  } | null;
   speech: {
-    fluency_score: number;
-    speaking_rate: number;
-    pronunciation_score: number;
-    stuttering_score: number;
-    stuttering_severity: string;
-    filler_count: number;
-    filler_per_minute: number;
-    top_filler: string;
-    pause_frequency: number;
-    fluency_grade: string;
+    fluency_score: number | null;
+    speaking_rate: number | null;
+    pronunciation_score: number | null;
+    stuttering_score: number | null;
+    stuttering_severity: string | null;
+    filler_count: number | null;
+    filler_per_minute: number | null;
+    top_filler: string | null;
+    pause_frequency: number | null;
+    fluency_grade: string | null;
   };
   vision: {
-    eye_contact_score: number;
-    posture_score: number;
-    dominant_emotion: string;
-    confidence_score: number;
-    confidence_label: string;
+    eye_contact_score: number | null;
+    posture_score: number | null;
+    dominant_emotion: string | null;
+    confidence_score: number | null;
+    confidence_label: string | null;
   };
   communication_score: {
-    overall_score: number;
-    grade: string;
+    overall_score: number | null;
+    grade: string | null;
     strengths: string[];
     improvement_areas: string[];
+    scored_on: string[];
   };
   recommendations: {
     weekly_focus: string;
     daily_target_minutes: number;
+    next_session_type: string;
     tips: string[];
     progress_forecast: string;
     exercises: {
@@ -149,6 +176,9 @@ export interface FullAnalysisResult {
       metric_target: string;
     }[];
   };
+  // Full per-model output (fluency, fillers, stuttering events, pronunciation
+  // word scores, eye contact, posture, emotion, confidence breakdown)
+  details: Record<string, unknown>;
 }
 
 // Gaze Tunneling — fuses two signals that every competitor (Elqo included)
@@ -171,4 +201,125 @@ export interface GazeTunnelingResult {
   coOccurrencePct: number;  // % of disfluency events that landed within one window of a gaze dip
   totalEvents: number;
   label: "Strong link" | "Some link" | "No clear link" | "Not enough data";
+}
+
+// ── Presentation coaching (PresentCoach) ──────────────────────────────────
+// Mirrors the Pydantic schemas in backend/app/schemas.
+
+export type DeckStatus =
+  | "queued"
+  | "processing_slides"
+  | "generating_scripts"
+  | "synthesizing_audio"
+  | "assembling_video"
+  | "complete"
+  | "failed";
+
+export interface DeckListItem {
+  session_id: string;
+  original_filename: string;
+  status: DeckStatus;
+  slide_count: number | null;
+  created_at: string;
+}
+
+export interface DeckStatusResponse {
+  session_id: string;
+  status: DeckStatus;
+  slide_count: number | null;
+  slides_progress: { rendered: number; scripted: number; synthesized: number; total: number } | null;
+  error_detail: string | null;
+  warnings: string[];
+  video_ready: boolean;
+  voice_cloning_used: boolean | null;
+  original_filename: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SlideScript {
+  slide_index: number;
+  script_text: string | null;
+  word_count: number | null;
+  script_source: "vlm" | "fallback" | null;
+  audio_source: "elevenlabs_clone" | "openai_tts" | "espeak" | "silence" | null;
+  start_sec: number | null;
+  duration_sec: number | null;
+  status: string;
+}
+
+export type PracticeStatus = "queued" | "transcribing" | "analyzing" | "complete" | "failed";
+export type RecordingGranularity = "whole_deck" | "per_slide";
+
+export interface PracticeMetrics {
+  duration_sec: number;
+  ideal_duration_sec: number | null;
+  duration_ratio: number | null;
+  pause_count: number;
+  total_pause_sec: number;
+  longest_pause_sec: number;
+  long_pauses: { at_sec: number; duration_sec: number }[];
+  ideal_wpm: number | null;
+  has_transcript: boolean;
+  // Only present when a transcript was produced
+  word_count?: number;
+  wpm?: number | null;
+  filler_word_count?: number;
+  filler_words?: Record<string, number>;
+  fillers_per_minute?: number | null;
+  script_coverage?: number | null;
+  missed_key_terms?: string[];
+}
+
+export interface OISObservation {
+  slide_index: number | null;
+  observation: string;
+  impact: string;
+  suggestion: string;
+}
+
+export interface CoachFeedback {
+  encouragement: string;
+  observations: OISObservation[];
+  source: "llm" | "rule_based" | string;
+}
+
+export interface AudienceFeedback {
+  audience_profile: string;
+  overall_impression?: string;
+  clarity_score: number;
+  engagement_score: number;
+  engaging_moments?: string[];
+  confusing_moments: string[];
+  key_takeaway: string;
+  questions_i_would_ask: string[];
+  source?: string;
+}
+
+export interface PracticeRun {
+  practice_id: string;
+  session_id: string;
+  status: PracticeStatus;
+  recording_granularity: RecordingGranularity;
+  slide_index: number | null;
+  error_detail: string | null;
+  warnings: string[];
+  transcript: string | null;
+  metrics: PracticeMetrics | null;
+  feedback: CoachFeedback | null;
+  audience_feedback: AudienceFeedback | null;
+  created_at: string;
+}
+
+export interface CoachChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string | null;
+}
+
+export interface BackendHealth {
+  status: string;
+  binaries: Record<string, boolean>;
+  local_ml: Record<string, boolean>;
+  providers: { openai: boolean; elevenlabs: boolean };
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Save, Check, Zap, Clock, Trophy, Target } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
+import { authService } from "@/services/auth";
 
 const LANGUAGE_OPTIONS = [
   { value: "English",         label: "English" },
@@ -52,8 +53,24 @@ export default function ProfilePage() {
   const toggleChallenge = (c: string) =>
     setChallenges((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
 
-  const handleSave = () => {
-    if (user) setUser({ ...user, full_name: name, language });
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaveError(null);
+    // Signed in: the backend is the source of truth (the AI coach reads it too)
+    if (authService.isSignedIn()) {
+      try {
+        const updated = await authService.updateProfile({
+          full_name: name, language, communication_goal: goal, skill_level: skill, challenges,
+        });
+        setUser(updated);
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : "Couldn't save your profile.");
+        return;
+      }
+    } else if (user) {
+      setUser({ ...user, full_name: name, language });
+    }
     if (profile) setProfile({ ...profile, communication_goal: goal, skill_level: skill as "Beginner" | "Intermediate" | "Advanced", challenges });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -255,7 +272,8 @@ export default function ProfilePage() {
           <div style={{ borderTop: "1px solid #F0EDE5" }} />
 
           {/* Save */}
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-3">
+            {saveError && <p className="text-sm" style={{ color: "#8C3B32" }}>{saveError}</p>}
             <button
               onClick={handleSave}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all press-effect"

@@ -1,58 +1,66 @@
-version: '3.8'
+# SpeechMate — full stack: Postgres + FastAPI backend + Next.js frontend.
+#   ./start.sh            (or: docker compose up --build -d)
+# Frontend: http://localhost:3000 · API: http://localhost:8000 (docs at /docs)
+name: speechmate
 
 services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: speechmate
+      POSTGRES_PASSWORD: speechmate_password
+      POSTGRES_DB: speechmate_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U speechmate -d speechmate_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
+      args:
+        # Local models for live-session analysis (~2 GB). INSTALL_ML=false ./start.sh for a slim image.
+        INSTALL_ML: ${INSTALL_ML:-true}
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # Always use the compose database and the persistent storage volume
+      - DATABASE_URL=postgresql+asyncpg://speechmate:speechmate_password@db/speechmate_db
+      - STORAGE_BASE_PATH=/app/storage
+      - CORS_ORIGINS=["http://localhost:3000"]
+      # Downloaded model weights (Whisper, Wav2Vec2, …) survive rebuilds
+      - HF_HOME=/models/huggingface
+      - XDG_CACHE_HOME=/models
+    volumes:
+      - storage_data:/app/storage
+      - model_cache:/models
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend/.env
-    environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./speechmate.db
-      - FRONTEND_URL=http://localhost:3000
-      - MINIO_ENDPOINT=minio:9000
-    volumes:
-      - ./backend/speechmate.db:/app/speechmate.db
     depends_on:
-      - minio
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
+      args:
+        # Baked into the browser bundle at build time
+        NEXT_PUBLIC_API_URL: http://localhost:8000/api
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
     depends_on:
       - backend
     restart: unless-stopped
 
-
-
-  minio:
-    image: quay.io/minio/minio:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - ./data/minio:/data
-    command: server /data --console-address ":9001"
-    restart: unless-stopped
-
-  minio-setup:
-    image: quay.io/minio/mc:latest
-    depends_on:
-      - minio
-    entrypoint: >
-      /bin/sh -c "
-      sleep 5;
-      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
-      /usr/bin/mc mb myminio/speechmate || true;
-      /usr/bin/mc anonymous set public myminio/speechmate || true;
-      "
+volumes:
+  postgres_data:
+  storage_data:
+  model_cache:

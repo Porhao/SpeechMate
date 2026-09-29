@@ -47,7 +47,7 @@ const MODES = [
   {
     id: "Presentation",
     title: "Presentation Practice",
-    description: "Deliver speeches, academic presentations, and pitches. Real-time analysis of your posture, eye contact, speaking pace, and slide timing.",
+    description: "Upload your slides and get an AI-narrated example presentation in your own voice. Then practise it and get Observation → Impact → Suggestion coaching plus a simulated audience's reaction.",
     icon: Presentation,
     color: "#8A5A22",
     dark: "#6B4419",
@@ -90,7 +90,9 @@ function gradeColor(score: number) {
 
 export default function PracticePage() {
   const router = useRouter();
-  const startSession = (mode: string) => router.push(`/session?mode=${encodeURIComponent(mode)}`);
+  // Presentation practice runs on the backend's upload → ideal video → coach flow.
+  const startSession = (mode: string) =>
+    router.push(mode === "Presentation" ? "/presentations" : `/session?mode=${encodeURIComponent(mode)}`);
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1320px] mx-auto space-y-8">

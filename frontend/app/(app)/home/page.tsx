@@ -182,7 +182,7 @@ export default function HomePage() {
       if (selecting) return;
       setSelecting(modeId);
       setTimeout(() => setPageOut(true), 260);
-      setTimeout(() => router.push(`/session?mode=${modeId}`), 540);
+      setTimeout(() => router.push(modeId === "Presentation" ? "/presentations" : `/session?mode=${modeId}`), 540);
     },
     [selecting, router],
   );

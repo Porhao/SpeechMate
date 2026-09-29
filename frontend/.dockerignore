@@ -1,0 +1,5 @@
+# Host builds must never overwrite the image's own (Alpine/musl) install
+node_modules
+.next
+.env*
+npm-debug.log*

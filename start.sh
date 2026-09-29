@@ -1,18 +1,20 @@
 #!/bin/bash
+# Build and start the full SpeechMate stack (Postgres, backend, frontend).
+set -e
+cd "$(dirname "$0")"
 
-# Ensure the backend database file exists to avoid docker creating a directory instead
-touch ./backend/speechmate.db
+if [ ! -f backend/.env ]; then
+  cp backend/.env.example backend/.env
+  echo "Created backend/.env from the example — add your API keys there (all optional)."
+fi
 
-echo "Starting SpeechMate via Docker Compose..."
-echo "This will build and start both the Next.js frontend and FastAPI backend."
-echo ""
-
+echo "Starting SpeechMate via Docker Compose…"
 docker compose up --build -d
 
 echo ""
 echo "🚀 Services are starting in the background!"
-echo "• Frontend will be available at: http://localhost:3000"
-echo "• Backend API will be available at: http://localhost:8000"
+echo "• Frontend:    http://localhost:3000"
+echo "• Backend API: http://localhost:8000  (interactive docs: http://localhost:8000/docs)"
+echo "• Health:      http://localhost:8000/health  (shows which AI models/providers are active)"
 echo ""
-echo "To view logs, run: docker compose logs -f"
-echo "To stop services, run: docker compose down"
+echo "Logs: docker compose logs -f     Stop: docker compose down"

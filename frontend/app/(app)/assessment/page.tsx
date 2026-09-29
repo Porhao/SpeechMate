@@ -46,7 +46,7 @@ import { useFeedbackStore } from "@/store/useFeedbackStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import type { FullAnalysisResult, GazeTunnelingResult } from "@/types";
 
-type PronunciationFlag = NonNullable<FullAnalysisResult["language"]["pronunciation_flags"]>[number];
+type PronunciationFlag = NonNullable<NonNullable<FullAnalysisResult["language"]>["pronunciation_flags"]>[number];
 
 function gradeColor(s: number) {
   if (s >= 90) return "#3F6B4C";
@@ -196,7 +196,7 @@ const FALLBACK_GAZE_TUNNELING: GazeTunnelingResult = {
 
 export default function AssessmentPage() {
   const router = useRouter();
-  const { liveFeedback, aiFeedback, fullAnalysis, gazeTunneling } = useFeedbackStore();
+  const { liveFeedback, aiFeedback, fullAnalysis, gazeTunneling, analysisError } = useFeedbackStore();
   const { sessionType, duration } = useSessionStore();
   const [mounted, setMounted] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
@@ -286,6 +286,21 @@ export default function AssessmentPage() {
           </button>
         </div>
       </div>
+
+      {/* Why some (or all) numbers below are samples rather than measurements */}
+      {(analysisError || (fullAnalysis?.warnings?.length ?? 0) > 0) && (
+        <div
+          className="rounded-xl px-4 py-3 text-xs space-y-1"
+          style={{ background: "rgba(138,90,34,0.07)", border: "1px solid rgba(138,90,34,0.22)", color: "#6B4419" }}
+        >
+          <p className="font-semibold">
+            {analysisError
+              ? `Backend analysis unavailable: ${analysisError} Scores below are sample values.`
+              : "Some metrics couldn't be measured this session — those scores show sample values:"}
+          </p>
+          {fullAnalysis?.warnings?.map((w, i) => <p key={i}>• {w}</p>)}
+        </div>
+      )}
 
       {/* Hero — overall score band, tinted by grade */}
       <div

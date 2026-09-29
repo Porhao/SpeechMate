@@ -10,7 +10,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { setUser, logout: storeLogout } = useUserStore();
+  const { setUser, setProfile, logout: storeLogout } = useUserStore();
 
   const login = async (data: LoginPayload) => {
     setLoading(true);
@@ -19,6 +19,14 @@ export function useAuth() {
       await authService.login(data);
       const user = await authService.me();
       setUser(user);
+      setProfile({
+        id: user.id,
+        user_id: user.id,
+        age_group: user.age_group ?? "",
+        communication_goal: user.communication_goal ?? "",
+        skill_level: (user.skill_level as "Beginner" | "Intermediate" | "Advanced") ?? "Beginner",
+        challenges: user.challenges,
+      });
       router.push("/dashboard");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
