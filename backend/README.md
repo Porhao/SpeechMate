@@ -85,12 +85,12 @@ If a binary isn't on your `PATH`, point to it with `FFMPEG_BIN`, `LIBREOFFICE_BI
 
 ## API keys and fallbacks
 
-All keys are optional. Here is what each one unlocks and what happens without it:
+All keys are optional. The AI layer is local-first: an LLM served by Ollama (`LLM_BASE_URL`), plus local speech, vision and TTS models (`requirements-ml.txt`). "LLM" below means whichever you've configured: a local model via `LLM_BASE_URL`, or OpenAI via `OPENAI_API_KEY`. Here is what each stage uses and what happens without it:
 
 | Stage | With keys | Without keys (fallback) |
 |---|---|---|
-| Slide → script | `OPENAI_API_KEY`: VLM (`gpt-4o-mini`) reads each slide image, with the previous slide's script as context for transitions | A template script built from the slide's own text |
-| Script → voice | `ELEVENLABS_API_KEY` + a voice sample: **your cloned voice** | OpenAI TTS standard voice → espeak-ng (offline) → silence |
+| Slide → script | the vision model (`VLM_MODEL`, e.g. Ollama `qwen2.5vl`) reads each slide image, with the previous slide's script as context for transitions | A template script built from the slide's own text |
+| Script → voice | **local Malaysian TTS** (`mesolitica/Malaysian-TTS-0.6B-v1`) in the deck's narrator voice. Only with `ELEVENLABS_API_KEY` + a voice sample: your cloned voice. | OpenAI TTS (if keyed) → espeak-ng (offline) → silence |
 | Practice → transcript | `OPENAI_API_KEY`: Whisper, prompted to keep "um/uh" verbatim | Skipped. Only audio metrics (duration, pauses) are used. |
 | Coach OIS feedback | LLM, JSON-validated, re-prompted once if invalid or over 150 words | Rule-based OIS from the metrics |
 | Audience feedback | LLM role-plays your target audience | Rule-based from the metrics |
@@ -104,7 +104,9 @@ Every fallback is recorded in the `warnings` field of the session, practice or l
 **Notes**
 - ElevenLabs voice cloning requires a plan that includes *Instant Voice Cloning*. The free tier returns an error, and the pipeline then falls back to a standard voice. The temporary cloned voice is deleted after each generation.
 - For best cloning results, record 30–60 seconds of clear speech in a quiet room. Any common format (wav, mp3, m4a, webm, ogg) works; uploads are converted to WAV.
-- `OPENAI_BASE_URL` lets you point at any OpenAI-compatible endpoint. For example, you can use Qwen2.5-VL / Qwen2.5 through DashScope to match the paper's models (set `VLM_MODEL` / `LLM_MODEL` to match).
+- **Local LLM (Ollama):** set `LLM_BASE_URL=http://ollama:11434/v1` (the root compose's bundled Ollama) or `http://host.docker.internal:11434/v1` (an Ollama on your machine), plus `LLM_MODEL` / `VLM_MODEL` to Ollama tags, e.g. `qwen2.5:3b` / `qwen2.5vl:3b`, or `7b` with ≥16 GB RAM. Only text and vision calls go there; speech keeps using OpenAI or the local models. `LLM_TIMEOUT_SEC` (default 300) allows for slow CPU inference. JSON-mode coach feedback works with Qwen2.5 as-is.
+- **Malaysian TTS:** Malay, English and code-switched speech, 7 fixed voices (`GET /api/narrator-voices`; default `MALAYSIAN_TTS_VOICE`). It does **not** clone voices. The text is spelled out (numbers → words) and chunked (~10 s per generation). CPU works but is slow (minutes per slide); it's used for the live partner's voice only on a GPU (`LIVE_TTS_LOCAL=auto`) unless forced.
+- `OPENAI_BASE_URL` lets you point the OpenAI client at any OpenAI-compatible endpoint. For example, you can use Qwen2.5-VL / Qwen2.5 through DashScope to match the paper's models (set `VLM_MODEL` / `LLM_MODEL` to match).
 
 ### Local models for live analysis
 
@@ -118,6 +120,7 @@ Every fallback is recorded in the `warnings` field of the session, practice or l
 | Stutter prolongations | `librosa` | only prolongations the transcript spells out ("sooo") |
 | Eye contact, posture | `cv2`, `mediapipe` | `null` |
 | Facial emotion | `mediapipe`, `transformers`, `torch` | `null` |
+| Presentation narration | `distilcodec`, `transformers`, `torch` (Malaysian TTS) | OpenAI TTS → espeak-ng |
 
 `GET /health` lists which are installed, and `USE_LOCAL_ML=false` turns them all off. The overall and confidence scores are re-weighted over whichever components were measured, and the response's `communication_score.scored_on` says which ones those were.
 
@@ -130,7 +133,7 @@ POST /api/sessions (.pptx, voice?, requirement?)
   └─ Ideal Presentation Agent (background job)
        processing_slides   .pptx → PDF (LibreOffice) → 1920px PNGs (pdftoppm) + slide text (python-pptx)
        generating_scripts  VLM per slide, sequential for smooth transitions, 60–100 words enforced
-       synthesizing_audio  ElevenLabs clone → OpenAI TTS → espeak-ng → silence, normalized to WAV
+       synthesizing_audio  [ElevenLabs clone] → local Malaysian TTS → OpenAI TTS → espeak-ng → silence, normalized to WAV
        assembling_video    ffmpeg: PNG + WAV → per-slide MP4 segment → concat → ideal_video.mp4
        complete
 
@@ -181,7 +184,8 @@ Interactive docs are at `/docs`. All routes are under `/api` except `/health`.
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/api/sessions` | multipart: `pptx` (required), `voice_sample`, `requirement_prompt` → `201 {session_id, status}` |
+| `POST` | `/api/sessions` | multipart: `pptx` (required), `narrator_voice`, `voice_sample`, `requirement_prompt` → `201 {session_id, status}` |
+| `GET` | `/api/narrator-voices` | Malaysian TTS voices, the default, and whether the model is installed |
 | `GET` | `/api/sessions` | list sessions |
 | `GET` | `/api/sessions/{id}` | status, `slides_progress`, `warnings`, `error_detail`, `video_ready`, `voice_cloning_used` |
 | `GET` | `/api/sessions/{id}/scripts` | per-slide script, sources, and `start_sec`/`duration_sec` in the video (for syncing the script panel) |
@@ -311,14 +315,15 @@ app/
     pipeline.py           Ideal Presentation Agent orchestration (4 stages)
     slide_processor.py    .pptx → PNGs + slide text
     script_generator.py   VLM narration + fallback
-    speech_synthesizer.py ElevenLabs / OpenAI TTS / espeak / silence chain
+    speech_synthesizer.py narration chain: [ElevenLabs clone] / Malaysian TTS / OpenAI TTS / espeak / silence
+    malaysian_tts.py      local Mesolitica Malaysian TTS (text normalizing, chunking, DistilCodec decoding)
     media.py              ffmpeg helpers (normalize, silencedetect, segments, concat)
     tasks.py              background job runner
     coach/                metrics, transcription, OIS + audience feedback, chat, pipeline
     live/                 live-session analysis: asr, language (Malaysian), speech, pronunciation,
                           vision, scoring, pipeline
-alembic/                  migrations (0001 presentation coaching, 0002 accounts + live sessions)
-scripts/                  make_sample_deck.py, smoke_test.py
+alembic/                  migrations (0001 presentation coaching, 0002 accounts + live sessions, 0003 narrator voice)
+scripts/                  make_sample_deck.py, smoke_test.py, seed_demo.py (demo accounts)
 tests/                    unit + end-to-end tests
 docs/                     design specs and the source paper
 ```

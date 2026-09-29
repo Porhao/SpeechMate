@@ -1,12 +1,16 @@
 """Speech synthesis (Ideal Agent Stage 3): script text → narration WAV per slide.
 
 Fallback chain, per slide, so the pipeline never hard-fails on audio:
-    1. ElevenLabs instant voice clone of the user's sample (needs key + sample)
-    2. OpenAI TTS with a standard voice (needs OPENAI_API_KEY)
-    3. espeak-ng, local and offline (robotic, but free)
-    4. Silence sized to the script length (video still renders)
+    1. ElevenLabs instant voice clone of the user's sample (only when
+       ELEVENLABS_API_KEY is set and a sample was uploaded — optional)
+    2. Local Malaysian TTS (mesolitica/Malaysian-TTS-0.6B-v1), open source,
+       in the deck's chosen narrator voice — the default
+    3. OpenAI TTS with a standard voice (needs OPENAI_API_KEY)
+    4. espeak-ng, local and offline (robotic, but free)
+    5. Silence sized to the script length (video still renders)
 """
 
+import asyncio
 import logging
 import tempfile
 from dataclasses import dataclass
@@ -15,6 +19,7 @@ from pathlib import Path
 import httpx
 
 from app.config import settings
+from app.services import malaysian_tts
 from app.services.ai import count_words, get_openai_client, with_retries
 from app.services.media import MediaError, normalize_to_wav, run_command, write_silence_wav
 
@@ -25,6 +30,7 @@ ELEVENLABS_BASE = "https://api.elevenlabs.io/v1"
 # Human-readable labels used in session warnings
 SOURCE_LABELS = {
     "elevenlabs_clone": "your cloned voice",
+    "malaysian_tts": "the local Malaysian TTS voice",
     "openai_tts": "a standard AI voice",
     "espeak": "the offline espeak voice",
     "silence": "silent placeholder audio",
@@ -36,15 +42,20 @@ class VoiceContext:
     """Per-session voice state. voice_id is set when cloning succeeded."""
     voice_id: str | None = None
     clone_error: str | None = None
+    narrator_voice: str | None = None  # Malaysian TTS speaker id
 
 
 class SpeechSynthesizer:
-    async def prepare_voice(self, session_id: str, voice_sample: Path | None) -> VoiceContext:
+    async def prepare_voice(
+        self, session_id: str, voice_sample: Path | None, narrator_voice: str | None = None
+    ) -> VoiceContext:
         """Create an ElevenLabs instant voice clone from the user's sample, if possible."""
         if voice_sample is None:
-            return VoiceContext(clone_error="No voice sample was provided")
+            return VoiceContext(clone_error="No voice sample was provided", narrator_voice=narrator_voice)
         if not settings.elevenlabs_api_key:
-            return VoiceContext(clone_error="ELEVENLABS_API_KEY is not configured")
+            return VoiceContext(
+                clone_error="Voice cloning needs ELEVENLABS_API_KEY", narrator_voice=narrator_voice
+            )
 
         async def create() -> str:
             async with httpx.AsyncClient(timeout=settings.ai_timeout_sec) as http:
@@ -62,9 +73,9 @@ class SpeechSynthesizer:
         try:
             voice_id = await with_retries(create, attempts=2, label="ElevenLabs voice clone")
             logger.info("Created ElevenLabs voice %s for session %s", voice_id, session_id)
-            return VoiceContext(voice_id=voice_id)
+            return VoiceContext(voice_id=voice_id, narrator_voice=narrator_voice)
         except Exception as e:  # noqa: BLE001
-            return VoiceContext(clone_error=f"Voice cloning failed: {e}")
+            return VoiceContext(clone_error=f"Voice cloning failed: {e}", narrator_voice=narrator_voice)
 
     async def cleanup_voice(self, voice: VoiceContext) -> None:
         """Delete the temporary cloned voice so it doesn't use up the account's voice slots."""
@@ -94,6 +105,14 @@ class SpeechSynthesizer:
                 return "elevenlabs_clone"
             except Exception as e:  # noqa: BLE001
                 logger.error("Cloned-voice TTS failed, falling back: %s", e)
+
+        if malaysian_tts.is_available():
+            try:
+                await asyncio.to_thread(malaysian_tts.synthesize, text, raw, voice.narrator_voice)
+                await self._finish(raw, out_wav)
+                return "malaysian_tts"
+            except Exception as e:  # noqa: BLE001
+                logger.error("Malaysian TTS failed, falling back: %s", e)
 
         client = get_openai_client()
         if client is not None:

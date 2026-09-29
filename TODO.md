@@ -8,7 +8,7 @@ Legend: `[x]` done · `[~]` partly done (the note says what's left) · `[ ]` not
 
 ## AI layer: cloud vs. local
 
-Each AI stage uses a **local model** or a **cloud API** (or both, with one as a fallback). Every stage also has an offline fallback, so the app runs with no keys and no local models. Check `GET /health` to see what's active: `local_ml` lists the local models, `providers` the cloud APIs.
+SpeechMate is **local-first**: every stage has a local option, and cloud APIs are optional extras. Every stage also has an offline fallback, so the app runs with no keys and no local models. Check `GET /health` to see what's active: `local_ml` lists the local models, `providers` the cloud APIs.
 
 **Live practice session analysis:**
 
@@ -21,25 +21,25 @@ Each AI stage uses a **local model** or a **cloud API** (or both, with one as a 
 | Eye contact, posture | ✅ MediaPipe Face Mesh / Pose | — | shown as unavailable |
 | Facial emotion | ✅ ViT `trpakov/vit-face-expression` | — | shown as unavailable |
 | Fluency, pauses, fillers, language ratio, scoring, recommendations | ✅ plain code (ffmpeg + rules, no model) | — | always runs |
-| AI conversation partner | — | ✅ `gpt-4o-mini` | scripted prompts |
-| Partner's voice | — | ✅ OpenAI TTS | browser speech synthesis |
-| General AI coach chat | — | ✅ `gpt-4o-mini` | unavailable (`503`) |
+| AI conversation partner | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | scripted prompts |
+| Partner's voice | Malaysian TTS, only on a GPU (too slow on CPU) | OpenAI TTS | browser speech synthesis |
+| General AI coach chat | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | unavailable (`503`) |
 
 **Presentation coaching:**
 
 | Stage | Local model | Cloud (`OPENAI_API_KEY`) | Neither available |
 |---|---|---|---|
-| Slide scripts | — | ✅ `gpt-4o-mini` vision-language model | template script built from the slide text |
-| Narration voice | espeak-ng (fallback) | ✅ ElevenLabs voice clone → OpenAI TTS | silence |
-| Practice transcription | — | ✅ OpenAI Whisper API | skipped |
-| OIS feedback, audience reaction, chat | — | ✅ `gpt-4o-mini` | rule-based |
+| Slide scripts | ✅ Ollama `qwen2.5vl` (vision) | `gpt-4o-mini` | template script built from the slide text |
+| Narration voice | ✅ **Mesolitica `Malaysian-TTS-0.6B-v1`** (7 voices, Malay/English/code-switching) | OpenAI TTS; ElevenLabs *only* to clone your own voice | espeak-ng → silence |
+| Practice transcription | ✅ faster-whisper | OpenAI Whisper API | skipped |
+| OIS feedback, audience reaction, chat | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | rule-based |
 
-**Current setup:** the Docker image installs the local models (`INSTALL_ML=true`), and no `OPENAI_API_KEY` or `ELEVENLABS_API_KEY` is set. In practice:
+**Current setup:** fully local, with no cloud keys.
+- `backend/.env` points the LLM at the bundled Ollama (`qwen2.5:3b` text, `qwen2.5vl:3b` vision).
+- The Docker image installs the speech, vision and TTS models (`INSTALL_ML=true`).
+- The only thing that falls back is the live partner's *voice*, which uses the browser's speech synthesis on CPU-only machines.
 
-- The **live-session analysis runs fully locally.**
-- The live-session **conversation partner and coach chat**, and **all of presentation coaching**, are running on their offline fallbacks until a key is added.
-
-**Planned vs. built:** the design documents name **Gemini Flash** as the LLM. The code uses **OpenAI `gpt-4o-mini`** through an OpenAI-compatible client. Setting `OPENAI_BASE_URL` points it at Gemini's OpenAI-compatible endpoint, Qwen/DashScope, or a local server (e.g. Ollama) without code changes.
+**Planned vs. built:** the design documents name **Gemini Flash** as the LLM. The code talks to any OpenAI-compatible server, currently local **Qwen2.5 / Qwen2.5-VL on Ollama** (the same model family the PresentCoach paper uses); Gemini, OpenAI or DashScope work by changing `LLM_BASE_URL` / `LLM_MODEL`.
 
 ---
 
@@ -98,6 +98,7 @@ Each AI stage uses a **local model** or a **cloud API** (or both, with one as a 
   - Compare the qualitative UAT findings with the objectives from Cognitive Load Theory (do users feel more prepared and less interrupted?).
 - [ ] **Final Tuning & Deployment**
   - Adjust parameters and fix issues based on the evaluation results (e.g., pronunciation scoring inconsistencies).
-  - [x] Documentation: README, backend README and PROJECT.md match the code.
+  - [x] Documentation: README, backend README and PROJECT.md match the code; TESTING.md has demo accounts, a test guide and a glossary.
+  - [x] Local-first AI: Ollama for LLM + vision, local Malaysian TTS for narration, demo accounts seeded for testing.
   - [ ] Deploy the prototype: set a real `SECRET_KEY`, add API keys, and pick a host with enough RAM/CPU for the local models.
   - Compile the final project report summarizing the quantitative results and user acceptance findings.

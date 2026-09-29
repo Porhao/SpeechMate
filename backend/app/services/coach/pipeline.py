@@ -74,7 +74,7 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
                 transcript = await transcribe(wav)
                 if transcript is None:
                     warnings.append(
-                        "No transcription configured (OPENAI_API_KEY missing): word-level metrics "
+                        "No transcription available (install requirements-ml.txt or set OPENAI_API_KEY): word-level metrics "
                         "(pace, fillers, content coverage) were skipped."
                     )
             except Exception as e:  # noqa: BLE001

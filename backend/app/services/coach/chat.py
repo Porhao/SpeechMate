@@ -13,7 +13,7 @@ from app.models.chat_message import ChatMessage
 from app.models.practice_session import PracticeSession
 from app.models.session import Session
 from app.models.slide import Slide
-from app.services.ai import get_openai_client, with_retries
+from app.services.ai import get_llm_client, with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def _offline_reply(practice: PracticeSession) -> str:
     fb = practice.feedback or {}
     tips = [o.get("suggestion") for o in fb.get("observations", []) if o.get("suggestion")]
     reply = (
-        "Chat needs an LLM (set OPENAI_API_KEY in .env and restart). "
+        "Chat needs an LLM (set OPENAI_API_KEY, or LLM_BASE_URL for a local model like Ollama, in .env and restart). "
         "Meanwhile, here are your key suggestions from this attempt:"
     )
     return reply + "".join(f"\n- {t}" for t in tips) if tips else reply
@@ -85,7 +85,7 @@ async def generate_reply(
     history: list[ChatMessage],
     user_message: str,
 ) -> str:
-    client = get_openai_client()
+    client = get_llm_client()
     if client is None:
         return _offline_reply(practice)
 

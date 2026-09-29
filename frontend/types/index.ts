@@ -232,6 +232,7 @@ export interface DeckStatusResponse {
   warnings: string[];
   video_ready: boolean;
   voice_cloning_used: boolean | null;
+  narrator_voice: string | null;
   original_filename: string;
   created_at: string;
   updated_at: string;
@@ -242,7 +243,7 @@ export interface SlideScript {
   script_text: string | null;
   word_count: number | null;
   script_source: "vlm" | "fallback" | null;
-  audio_source: "elevenlabs_clone" | "openai_tts" | "espeak" | "silence" | null;
+  audio_source: "elevenlabs_clone" | "malaysian_tts" | "openai_tts" | "espeak" | "silence" | null;
   start_sec: number | null;
   duration_sec: number | null;
   status: string;
@@ -317,9 +318,17 @@ export interface CoachChatMessage {
   created_at: string | null;
 }
 
+export interface NarratorVoices {
+  available: boolean;   // is the local Malaysian TTS installed?
+  default: string;
+  voices: { id: string; label: string }[];
+}
+
 export interface BackendHealth {
   status: string;
   binaries: Record<string, boolean>;
   local_ml: Record<string, boolean>;
+  // Where chat / feedback / slide scripts go: "custom" = LLM_BASE_URL (e.g. local Ollama)
+  llm: { provider: "openai" | "custom" | null; base_url: string | null; model: string | null; vision_model: string | null };
   providers: { openai: boolean; elevenlabs: boolean };
 }

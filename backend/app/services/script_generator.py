@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import settings
-from app.services.ai import count_words, get_openai_client, with_retries
+from app.services.ai import count_words, get_llm_client, with_retries
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class ScriptGenerator:
         requirement_prompt: str | None,
         previous_script: str | None,
     ) -> ScriptResult:
-        client = get_openai_client()
+        client = get_llm_client()
         if client is not None:
             try:
                 return await self._generate_with_vlm(

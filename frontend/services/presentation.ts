@@ -5,6 +5,7 @@ import type {
   CoachChatMessage,
   DeckListItem,
   DeckStatusResponse,
+  NarratorVoices,
   PracticeRun,
   RecordingGranularity,
   SlideScript,
@@ -34,9 +35,12 @@ export const presentationService = {
   },
 
   // ── Ideal Presentation Agent ────────────────────────────────────────────
-  create: (pptx: File, voiceSample?: File | Blob | null, requirementPrompt?: string) => {
+  narratorVoices: () => api.get<NarratorVoices>("/narrator-voices"),
+
+  create: (pptx: File, voiceSample?: File | Blob | null, requirementPrompt?: string, narratorVoice?: string) => {
     const form = new FormData();
     form.append("pptx", pptx);
+    if (narratorVoice) form.append("narrator_voice", narratorVoice);
     if (voiceSample) {
       const name = voiceSample instanceof File ? voiceSample.name : blobFilename(voiceSample, "voice_sample");
       form.append("voice_sample", voiceSample, name);

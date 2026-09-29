@@ -39,9 +39,16 @@ class Settings(BaseSettings):
     libreoffice_bin: str = "libreoffice"
     espeak_bin: str = "espeak-ng"
 
-    # OpenAI (or any OpenAI-compatible endpoint, e.g. Qwen via DashScope)
+    # OpenAI: the default provider for everything (LLM, vision, TTS, Whisper)
     openai_api_key: str = ""
     openai_base_url: str | None = None
+
+    # Separate LLM endpoint for text + vision only (chat, feedback, slide scripts),
+    # e.g. a local Ollama: LLM_BASE_URL=http://ollama:11434/v1. Speech (TTS,
+    # Whisper) still uses OpenAI or the local models. Unset = use OpenAI.
+    llm_base_url: str | None = None
+    llm_api_key: str = ""
+    llm_timeout_sec: float = 300.0  # local models on CPU can be slow
     vlm_model: str = "gpt-4o-mini"
     llm_model: str = "gpt-4o-mini"
     tts_model: str = "gpt-4o-mini-tts"
@@ -59,6 +66,13 @@ class Settings(BaseSettings):
     # Each one is skipped, with a warning, when its packages aren't installed.
     use_local_ml: bool = True
     whisper_model_size: str = "small"
+
+    # Local Malaysian TTS (mesolitica/Malaysian-TTS-0.6B-v1): the default narrator
+    # for presentation videos. Voice ids: see app/services/malaysian_tts.VOICES.
+    malaysian_tts_voice: str = "husein"
+    # Also use it for the live AI partner's voice (/api/tts/speak)? "auto" = only
+    # on a CUDA GPU, where it's fast enough for conversation; "true" / "false" to force.
+    live_tts_local: str = "auto"
 
     # Ideal Presentation Agent tuning
     script_min_words: int = 60

@@ -5,6 +5,7 @@ import shutil
 from fastapi import APIRouter
 
 from app.config import settings
+from app.services.ai import llm_provider
 from app.services.live._ml import available
 
 router = APIRouter(tags=["health"])
@@ -28,6 +29,13 @@ async def health_check():
             "wav2vec2": available("transformers", "torch"),
             "librosa": available("librosa"),
             "mediapipe": available("cv2", "mediapipe"),
+        },
+        # Where chat / feedback / slide-script calls go (LLM_BASE_URL = e.g. local Ollama)
+        "llm": {
+            "provider": llm_provider(),
+            "base_url": settings.llm_base_url if settings.llm_base_url else None,
+            "model": settings.llm_model if llm_provider() else None,
+            "vision_model": settings.vlm_model if llm_provider() else None,
         },
         "providers": {
             "openai": bool(settings.openai_api_key),

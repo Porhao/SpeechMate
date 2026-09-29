@@ -1,11 +1,15 @@
 """Conversational endpoints used by live sessions and the general coach:
 the AI practice partner, the general AI coach, and text-to-speech."""
 
+import asyncio
 import json
 import logging
+import tempfile
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import BackgroundTasks
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,13 +19,15 @@ from app.database import get_db
 from app.models.live_session import LiveSession
 from app.models.user import User
 from app.schemas.live import CoachQuestion, ConversationRequest, TTSRequest
-from app.services.ai import get_openai_client
+from app.services import malaysian_tts
+from app.services.ai import get_llm_client, get_openai_client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["conversation"])
 
-NO_KEY = "OpenAI API key not configured"
+NO_LLM = "No LLM configured (set OPENAI_API_KEY, or LLM_BASE_URL for a local model like Ollama)"
+NO_TTS = "No text-to-speech for live replies (set OPENAI_API_KEY, or LIVE_TTS_LOCAL=true for the local Malaysian TTS)"
 
 # The live-session AI partner, one persona per practice mode
 PARTNER_PROMPTS: dict[str, str] = {
@@ -84,10 +90,10 @@ TTS_VOICES = [
 ]
 
 
-def _client():
-    client = get_openai_client()
+def _llm():
+    client = get_llm_client()
     if client is None:
-        raise HTTPException(status_code=503, detail=NO_KEY)
+        raise HTTPException(status_code=503, detail=NO_LLM)
     return client
 
 
@@ -95,7 +101,7 @@ def _client():
 async def partner_reply(body: ConversationRequest):
     """The AI partner's next spoken turn in a live session. 503 without an API key
     (the frontend then falls back to scripted prompts)."""
-    client = _client()
+    client = _llm()
     system = PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"])
     if body.topic:
         system += f"\n\nThe current conversation topic is: {body.topic}"
@@ -145,7 +151,7 @@ async def coach_chat(
     db: AsyncSession = Depends(get_db),
 ):
     """General AI coach. When signed in, it sees your profile and recent session results."""
-    client = _client()
+    client = _llm()
     system = COACH_PROMPT
     if user:
         system += "\n\n=== LEARNER CONTEXT ===\n" + await _user_context(db, user)
@@ -161,11 +167,34 @@ async def coach_chat(
     return {"answer": (resp.choices[0].message.content or "").strip()}
 
 
+def _local_live_tts() -> bool:
+    """Local Malaysian TTS is too slow for conversation on CPU, so by default only use it on a GPU."""
+    mode = settings.live_tts_local.lower()
+    if mode in ("true", "1", "yes"):
+        return malaysian_tts.is_available()
+    if mode == "auto" and malaysian_tts.is_available():
+        import torch
+
+        return torch.cuda.is_available()
+    return False
+
+
 @router.post("/tts/speak")
-async def speak(body: TTSRequest):
-    """Stream MP3 speech for the AI partner's replies. 503 without an API key
-    (the frontend then falls back to the browser's speech synthesis)."""
-    client = _client()
+async def speak(body: TTSRequest, background: BackgroundTasks):
+    """Speech for the AI partner's replies: OpenAI TTS (streamed MP3), else the local
+    Malaysian TTS (WAV) when enabled, else 503 (the frontend then uses the browser's voice)."""
+    client = get_openai_client()
+    if client is None:
+        if not _local_live_tts():
+            raise HTTPException(status_code=503, detail=NO_TTS)
+        out = Path(tempfile.mkstemp(suffix=".wav")[1])
+        try:
+            await asyncio.to_thread(malaysian_tts.synthesize, body.text.strip()[:1000], out, body.voice)
+        except Exception as e:  # noqa: BLE001
+            out.unlink(missing_ok=True)
+            raise HTTPException(status_code=502, detail=f"Local TTS failed: {e}")
+        background.add_task(out.unlink, missing_ok=True)
+        return FileResponse(out, media_type="audio/wav", headers={"Cache-Control": "no-store"})
     text = body.text.strip()[:4096]
     voice = body.voice or settings.coach_tts_voice
 

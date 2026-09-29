@@ -34,4 +34,5 @@ COPY . .
 RUN mkdir -p /app/storage
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+# Migrations, then demo accounts (only when SEED_DEMO_DATA=true), then the API
+CMD ["sh", "-c", "alembic upgrade head && python scripts/seed_demo.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

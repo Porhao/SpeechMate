@@ -18,8 +18,58 @@ T = TypeVar("T")
 _openai_client: AsyncOpenAI | None = None
 
 
+_llm_client: AsyncOpenAI | None = None
+
+
+def llm_provider() -> str | None:
+    """Where LLM/VLM calls go: "custom" (LLM_BASE_URL, e.g. Ollama), "openai", or None."""
+    if settings.llm_base_url:
+        return "custom"
+    if settings.openai_api_key:
+        return "openai"
+    return None
+
+
+def get_llm_client() -> AsyncOpenAI | None:
+    """Client for text + vision calls (chat, feedback, slide scripts), or None if no LLM is configured.
+
+    LLM_BASE_URL points these at any OpenAI-compatible server — Ollama, vLLM,
+    LM Studio, Gemini's or DashScope's compatible endpoints — independently of
+    speech, which stays on OpenAI / local models (see get_openai_client).
+    """
+    global _llm_client
+    if not settings.llm_base_url:
+        return get_openai_client()
+    if _llm_client is None:
+        _llm_client = AsyncOpenAI(
+            api_key=settings.llm_api_key or "not-needed",  # Ollama ignores it, the SDK requires one
+            base_url=settings.llm_base_url,
+            timeout=settings.llm_timeout_sec,
+            max_retries=0,
+        )
+    return _llm_client
+
+
+async def unload_local_model(model: str) -> None:
+    """Ask an Ollama server to drop `model` from memory now instead of after its idle timeout.
+
+    Used on small machines between pipeline stages (e.g. free the vision model
+    before the TTS model loads). A no-op for OpenAI or non-Ollama servers.
+    """
+    base = settings.llm_base_url
+    if not base or not base.rstrip("/").endswith("/v1"):
+        return
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            await http.post(f"{base.rstrip('/')[:-3]}/api/generate", json={"model": model, "keep_alive": 0})
+    except Exception as e:  # noqa: BLE001 — best effort
+        logger.debug("Could not unload %s: %s", model, e)
+
+
 def get_openai_client() -> AsyncOpenAI | None:
-    """Return a shared OpenAI client, or None when no API key is configured."""
+    """Shared OpenAI client (used directly for speech: TTS and Whisper), or None without an API key."""
     global _openai_client
     if not settings.openai_api_key:
         return None

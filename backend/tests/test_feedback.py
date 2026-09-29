@@ -74,7 +74,7 @@ async def test_llm_feedback_reprompts_when_too_long(monkeypatch):
          "suggestion": "Pause after the statistic."}
     ]}
     fake = FakeLLM([json.dumps(too_long), json.dumps(good)])
-    monkeypatch.setattr(fb_mod, "get_openai_client", lambda: fake)
+    monkeypatch.setattr(fb_mod, "get_llm_client", lambda: fake)
 
     result, warning = await generate_coach_feedback("input", WORST_CASE_METRICS)
     assert warning is None
@@ -86,7 +86,7 @@ async def test_llm_feedback_reprompts_when_too_long(monkeypatch):
 
 async def test_llm_feedback_falls_back_after_two_bad_replies(monkeypatch):
     fake = FakeLLM(["not json", "still not json"])
-    monkeypatch.setattr(fb_mod, "get_openai_client", lambda: fake)
+    monkeypatch.setattr(fb_mod, "get_llm_client", lambda: fake)
     result, warning = await generate_coach_feedback("input", WORST_CASE_METRICS)
     assert result["source"] == "rule_based"
     assert warning and "failed" in warning

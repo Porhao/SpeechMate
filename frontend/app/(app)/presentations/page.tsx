@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
 import { useRecorder } from "@/hooks/useRecorder";
-import type { BackendHealth, DeckListItem } from "@/types";
+import type { BackendHealth, DeckListItem, NarratorVoices } from "@/types";
 import { formatDate, formatDuration } from "@/utils/format";
 
 const ACCENT = "#8A5A22";
@@ -42,6 +42,8 @@ export default function PresentationsPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckListItem[] | null>(null);
   const [health, setHealth] = useState<BackendHealth | null>(null);
+  const [voices, setVoices] = useState<NarratorVoices | null>(null);
+  const [narrator, setNarrator] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [pptx, setPptx] = useState<File | null>(null);
@@ -71,6 +73,9 @@ export default function PresentationsPage() {
       .then(setDecks)
       .catch((e: Error) => setLoadError(e.message));
     presentationService.health().then(setHealth).catch(() => null);
+    presentationService.narratorVoices()
+      .then((v) => { setVoices(v); setNarrator(v.default); })
+      .catch(() => null);
   }, []);
 
   // Keep the list fresh while any deck is still generating.
@@ -97,7 +102,7 @@ export default function PresentationsPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const { session_id } = await presentationService.create(pptx, voiceSample, requirement);
+      const { session_id } = await presentationService.create(pptx, voiceSample, requirement, narrator || undefined);
       router.push(`/presentations/${session_id}`);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Upload failed.");
@@ -115,7 +120,7 @@ export default function PresentationsPage() {
     }
   };
 
-  const noAI = health && !health.providers.openai;
+  const noAI = health && !health.llm.provider;
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1100px] mx-auto space-y-6">
@@ -134,8 +139,8 @@ export default function PresentationsPage() {
         >
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>
-            The backend has no <code>OPENAI_API_KEY</code>, so it will use offline fallbacks: scripts are built
-            from the slide text, the voice is synthetic, and coach feedback is rule-based (no transcript).
+            The backend has no LLM configured (<code>OPENAI_API_KEY</code>, or <code>LLM_BASE_URL</code> for a local
+            model like Ollama), so scripts are built from the slide text and coach feedback is rule-based.
           </span>
         </div>
       )}
@@ -183,12 +188,31 @@ export default function PresentationsPage() {
           )}
         </div>
 
-        {/* Voice sample */}
+        {/* Narrator voice (local Malaysian TTS) */}
+        {voices?.available && (
+          <div>
+            <label htmlFor="narrator" className="text-sm font-medium" style={{ color: "#17181C" }}>Narrator voice</label>
+            <p className="text-xs mt-0.5 mb-2" style={{ color: "#6E6C63" }}>
+              Open-source Malaysian TTS (Mesolitica). It handles Malay, English and code-switching, and runs on this server.
+            </p>
+            <select
+              id="narrator"
+              value={narrator}
+              onChange={(e) => setNarrator(e.target.value)}
+              className="text-sm px-3 py-2 rounded-lg outline-none"
+              style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+            >
+              {voices.voices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Voice sample (cloning — optional, needs ElevenLabs) */}
         <div>
           <p className="text-sm font-medium mb-1" style={{ color: "#17181C" }}>Voice sample <span style={{ color: "#9B988E" }}>(optional)</span></p>
           <p className="text-xs mb-3" style={{ color: "#6E6C63" }}>
-            30–60 seconds of clear speech in a quiet room lets the narrator clone your voice (needs an ElevenLabs key
-            on the backend). Skip this to use a standard voice.
+            Only used for cloning your own voice, which needs an ElevenLabs key on the backend. Without one, the
+            narrator voice above is used. For cloning, record 30–60 seconds of clear speech in a quiet room.
           </p>
           <div className="flex flex-wrap gap-2 mb-3">
             {(["none", "record", "upload"] as const).map((m) => (
@@ -200,7 +224,7 @@ export default function PresentationsPage() {
                   ? { background: ACCENT, color: "white" }
                   : { background: "#F5F2EB", color: "#4B4C52", border: "1px solid #E6E2D8" }}
               >
-                {m === "none" ? "Standard voice" : m === "record" ? "Record now" : "Upload file"}
+                {m === "none" ? "Skip" : m === "record" ? "Record now" : "Upload file"}
               </button>
             ))}
           </div>

@@ -27,7 +27,7 @@ async def test_vlm_rewrites_when_far_outside_word_band(monkeypatch, tmp_path: Pa
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=replies.pop(0)))])
 
     fake = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
-    monkeypatch.setattr(sg, "get_openai_client", lambda: fake)
+    monkeypatch.setattr(sg, "get_llm_client", lambda: fake)
 
     result = await sg.script_generator.generate(
         image_path=image, slide_index=2, slide_count=3, slide_text="Plan",

@@ -17,7 +17,7 @@ import logging
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from app.config import settings
-from app.services.ai import count_words, get_openai_client, parse_json_object
+from app.services.ai import count_words, get_llm_client, parse_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def build_analysis_input(
 
 async def _llm_json(system: str, user: str, validate) -> dict:
     """Ask for JSON, validate, re-prompt once with the error. Raises on second failure."""
-    client = get_openai_client()
+    client = get_llm_client()
     assert client is not None
     messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     last_error: Exception | None = None
@@ -163,9 +163,9 @@ def _validate_audience(data: dict) -> dict:
 
 async def generate_coach_feedback(analysis_input: str, metrics: dict) -> tuple[dict, str | None]:
     """Returns (feedback, warning). Falls back to rule-based feedback when needed."""
-    if get_openai_client() is None:
+    if get_llm_client() is None:
         return rule_based_coach_feedback(metrics), (
-            "Coach feedback was generated from metrics only (OPENAI_API_KEY not configured)."
+            "Coach feedback was generated from metrics only (no LLM configured: set OPENAI_API_KEY or LLM_BASE_URL)."
         )
     try:
         return await _llm_json(COACH_SYSTEM, analysis_input, _validate_coach), None
@@ -178,7 +178,7 @@ async def generate_audience_feedback(
     analysis_input: str, metrics: dict, requirement_prompt: str | None
 ) -> tuple[dict, str | None]:
     audience = requirement_prompt or "a general, non-specialist audience"
-    if get_openai_client() is None:
+    if get_llm_client() is None:
         return rule_based_audience_feedback(metrics, audience), None
     try:
         return await _llm_json(AUDIENCE_SYSTEM.format(audience=audience), analysis_input, _validate_audience), None

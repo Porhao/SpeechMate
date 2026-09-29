@@ -33,6 +33,8 @@ class Session(Base):
     pptx_storage_path: Mapped[str] = mapped_column(Text, nullable=False)
     voice_sample_storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     requirement_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Malaysian TTS speaker for the narration (None = MALAYSIAN_TTS_VOICE)
+    narrator_voice: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Pipeline status tracking
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="queued")

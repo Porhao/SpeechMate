@@ -16,9 +16,12 @@ from datetime import datetime, timezone
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import async_session_factory
 from app.models.session import Session
 from app.models.slide import Slide
+from app.services import malaysian_tts
+from app.services.ai import unload_local_model
 from app.services.media import (
     MediaError,
     concat_segments,
@@ -150,7 +153,7 @@ async def _stage_generate_scripts(db: AsyncSession, session: Session, slides: li
         _add_warning(
             session,
             f"{fallback_count} of {len(slides)} script(s) were built from slide text instead of the AI "
-            "model (OPENAI_API_KEY missing or the model call failed).",
+            "model (no LLM configured, or the model call failed).",
         )
         await db.commit()
 
@@ -170,7 +173,10 @@ async def _stage_synthesize_audio(db: AsyncSession, session: Session, slides: li
         except MediaError as e:
             _add_warning(session, f"Could not read the voice sample ({e}); using a standard voice.")
 
-    voice = await speech_synthesizer.prepare_voice(str(session.id), sample_wav)
+    # The slide scripts are written: free the local vision model before the TTS model loads
+    await unload_local_model(settings.vlm_model)
+
+    voice = await speech_synthesizer.prepare_voice(str(session.id), sample_wav, session.narrator_voice)
     sources: list[str] = []
     try:
         for slide in slides:
@@ -184,6 +190,8 @@ async def _stage_synthesize_audio(db: AsyncSession, session: Session, slides: li
             await db.commit()
     finally:
         await speech_synthesizer.cleanup_voice(voice)
+        if malaysian_tts.is_available() and not malaysian_tts.keep_loaded():
+            malaysian_tts.unload()
 
     session.voice_cloning_used = bool(sources) and all(s == "elevenlabs_clone" for s in sources)
     if not session.voice_cloning_used:

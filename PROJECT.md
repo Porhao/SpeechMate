@@ -40,7 +40,7 @@ Pages (`app/(app)/`): `home`, `practice`, `session` (the live coaching session),
 
 - **FastAPI** on Python 3.12, **SQLAlchemy** (async) on **PostgreSQL** with **Alembic** migrations
 - JWT auth (`pyjwt`, `bcrypt`) with access + refresh tokens
-- **OpenAI** (`gpt-4o-mini`) for the live-session AI partner, the general coach, presentation scripts (vision-language), OIS coaching feedback and TTS; **ElevenLabs** for voice cloning. Any OpenAI-compatible provider works through `OPENAI_BASE_URL`.
+- **Local-first AI.** An LLM served by **Ollama** (`qwen2.5` for text: live AI partner, general coach, OIS coaching feedback; `qwen2.5vl` for vision: presentation scripts) through the OpenAI-compatible API (`LLM_BASE_URL`), and **Mesolitica `Malaysian-TTS-0.6B-v1`** for narration (Malay / English / code-switching, 7 voices). OpenAI (LLM, TTS, Whisper) and ElevenLabs (cloning your own voice) are optional cloud extras.
 - Routers (`app/routers/`): `auth` (accounts + profile), `live` (live sessions, progress, reports), `conversation` (AI partner, general coach, TTS), `sessions` + `practice` (presentation coaching), `health`
 - Long-running work (video generation, coaching analysis, live-session analysis) runs as in-process background jobs the frontend polls
 

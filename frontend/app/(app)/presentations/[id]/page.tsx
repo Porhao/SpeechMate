@@ -24,6 +24,7 @@ const PRACTICE_STAGE: Record<string, string> = {
 
 const AUDIO_SOURCE_LABEL: Record<string, string> = {
   elevenlabs_clone: "your cloned voice",
+  malaysian_tts: "Malaysian TTS voice",
   openai_tts: "standard AI voice",
   espeak: "offline synthetic voice",
   silence: "silent (no voice available)",
@@ -124,7 +125,7 @@ export default function PresentationWorkspace() {
           <h1 className="font-display text-xl truncate" style={{ color: "#17181C" }}>{deck.original_filename}</h1>
           <p className="text-xs" style={{ color: "#9B988E" }}>
             {deck.slide_count ? `${deck.slide_count} slides` : "Presentation"}
-            {complete && deck.voice_cloning_used != null && ` · narrated in ${deck.voice_cloning_used ? "your cloned voice" : "a standard voice"}`}
+            {complete && deck.voice_cloning_used != null && ` · narrated in ${deck.voice_cloning_used ? "your cloned voice" : deck.narrator_voice ? `the “${deck.narrator_voice}” voice` : "a standard voice"}`}
           </p>
         </div>
         {complete && (

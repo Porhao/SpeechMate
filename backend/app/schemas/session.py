@@ -35,6 +35,7 @@ class SessionStatusResponse(BaseModel):
     warnings: list[str] = []
     video_ready: bool = False
     voice_cloning_used: bool | None = None
+    narrator_voice: str | None = None
     original_filename: str
     created_at: datetime
     updated_at: datetime

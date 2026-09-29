@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
 from app.models.slide import Slide
@@ -19,7 +20,7 @@ from app.schemas.session import (
     SlidesProgress,
 )
 from app.schemas.slide import SlideScript, SlideScriptsResponse
-from app.services import tasks
+from app.services import malaysian_tts, tasks
 from app.services.media import SLIDE_GAP_SEC
 from app.services.pipeline import run_ideal_presentation_pipeline
 from app.services.storage import storage_service
@@ -27,6 +28,17 @@ from app.services.storage import storage_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+voices_router = APIRouter(tags=["sessions"])
+
+
+@voices_router.get("/narrator-voices")
+async def narrator_voices():
+    """Voices for the presentation narration (local Malaysian TTS), and whether it's installed."""
+    return {
+        "available": malaysian_tts.is_available(),
+        "default": settings.malaysian_tts_voice,
+        "voices": [{"id": k, "label": v} for k, v in malaysian_tts.VOICES.items()],
+    }
 
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm", ".ogg", ".oga", ".flac", ".aac", ".mp4", ".mov"}
 
@@ -60,6 +72,7 @@ async def create_session(
     pptx: UploadFile = File(..., description="PowerPoint .pptx file"),
     voice_sample: UploadFile | None = File(None, description="Voice sample for cloning (optional)"),
     requirement_prompt: str | None = Form(None, description="Audience/purpose context (optional)"),
+    narrator_voice: str | None = Form(None, description="Malaysian TTS voice id (see GET /api/narrator-voices)"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -69,6 +82,11 @@ async def create_session(
     """
     if not pptx.filename or not pptx.filename.lower().endswith(".pptx"):
         raise HTTPException(status_code=400, detail="File must be a .pptx PowerPoint file")
+
+    if narrator_voice and narrator_voice not in malaysian_tts.VOICES:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown narrator_voice. Use one of: {', '.join(malaysian_tts.VOICES)}"
+        )
 
     voice_ext = None
     if voice_sample and voice_sample.filename:
@@ -90,6 +108,7 @@ async def create_session(
         pptx_storage_path=pptx_path,
         voice_sample_storage_path=voice_path,
         requirement_prompt=(requirement_prompt or "").strip() or None,
+        narrator_voice=narrator_voice or None,
         status="queued",
     )
     db.add(session)
@@ -142,6 +161,7 @@ async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db))
         video_ready=session.status == "complete" and bool(session.video_storage_path),
         voice_cloning_used=session.voice_cloning_used,
         original_filename=session.original_filename,
+        narrator_voice=session.narrator_voice,
         created_at=session.created_at,
         updated_at=session.updated_at,
     )

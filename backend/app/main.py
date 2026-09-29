@@ -52,6 +52,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router)
 app.include_router(sessions.router, prefix="/api")
+app.include_router(sessions.voices_router, prefix="/api")
 app.include_router(practice.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(live.router, prefix="/api")

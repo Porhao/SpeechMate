@@ -16,6 +16,9 @@ os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_tmp / 'test.db'}"
 os.environ["STORAGE_BASE_PATH"] = str(_tmp / "storage")
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["ELEVENLABS_API_KEY"] = ""
+os.environ["LLM_BASE_URL"] = ""
+# Deterministic and offline even where requirements-ml.txt is installed
+os.environ["USE_LOCAL_ML"] = "false"
 os.environ["MAX_CONCURRENT_JOBS"] = "2"
 os.environ["SECRET_KEY"] = "test-secret-key-that-is-at-least-32-bytes"
 
