@@ -7,7 +7,7 @@ import logging
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi import BackgroundTasks
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
@@ -20,14 +20,26 @@ from app.models.live_session import LiveSession
 from app.models.user import User
 from app.schemas.live import CoachQuestion, ConversationRequest, TTSRequest
 from app.services import malaysian_tts
-from app.services.ai import get_llm_client, get_openai_client
+from app.services.ai import get_llm_client, get_openai_client, get_tts_client
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["conversation"])
 
 NO_LLM = "No LLM configured (set OPENAI_API_KEY, or LLM_BASE_URL for a local model like Ollama)"
-NO_TTS = "No text-to-speech for live replies (set OPENAI_API_KEY, or LIVE_TTS_LOCAL=true for the local Malaysian TTS)"
+NO_TTS = (
+    "No text-to-speech for live replies (set TTS_BASE_URL for a local Kokoro server, OPENAI_API_KEY, "
+    "or LIVE_TTS_LOCAL=true for the local Malaysian TTS)"
+)
+
+# Replies are spoken aloud, so they must read like natural speech
+SPOKEN_STYLE = """
+
+Speak like a real person in a relaxed voice conversation:
+- Use contractions and everyday phrasing ("that's great", "let's try", "you know what").
+- Vary your sentence length; it's fine to start with a short reaction like "Oh nice!" or "Hmm, good point."
+- Plain sentences only: no lists, bullet points, headings, emoji, asterisks or markdown — everything you write is read aloud by a text-to-speech voice.
+- Never say you are an AI unless asked."""
 
 # The live-session AI partner, one persona per practice mode
 PARTNER_PROMPTS: dict[str, str] = {
@@ -102,7 +114,7 @@ async def partner_reply(body: ConversationRequest):
     """The AI partner's next spoken turn in a live session. 503 without an API key
     (the frontend then falls back to scripted prompts)."""
     client = _llm()
-    system = PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"])
+    system = PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"]) + SPOKEN_STYLE
     if body.topic:
         system += f"\n\nThe current conversation topic is: {body.topic}"
     try:
@@ -181,8 +193,15 @@ def _local_live_tts() -> bool:
 
 @router.post("/tts/speak")
 async def speak(body: TTSRequest, background: BackgroundTasks):
-    """Speech for the AI partner's replies: OpenAI TTS (streamed MP3), else the local
-    Malaysian TTS (WAV) when enabled, else 503 (the frontend then uses the browser's voice)."""
+    """Speech for the AI partner's replies, in order: a local Kokoro-style server (TTS_BASE_URL),
+    OpenAI TTS, the local Malaysian TTS (when enabled), else 503 (the frontend then uses the
+    browser's voice). Streamed as MP3, except the Malaysian TTS (WAV)."""
+    local = get_tts_client()
+    if local is not None:
+        # The frontend asks for OpenAI's "nova"; Kokoro voice ids look like "af_heart"
+        voice = body.voice if body.voice and "_" in body.voice else settings.local_tts_voice
+        return _stream_speech(local, settings.local_tts_model, voice, body.text.strip()[:4096])
+
     client = get_openai_client()
     if client is None:
         if not _local_live_tts():
@@ -195,17 +214,73 @@ async def speak(body: TTSRequest, background: BackgroundTasks):
             raise HTTPException(status_code=502, detail=f"Local TTS failed: {e}")
         background.add_task(out.unlink, missing_ok=True)
         return FileResponse(out, media_type="audio/wav", headers={"Cache-Control": "no-store"})
-    text = body.text.strip()[:4096]
-    voice = body.voice or settings.coach_tts_voice
+    return _stream_speech(client, settings.tts_model, body.voice or settings.coach_tts_voice, body.text.strip()[:4096])
 
+
+def _stream_speech(client, model: str, voice: str, text: str) -> StreamingResponse:
     async def stream():
         async with client.audio.speech.with_streaming_response.create(
-            model=settings.tts_model, voice=voice, input=text, response_format="mp3"
+            model=model, voice=voice, input=text, response_format="mp3"
         ) as resp:
             async for chunk in resp.iter_bytes(chunk_size=4096):
                 yield chunk
 
     return StreamingResponse(stream(), media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
+
+# Whisper sometimes "hears" these in near-silence or noise (YouTube-style outros)
+_STT_HALLUCINATIONS = (
+    "thank you for watching", "thanks for watching", "please subscribe", "subscribe to",
+    "see you in the next video", "like and subscribe",
+)
+STT_PROMPT = "Malaysian English conversation. The speaker may use words like lah, kan, tapi, sebenarnya."
+MAX_STT_BYTES = 15 * 1024 * 1024
+
+
+def _local_stt(path: Path) -> str:
+    from app.services.live.asr import _whisper_model, whisper_language
+
+    language = whisper_language()
+    segments, _ = _whisper_model().transcribe(
+        str(path), language=language, initial_prompt=STT_PROMPT, vad_filter=True,
+        condition_on_previous_text=False,
+    )
+    kept = [
+        seg.text.strip() for seg in segments
+        if not (seg.no_speech_prob > 0.6 and seg.avg_logprob < -1.0)
+        and not any(h in seg.text.lower() for h in _STT_HALLUCINATIONS)
+    ]
+    return " ".join(t for t in kept if t).strip()
+
+
+@router.post("/stt")
+async def speech_to_text(file: UploadFile = File(..., description="One spoken turn (WAV/WebM)")):
+    """Transcribe one conversation turn for the live AI partner: local faster-whisper, else the
+    OpenAI API, else 503 (the frontend then falls back to the browser's speech recognition)."""
+    from app.services.live._ml import available
+
+    data = await file.read()
+    if len(data) > MAX_STT_BYTES:
+        raise HTTPException(status_code=413, detail="Recording too long for one turn")
+    suffix = Path(file.filename or "turn.wav").suffix or ".wav"
+    fd, name = tempfile.mkstemp(suffix=suffix)
+    path = Path(name)
+    try:
+        with open(fd, "wb") as f:
+            f.write(data)
+        if available("faster_whisper"):
+            return {"text": await asyncio.to_thread(_local_stt, path), "engine": "faster-whisper"}
+        client = get_openai_client()
+        if client is None:
+            raise HTTPException(status_code=503, detail="No speech recognition available")
+        extra = {} if settings.stt_language == "auto" else {"language": settings.stt_language or "en"}
+        with path.open("rb") as f:
+            resp = await client.audio.transcriptions.create(
+                model=settings.transcription_model, file=f, prompt=STT_PROMPT, **extra
+            )
+        return {"text": resp.text.strip(), "engine": f"openai:{settings.transcription_model}"}
+    finally:
+        path.unlink(missing_ok=True)
 
 
 @router.get("/tts/voices")

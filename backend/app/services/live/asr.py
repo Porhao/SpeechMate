@@ -17,13 +17,12 @@
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 
 from app.config import settings
 from app.services.ai import get_openai_client, with_retries
 from app.services.coach.transcription import VERBATIM_PROMPT
-from app.services.live._ml import available
+from app.services.live._ml import available, load_once
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,21 @@ class ASRResult:
     word_timestamps: list[dict] = field(default_factory=list)  # [{word, start, end}]
 
 
-@lru_cache(maxsize=1)
+def is_malaysian_model() -> bool:
+    """Mesolitica's Malaysian Whisper already handles Malay/English/Manglish itself."""
+    return "malaysian-whisper" in settings.whisper_model_size.lower()
+
+
+def whisper_language(default_for_standard: str | None = "en") -> str | None:
+    """The language token to transcribe with (see settings.stt_language); None = auto-detect."""
+    if settings.stt_language == "auto":
+        return None
+    if settings.stt_language:
+        return settings.stt_language
+    return "ms" if is_malaysian_model() else default_for_standard
+
+
+@load_once
 def _whisper_model():
     from faster_whisper import WhisperModel
 
@@ -53,7 +66,7 @@ def _whisper_model():
     return WhisperModel(settings.whisper_model_size, device="cpu", compute_type="int8")
 
 
-@lru_cache(maxsize=1)
+@load_once
 def _codeswitch_model():
     from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
@@ -77,8 +90,11 @@ def _codeswitch_transcribe(wav_16k: Path) -> str:
 
 
 def _transcribe_local(wav_16k: Path, warnings: list[str]) -> ASRResult:
+    malaysian = is_malaysian_model()
     segments, info = _whisper_model().transcribe(
-        str(wav_16k), task="transcribe", vad_filter=True, word_timestamps=True
+        str(wav_16k), task="transcribe", vad_filter=True, word_timestamps=True,
+        # Standard Whisper auto-detects (the routing signal below); Malaysian Whisper uses "ms"
+        language=whisper_language(default_for_standard=None),
     )
     segments = list(segments)  # single-use generator
     words = [
@@ -89,9 +105,11 @@ def _transcribe_local(wav_16k: Path, warnings: list[str]) -> ASRResult:
         transcript=" ".join(seg.text.strip() for seg in segments).strip(),
         language=info.language or "en",
         confidence=round(float(info.language_probability or 0.0), 3),
-        engine="faster-whisper",
+        engine=f"faster-whisper ({Path(settings.whisper_model_size).name})",
         word_timestamps=words,
     )
+    if malaysian:
+        return result  # already Malaysian-tuned: no need to re-run the code-switching model
 
     confident_english = result.language == "en" and result.confidence >= ENGLISH_CONFIDENCE_THRESHOLD
     if not confident_english:

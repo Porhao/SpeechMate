@@ -146,6 +146,9 @@ async def test_conversation_endpoints_without_key(client: httpx.AsyncClient):
     assert (await client.post("/api/coach/chat", json={"question": "help"})).status_code == 503
     assert (await client.post("/api/tts/speak", json={"text": "hello"})).status_code == 503
     assert len((await client.get("/api/tts/voices")).json()["voices"]) == 8
+    # No local model and no key: the frontend falls back to the browser's speech recognition
+    r = await client.post("/api/stt", files={"file": ("turn.wav", _tone_wav([(1, True)]))})
+    assert r.status_code == 503
 
 
 @pytest.mark.skipif(shutil.which(settings.ffmpeg_bin) is None, reason="ffmpeg is required")

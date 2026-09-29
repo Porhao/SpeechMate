@@ -11,6 +11,8 @@ import { useSessionStore } from "@/store/useSessionStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
 import { cn } from "@/lib/utils";
 import { liveService, conversationService } from "@/services/live";
+import { presentationService } from "@/services/presentation";
+import { VoiceTurnListener } from "@/lib/voiceTurns";
 import type { SessionType, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -606,7 +608,10 @@ function SessionContent() {
   const [faceDetected,   setFaceDetected]   = useState(false);
   const [poseDetected,   setPoseDetected]   = useState(false);
   const [mood,           setMood]           = useState<{ label: MoodLabel; score: number } | null>(null);
+  // true while the mic is open for the user's turn (not tied to the recogniser's internal restarts)
   const [speechActive,   setSpeechActive]   = useState(false);
+  // AI reply text is ready and its voice is loading: shown as "thinking" until audio really plays
+  const [voicePending,   setVoicePending]   = useState(false);
   const [interimText,    setInterimText]    = useState("");
   const [wpm,            setWpm]            = useState(0);
   const [, setFillerCount]    = useState(0);
@@ -634,6 +639,10 @@ function SessionContent() {
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const animRef    = useRef<number>(0);
   const recognRef  = useRef<any>(null);
+  // Speech-to-text for the user's turns: "server" = mic turns transcribed by the backend's
+  // faster-whisper (accurate for Malaysian English); "browser" = Chrome's speech recognition
+  const sttModeRef       = useRef<"server" | "browser">("browser");
+  const voiceListenerRef = useRef<VoiceTurnListener | null>(null);
   const mpRef      = useRef<any>(null);
   const mediaRecorderRef    = useRef<MediaRecorder | null>(null);
   const recordedChunksRef   = useRef<Blob[]>([]);
@@ -698,6 +707,8 @@ function SessionContent() {
 
   // Audio ref (main TTS)
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Bumped for every AI utterance; callbacks from an older (cancelled) utterance are ignored
+  const speakTokenRef = useRef(0);
 
   // Track conversation history for real AI calls
   const messagesRef     = useRef<Message[]>([]);
@@ -705,7 +716,6 @@ function SessionContent() {
 
   // ── Sync refs ─────────────────────────────────────────────────────────────
   useEffect(() => { aiTypingRef.current      = aiTyping; },       [aiTyping]);
-  useEffect(() => { aiSpeakingRef.current    = aiSpeaking; },     [aiSpeaking]);
   useEffect(() => { voiceEnabledRef.current  = voiceEnabled; },   [voiceEnabled]);
   useEffect(() => { isRecordingRef.current   = isRecording; },    [isRecording]);
   useEffect(() => { modeRef.current          = mode; },           [mode]);
@@ -724,39 +734,77 @@ function SessionContent() {
     return () => { console.error = orig; };
   }, []);
 
-  // ── TTS (OpenAI via backend) ──────────────────────────────────────────────
+  // ── Turn-taking ───────────────────────────────────────────────────────────
+  // listening → thinking (LLM) → thinking (voice loading) → speaking → listening.
+  // The mic is fully closed (recogniser detached) while it's the AI's turn, so the
+  // AI never hears itself and no late recogniser event can reopen or double it.
+  const detachRecognizer = useCallback(() => {
+    const rec = recognRef.current;
+    recognRef.current = null;
+    if (rec) {
+      rec.onresult = null; rec.onend = null; rec.onerror = null;
+      try { rec.stop(); } catch { /* already stopped */ }
+    }
+    voiceListenerRef.current?.stop();
+    voiceListenerRef.current = null;
+    // The session recording (sent for analysis) only keeps the user's turns: AI turns
+    // would otherwise count as long pauses and stutter "blocks" in the user's speech
+    const mr = mediaRecorderRef.current;
+    if (mr?.state === "recording") { try { mr.pause(); } catch { /* unsupported */ } }
+    setSpeechActive(false); setInterimText("");
+  }, []);
+
+  const resumeListening = useCallback(() => {
+    if (activeRef.current && isRecordingRef.current && !aiSpeakingRef.current && !aiTypingRef.current)
+      startSpeechRef.current();
+  }, []);
+
+  // ── TTS (local Kokoro / OpenAI via backend, browser voice as fallback) ─────
   const speakText = useCallback((text: string, onEnd?: () => void) => {
-    if (!voiceEnabledRef.current) { onEnd?.(); return; }
+    const token = ++speakTokenRef.current;
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
+    window.speechSynthesis?.cancel();
 
-    setAiSpeaking(true); aiSpeakingRef.current = true;
-    if (recognRef.current) { try { recognRef.current.stop(); } catch { /* ok */ } }
+    aiSpeakingRef.current = true;  // blocks listening, replies and check-ins from now on
+    detachRecognizer();
 
+    let done = false;
     const finish = () => {
-      setAiSpeaking(false); aiSpeakingRef.current = false;
+      if (done || token !== speakTokenRef.current) return;
+      done = true;
+      setVoicePending(false); setAiSpeaking(false); aiSpeakingRef.current = false;
       onEnd?.();
-      if (activeRef.current && isRecordingRef.current)
-        setTimeout(() => startSpeechRef.current(), 350);
+      setTimeout(resumeListening, 300);
     };
+    if (!voiceEnabledRef.current) { finish(); return; }
+
+    const started = () => {
+      if (token !== speakTokenRef.current) return;
+      setVoicePending(false); setAiSpeaking(true);
+    };
+    setVoicePending(true);
 
     conversationService.speak(text.slice(0, 2000))
       .then((blob) => {
+        if (token !== speakTokenRef.current) return;  // a newer utterance replaced this one
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audioRef.current = audio;
+        audio.onplaying = started;
         audio.onended = () => { URL.revokeObjectURL(url); finish(); };
         audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
         audio.play().catch(finish);
       })
       .catch(() => {
+        if (token !== speakTokenRef.current) return;
         // Browser fallback
         const synth = window.speechSynthesis; synth.cancel();
         const utt = new SpeechSynthesisUtterance(text);
         const v = synth.getVoices().find((v) => v.lang.startsWith("en")) ?? null;
         if (v) utt.voice = v; utt.rate = 0.9;
-        utt.onend = finish; utt.onerror = finish; synth.speak(utt);
+        utt.onstart = started; utt.onend = finish; utt.onerror = finish; synth.speak(utt);
       });
-  }, []);
+  }, [detachRecognizer, resumeListening]);
 
   // ── Auto-reply after user speech (real OpenAI chat) ─────────────────────
   const triggerAIReply = useCallback(async (spokenText: string) => {
@@ -765,7 +813,10 @@ function SessionContent() {
 
     const userMsg: Message = { role: "user", text: spokenText.trim(), ts: Date.now() };
     setMessages((p) => [...p, userMsg]);
-    setAiTyping(true);
+    setAiTyping(true); aiTypingRef.current = true;
+    if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
+    pendingUserSpeechRef.current = "";
+    detachRecognizer();  // the user's turn is over; nothing said now would be answered
 
     // Build conversation history for the API (last 12 msgs + the new user msg)
     const history = [...messagesRef.current, userMsg].slice(-12).map((m) => ({
@@ -780,7 +831,7 @@ function SessionContent() {
         modeRef.current === "Conversation" ? currentTopicRef.current : undefined,
       );
 
-      setAiTyping(false);
+      setAiTyping(false); aiTypingRef.current = false;
       setMessages((p) => [...p, { role: "ai", text: reply, ts: Date.now() }]);
       speakText(reply);
     } catch {
@@ -788,7 +839,7 @@ function SessionContent() {
       const prompts = MODE_PROMPTS[modeRef.current] ?? MODE_PROMPTS.Conversation;
       const idx = promptIndexRef.current;
       setTimeout(() => {
-        setAiTyping(false);
+        setAiTyping(false); aiTypingRef.current = false;
         let reply: string;
         if (idx < prompts.length) {
           const acks = MODE_ACKS[modeRef.current] ?? [];
@@ -804,7 +855,7 @@ function SessionContent() {
         speakText(reply);
       }, 900 + Math.random() * 500);
     }
-  }, [speakText]);
+  }, [speakText, detachRecognizer]);
 
   useEffect(() => { triggerAIReplyRef.current = triggerAIReply; }, [triggerAIReply]);
 
@@ -1003,84 +1054,118 @@ function SessionContent() {
 
   // ── Web Speech API ────────────────────────────────────────────────────────
   const startSpeech = useCallback(() => {
+    if (recognRef.current || voiceListenerRef.current) return;  // never two listeners at once
+
+    // One finished utterance from either recogniser
+    const onFinal = (text: string, conf: number, replyDelayMs: number) => {
+      lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
+      if (modeRef.current === "Pronunciation") { pronounceAttemptRef.current(text); return; }
+      appendTranscript(text);
+      const words = text.trim().split(/\s+/).filter(Boolean);
+      wordListRef.current.push(...words);
+      const tNow = (performance.now() - startTimeRef.current) / 1000;
+      const cleanWords = words.map((w: string) => w.toLowerCase().replace(/[^a-z']/g, ""));
+      let fillerHits = 0;
+      cleanWords.forEach((cw: string, i: number) => {
+        if (!cw) return;
+        if (FILLER_WORDS.has(cw)) { fillerHits++; disfluencyEventsRef.current.push({ t: tNow }); }
+        // Immediate word repetition ("I I", "the the") — a classic
+        // stutter/repetition proxy, checked across the recognition
+        // batch boundary too via lastWordRef.
+        const prev = i === 0 ? lastWordRef.current : cleanWords[i - 1];
+        if (cw === prev) disfluencyEventsRef.current.push({ t: tNow });
+      });
+      if (cleanWords.length) lastWordRef.current = cleanWords[cleanWords.length - 1];
+      fillerCntRef.current += fillerHits;
+      setFillerCount(fillerCntRef.current);
+      pronounceRef.current = Math.round(ema(pronounceRef.current, conf * 100, 0.3));
+      pendingUserSpeechRef.current += (pendingUserSpeechRef.current ? " " : "") + text.trim();
+      if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
+      autoReplyTimerRef.current = setTimeout(() => {
+        const spoken = pendingUserSpeechRef.current.trim();
+        pendingUserSpeechRef.current = "";
+        if (spoken) triggerAIReplyRef.current(spoken);
+      }, replyDelayMs);
+    };
+
+    const opened = () => {
+      setSpeechActive(true);
+      const mr = mediaRecorderRef.current;
+      if (mr?.state === "paused") { try { mr.resume(); } catch { /* unsupported */ } }
+    };
+
+    // ── Preferred: backend transcription (faster-whisper) of each spoken turn ──
+    if (sttModeRef.current === "server" && streamRef.current) {
+      const listener: VoiceTurnListener = new VoiceTurnListener(conversationService.transcribe, {
+        onSpeechStart: () => {
+          // The user is (still) talking: don't answer yet
+          lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
+          if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
+          setInterimText("🎙 …");
+        },
+        onTranscribing: () => setInterimText("Transcribing…"),
+        // The listener already waited ~1 s of silence, so reply sooner than the browser path
+        onText: (text) => { setInterimText(""); if (text) onFinal(text, 0.85, 1200); },
+        onError: () => {
+          // Backend STT unavailable: switch to the browser's recogniser for the rest of the session
+          listener.stop();
+          if (voiceListenerRef.current === listener) voiceListenerRef.current = null;
+          sttModeRef.current = "browser"; setInterimText("");
+          startSpeechRef.current();
+        },
+      });
+      try { listener.start(streamRef.current); voiceListenerRef.current = listener; opened(); return; }
+      catch { sttModeRef.current = "browser"; }
+    }
+
+    // ── Fallback: the browser's speech recognition (Chrome) ──
     const w = window as any;
     const SR = typeof window !== "undefined" ? (w.SpeechRecognition ?? w.webkitSpeechRecognition) : null;
     if (!SR) return;
     const rec: any = new SR();
-    rec.continuous = true; rec.interimResults = true; rec.lang = "en-MY"; rec.maxAlternatives = 1;
-    rec.onstart = () => setSpeechActive(true);
+    // Chrome has no Malaysian English ("en-MY") model; US English is its most accurate one
+    rec.continuous = true; rec.interimResults = true; rec.lang = "en-US"; rec.maxAlternatives = 1;
     rec.onresult = (ev: any) => {
       lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
       let interim = "";
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
         const text: string = ev.results[i][0].transcript;
-        const conf: number = ev.results[i][0].confidence ?? 0.7;
         if (ev.results[i].isFinal) {
-          if (modeRef.current === "Pronunciation") {
-            pronounceAttemptRef.current(text);
-          } else {
-            appendTranscript(text);
-            const words = text.trim().split(/\s+/).filter(Boolean);
-            wordListRef.current.push(...words);
-            const tNow = (performance.now() - startTimeRef.current) / 1000;
-            const cleanWords = words.map((w: string) => w.toLowerCase().replace(/[^a-z']/g, ""));
-            let fillerHits = 0;
-            cleanWords.forEach((cw: string, i: number) => {
-              if (!cw) return;
-              if (FILLER_WORDS.has(cw)) { fillerHits++; disfluencyEventsRef.current.push({ t: tNow }); }
-              // Immediate word repetition ("I I", "the the") — a classic
-              // stutter/repetition proxy, checked across the recognition
-              // batch boundary too via lastWordRef.
-              const prev = i === 0 ? lastWordRef.current : cleanWords[i - 1];
-              if (cw === prev) disfluencyEventsRef.current.push({ t: tNow });
-            });
-            if (cleanWords.length) lastWordRef.current = cleanWords[cleanWords.length - 1];
-            fillerCntRef.current += fillerHits;
-            setFillerCount(fillerCntRef.current);
-            pronounceRef.current = Math.round(ema(pronounceRef.current, conf * 100, 0.3));
-            pendingUserSpeechRef.current += (pendingUserSpeechRef.current ? " " : "") + text.trim();
-            if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
-            autoReplyTimerRef.current = setTimeout(() => {
-              const spoken = pendingUserSpeechRef.current.trim();
-              pendingUserSpeechRef.current = "";
-              if (spoken) triggerAIReplyRef.current(spoken);
-            }, 2500);
-          }
+          onFinal(text, ev.results[i][0].confidence ?? 0.7, 2500);
           setInterimText("");
         } else { interim += text; }
       }
       if (interim) setInterimText(interim);
     };
     rec.onerror = (ev: any) => {
-      if (ev.error === "no-speech" || ev.error === "aborted") return;
-      setSpeechActive(false);
-    };
-    rec.onend = () => {
-      setSpeechActive(false);
-      if (activeRef.current && !aiSpeakingRef.current) {
-        try { rec.start(); } catch { /* ok */ }
+      // Mic permission / hardware problems end the turn; "no-speech" etc. just restart via onend
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed" || ev.error === "audio-capture") {
+        rec.onend = null; recognRef.current = null; setSpeechActive(false);
       }
     };
-    try { rec.start(); recognRef.current = rec; } catch { /* ok */ }
+    rec.onend = () => {
+      // Chrome ends continuous recognition after a stretch of silence: quietly restart it,
+      // keeping the "listening" state steady instead of flickering
+      if (recognRef.current !== rec) return;
+      if (activeRef.current && !aiSpeakingRef.current && !aiTypingRef.current) {
+        try { rec.start(); return; } catch { /* fall through */ }
+      }
+      recognRef.current = null; setSpeechActive(false);
+    };
+    try { rec.start(); recognRef.current = rec; opened(); } catch { setSpeechActive(false); }
   }, [appendTranscript]);
 
   useEffect(() => { startSpeechRef.current = startSpeech; }, [startSpeech]);
 
-  const stopSpeech = useCallback(() => {
-    if (recognRef.current) {
-      recognRef.current.onend = null;
-      try { recognRef.current.stop(); } catch { /* ok */ }
-      recognRef.current = null;
-    }
-    setSpeechActive(false); setInterimText("");
-  }, []);
+  const stopSpeech = detachRecognizer;
 
   const interruptAI = useCallback(() => {
+    speakTokenRef.current++;  // cancels a voice still loading, and the old utterance's callbacks
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
     window.speechSynthesis?.cancel();
-    setAiSpeaking(false); aiSpeakingRef.current = false;
-    setTimeout(() => startSpeechRef.current(), 120);
-  }, []);
+    setVoicePending(false); setAiSpeaking(false); aiSpeakingRef.current = false;
+    setTimeout(resumeListening, 120);
+  }, [resumeListening]);
 
   // ── Live audio metering ──────────────────────────────────────────────────
   const startAudioMeter = useCallback((stream: MediaStream) => {
@@ -1121,7 +1206,12 @@ function SessionContent() {
   // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        // Echo cancellation keeps the AI's voice out of the mic; noise suppression and
+        // auto gain keep quiet or distant speech at a level recognition can use
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraOn(true);
@@ -1186,10 +1276,13 @@ function SessionContent() {
 
     // A backend live session (for recording + analysis) needs sign-in; without
     // it the session still runs, and /assessment shows the client-side results.
-    const [backendSession] = await Promise.all([
+    const [backendSession, health] = await Promise.all([
       liveService.start(mode as SessionType).catch(() => null),
+      presentationService.health().catch(() => null),
       startCamera(),
     ]);
+    // Transcribe the user's turns on the backend when it has a speech model
+    sttModeRef.current = health && (health.local_ml?.faster_whisper || health.providers?.openai) ? "server" : "browser";
     backendSessionIdRef.current = backendSession?.id ?? null;
     if (backendSession) startLiveSession(backendSession, mode as SessionType);
 
@@ -1216,6 +1309,8 @@ function SessionContent() {
 
   const endSession = useCallback(async () => {
     setIsEnding(true); activeRef.current = false;
+    speakTokenRef.current++;  // a reply whose voice is still loading must not play after the end
+    setVoicePending(false);
     if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
     pendingUserSpeechRef.current = "";
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
@@ -1366,6 +1461,8 @@ function SessionContent() {
   }, [stopCamera, stopSpeech, disposeMediaPipe]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
+  // The AI's turn before its voice starts (LLM reply + TTS loading) reads as "thinking"
+  const thinking = aiTyping || voicePending;
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
@@ -1375,19 +1472,19 @@ function SessionContent() {
   const mc = MODE_COLORS[mode] ?? "#5C729B";
 
   const orbState: OrbState =
-    aiTyping   ? "thinking"  :
+    thinking   ? "thinking"  :
     aiSpeaking ? "speaking"  :
     speechActive && sessionStarted ? "listening" : "idle";
 
   const stateLabel =
-    aiTyping    ? "Thinking…"      :
+    thinking    ? "Thinking…"      :
     aiSpeaking  ? "AI speaking"    :
     speechActive && sessionStarted ? "Listening…" :
     sessionStarted ? "Your turn"   : "Ready to start";
 
   const currentPhrase   = PRONUNCIATION_PHRASES[pronounceIndex];
   const currentQuestion = messages.filter((m) => m.role === "ai").at(-1)?.text ?? null;
-  const showYourTurn    = sessionStarted && !aiTyping && !aiSpeaking
+  const showYourTurn    = sessionStarted && !thinking && !aiSpeaking
     && messages.length > 0 && messages[messages.length - 1].role === "ai"
     && mode !== "Pronunciation";
 
@@ -1667,7 +1764,7 @@ function SessionContent() {
                     </div>
                   ))}
 
-                  {aiTyping && (
+                  {thinking && (
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
                         style={{ background: "#5A5470", minWidth: 24 }}>A</div>
@@ -1712,11 +1809,11 @@ function SessionContent() {
               <input type="text" value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                disabled={!sessionStarted || aiTyping || aiSpeaking}
+                disabled={!sessionStarted || thinking || aiSpeaking}
                 placeholder={
                   !sessionStarted   ? "Start the interview first…" :
                   aiSpeaking        ? "Alex is speaking — listen carefully…" :
-                  aiTyping          ? "Alex is formulating a question…" :
+                  thinking          ? "Alex is formulating a question…" :
                   speechActive      ? "Speaking captured — or type here…" :
                   "Speak your answer aloud, or type it here…"
                 }
@@ -1726,7 +1823,7 @@ function SessionContent() {
                 onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.08)")}
               />
               <button onClick={sendMessage}
-                disabled={!sessionStarted || !input.trim() || aiTyping || aiSpeaking}
+                disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                 className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
                 style={{ background: "#23345C" }}>
                 <Send className="w-4 h-4" />
@@ -2046,7 +2143,7 @@ function SessionContent() {
                     ))}
 
                     {/* AI thinking */}
-                    {aiTyping && (
+                    {thinking && (
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{ background: mc }}>
@@ -2063,7 +2160,7 @@ function SessionContent() {
                     )}
 
                     {/* AI speaking indicator in chat */}
-                    {aiSpeaking && !aiTyping && (
+                    {aiSpeaking && !thinking && (
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                           style={{ background: mc }}>
@@ -2116,11 +2213,11 @@ function SessionContent() {
                 <input type="text" value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  disabled={!sessionStarted || aiTyping || aiSpeaking}
+                  disabled={!sessionStarted || thinking || aiSpeaking}
                   placeholder={
                     !sessionStarted ? "Start the session first…" :
                     aiSpeaking ? "AI Coach is speaking — listen…" :
-                    aiTyping   ? "AI Coach is responding…" :
+                    thinking   ? "AI Coach is responding…" :
                     speechActive ? "Speaking captured — or type here…" :
                     "Speak aloud, or type your response…"
                   }
@@ -2133,7 +2230,7 @@ function SessionContent() {
                   onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.08)")}
                 />
                 <button onClick={sendMessage}
-                  disabled={!sessionStarted || !input.trim() || aiTyping || aiSpeaking}
+                  disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                   className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
                   style={{ background: mc }}>
                   <Send className="w-4 h-4" />

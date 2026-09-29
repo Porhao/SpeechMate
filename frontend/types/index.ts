@@ -243,7 +243,7 @@ export interface SlideScript {
   script_text: string | null;
   word_count: number | null;
   script_source: "vlm" | "fallback" | null;
-  audio_source: "elevenlabs_clone" | "malaysian_tts" | "openai_tts" | "espeak" | "silence" | null;
+  audio_source: "elevenlabs_clone" | "malaysian_tts" | "kokoro" | "openai_tts" | "espeak" | "silence" | null;
   start_sec: number | null;
   duration_sec: number | null;
   status: string;
@@ -330,5 +330,6 @@ export interface BackendHealth {
   local_ml: Record<string, boolean>;
   // Where chat / feedback / slide scripts go: "custom" = LLM_BASE_URL (e.g. local Ollama)
   llm: { provider: "openai" | "custom" | null; base_url: string | null; model: string | null; vision_model: string | null };
+  tts: { base_url: string | null; voice: string | null };
   providers: { openai: boolean; elevenlabs: boolean };
 }

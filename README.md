@@ -46,6 +46,7 @@ SpeechMate/
   - **LLM + vision via Ollama:** `qwen2.5` writes the chat replies, coach feedback and the live AI partner's lines; `qwen2.5vl` reads the slide images to write their scripts. Any OpenAI-compatible server works through `LLM_BASE_URL`.
   - **Speech:** **faster-whisper** for ASR, plus **Mesolitica `wav2vec2-xls-r-300m-mixed`** for Malay / code-switched speech.
   - **Narration:** **Mesolitica `Malaysian-TTS-0.6B-v1`**, speaking Malay, English and code-switched text in 7 voices.
+  - **Live AI partner's voice:** **Kokoro-82M** (Apache-2.0) via Kokoro-FastAPI: natural-sounding and faster than real time on CPU, with 70+ US/UK voices.
   - **Analysis:** **Wav2Vec2** for pronunciation, **MediaPipe** for eye contact and posture, a **ViT** facial-expression classifier for emotion, and **librosa** for stutter prolongations.
   - **Optional cloud:** OpenAI (`OPENAI_API_KEY`) for faster LLM, TTS and Whisper; ElevenLabs (`ELEVENLABS_API_KEY`) only for cloning *your own* voice.
   - ffmpeg, LibreOffice and poppler for media and slides.
@@ -76,6 +77,7 @@ recording (webm) → 16 kHz audio → ASR: faster-whisper; if not confidently En
 |---|---|
 | `SECRET_KEY` | signs login tokens. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `LLM_BASE_URL`, `LLM_MODEL`, `VLM_MODEL` | the local LLM. `LLM_BASE_URL=http://ollama:11434/v1` makes `start.sh` run the bundled Ollama and download the two models. `http://host.docker.internal:11434/v1` uses an Ollama you've installed yourself. |
+| `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | the live AI partner's voice. `TTS_BASE_URL=http://kokoro:8880/v1` makes `start.sh` run the bundled Kokoro server; pick a voice such as `af_heart`, `af_bella`, `am_michael`, `bf_emma` or `bm_george` |
 | `MALAYSIAN_TTS_VOICE` | default narrator voice (`husein`, `idayu`, `haqkiem`, …); it can also be chosen per deck in the app |
 | `OPENAI_API_KEY` | *optional*: cloud LLM/TTS/Whisper instead of, or on top of, the local models |
 | `ELEVENLABS_API_KEY` | *optional*: only for narrating in **your own cloned voice** |
@@ -113,8 +115,8 @@ Without them, the live-session analysis uses the OpenAI API for transcription (i
 
 ```bash
 docker compose logs -f backend   # follow backend logs
-docker compose --profile ollama down   # stop everything, Ollama included (data is kept in Docker volumes)
-docker compose --profile ollama down -v   # stop and delete all data, recordings and cached models
+docker compose --profile ollama --profile tts down      # stop everything (data is kept in Docker volumes)
+docker compose --profile ollama --profile tts down -v   # stop and delete all data, recordings and cached models
 ```
 
 ---

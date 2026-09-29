@@ -5,9 +5,10 @@ Fallback chain, per slide, so the pipeline never hard-fails on audio:
        ELEVENLABS_API_KEY is set and a sample was uploaded — optional)
     2. Local Malaysian TTS (mesolitica/Malaysian-TTS-0.6B-v1), open source,
        in the deck's chosen narrator voice — the default
-    3. OpenAI TTS with a standard voice (needs OPENAI_API_KEY)
-    4. espeak-ng, local and offline (robotic, but free)
-    5. Silence sized to the script length (video still renders)
+    3. A local OpenAI-compatible TTS server such as Kokoro (TTS_BASE_URL)
+    4. OpenAI TTS with a standard voice (needs OPENAI_API_KEY)
+    5. espeak-ng, local and offline (robotic, but free)
+    6. Silence sized to the script length (video still renders)
 """
 
 import asyncio
@@ -20,7 +21,7 @@ import httpx
 
 from app.config import settings
 from app.services import malaysian_tts
-from app.services.ai import count_words, get_openai_client, with_retries
+from app.services.ai import count_words, get_openai_client, get_tts_client, with_retries
 from app.services.media import MediaError, normalize_to_wav, run_command, write_silence_wav
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ ELEVENLABS_BASE = "https://api.elevenlabs.io/v1"
 SOURCE_LABELS = {
     "elevenlabs_clone": "your cloned voice",
     "malaysian_tts": "the local Malaysian TTS voice",
+    "kokoro": "the local Kokoro voice",
     "openai_tts": "a standard AI voice",
     "espeak": "the offline espeak voice",
     "silence": "silent placeholder audio",
@@ -113,6 +115,18 @@ class SpeechSynthesizer:
                 return "malaysian_tts"
             except Exception as e:  # noqa: BLE001
                 logger.error("Malaysian TTS failed, falling back: %s", e)
+
+        local = get_tts_client()
+        if local is not None:
+            try:
+                resp = await local.audio.speech.create(
+                    model=settings.local_tts_model, voice=settings.local_tts_voice, input=text, response_format="wav"
+                )
+                raw.write_bytes(resp.content)
+                await self._finish(raw, out_wav)
+                return "kokoro"
+            except Exception as e:  # noqa: BLE001
+                logger.error("Local TTS server failed, falling back: %s", e)
 
         client = get_openai_client()
         if client is not None:

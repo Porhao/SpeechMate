@@ -16,7 +16,8 @@ import statistics
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import asdict, dataclass, field
-from functools import lru_cache
+
+from app.services.live._ml import load_once
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ def _sample_frames_blocking(video_path: str, max_frames: int) -> list:
 
 # ── Eye contact ─────────────────────────────────────────────────────────────
 
-@lru_cache(maxsize=1)
+@load_once
 def _face_mesh():
     import mediapipe as mp
 
@@ -184,7 +185,7 @@ def analyze_eye_contact(frames: list) -> EyeContactResult | None:
 
 # ── Posture ─────────────────────────────────────────────────────────────────
 
-@lru_cache(maxsize=1)
+@load_once
 def _pose():
     import mediapipe as mp
 
@@ -232,7 +233,7 @@ def analyze_posture(frames: list) -> PostureResult | None:
 
 # ── Facial emotion ──────────────────────────────────────────────────────────
 
-@lru_cache(maxsize=1)
+@load_once
 def _emotion_models():
     import mediapipe as mp
     from transformers import pipeline

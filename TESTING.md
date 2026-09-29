@@ -47,7 +47,7 @@ Created automatically at startup when `SEED_DEMO_DATA=true`, which the root `doc
 
 ### B. Live practice session + analysis
 1. **Start a session:** Home or `/practice` → **Conversation** (or Interview / Pronunciation) → allow the camera and microphone.
-2. **Talk** with the AI partner for about a minute. Its replies come from the local LLM (Ollama); if no LLM is ready, you get scripted prompts instead.
+2. **Talk** with the AI partner for about a minute. Your turns are transcribed on the backend by faster-whisper: pause for about a second and "Transcribing…" appears, then the AI replies. If the backend has no speech model, Chrome's own recogniser is used instead. Its replies come from the local LLM (Ollama) and are spoken by the local **Kokoro** voice. If no LLM is ready you get scripted prompts; if Kokoro isn't running, the voice falls back to the browser's robotic speech.
 3. **End the session** → wait on "Analysing…". The recording is uploaded and analysed on the server, which takes about 20 seconds to a few minutes on CPU.
 4. **Check `/assessment`:**
    - transcript
@@ -124,6 +124,7 @@ cd frontend && npx tsc --noEmit && npm run lint                                 
 | **Key-term coverage** | The share of the example script's important words that you actually said. *Missed key terms* lists the ones you skipped. |
 | **Live session** | A camera + mic practice session with the AI partner (Conversation, Interview, Pronunciation). |
 | **Local ML** | Models that run on your own server (faster-whisper, Wav2Vec2, MediaPipe, the ViT emotion model, the Malaysian TTS). Installed from `requirements-ml.txt`. |
+| **Kokoro** | An open-source (Apache-2.0) 82M-parameter TTS model that gives the live AI partner a natural voice. It runs faster than real time on CPU, served by the `kokoro` container. |
 | **LLM / VLM** | Large language model (text: chat, feedback) / vision-language model (reads slide images to write scripts). Here: Ollama `qwen2.5` / `qwen2.5vl`. |
 | **Malaysian TTS** | Mesolitica's open-source `Malaysian-TTS-0.6B-v1`, which narrates in Malay, English and code-switched speech with a choice of 7 voices. It doesn't clone your voice. |
 | **Narrator voice** | The Malaysian TTS voice chosen for a deck's example video. |

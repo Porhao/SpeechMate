@@ -65,7 +65,21 @@ class Settings(BaseSettings):
     # Live-session analysis: local models (installed from requirements-ml.txt).
     # Each one is skipped, with a warning, when its packages aren't installed.
     use_local_ml: bool = True
+    # A size (tiny/base/small/medium/large-v3), a faster-whisper repo id, or the folder of a
+    # converted model, e.g. /models/ct2/malaysian-whisper-small-v3 (scripts/convert_whisper.sh)
     whisper_model_size: str = "small"
+    # Language token for transcription. Empty = the model's own default: "ms" for
+    # Mesolitica's Malaysian Whisper (trained to transcribe Malay, English and Manglish
+    # under "ms"), "en" for standard Whisper (whose auto-detect sometimes hears
+    # Malaysian English as Malay and translates it). "auto" = let Whisper detect it.
+    stt_language: str = ""
+
+    # Natural-sounding local TTS server with an OpenAI-compatible API, e.g. Kokoro-FastAPI
+    # (TTS_BASE_URL=http://kokoro:8880/v1). Voices the live AI partner, and is a narration
+    # fallback. Unset = OpenAI TTS (if keyed) / browser speech.
+    tts_base_url: str | None = None
+    local_tts_model: str = "kokoro"
+    local_tts_voice: str = "af_heart"
 
     # Local Malaysian TTS (mesolitica/Malaysian-TTS-0.6B-v1): the default narrator
     # for presentation videos. Voice ids: see app/services/malaysian_tts.VOICES.

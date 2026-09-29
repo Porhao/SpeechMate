@@ -1,5 +1,5 @@
 # SpeechMate — full stack: Postgres + FastAPI backend + Next.js frontend
-# (+ an optional local LLM with Ollama, profile "ollama").
+# (+ optional local AI servers: Ollama LLM, profile "ollama"; Kokoro TTS, profile "tts").
 #   ./start.sh            (or: docker compose up --build -d; add --profile ollama for the local LLM)
 # Frontend: http://localhost:3000 · API: http://localhost:8000 (docs at /docs)
 name: speechmate
@@ -76,6 +76,15 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
+
+  # ── Optional natural-sounding local TTS for the live AI partner (Kokoro-82M, Apache-2.0;
+  # ./start.sh starts it when backend/.env has TTS_BASE_URL=http://kokoro:8880/v1) ──
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    profiles: ["tts"]
+    ports:
+      - "8880:8880"
+    restart: unless-stopped
 
   # One-shot: downloads the LLM_MODEL / VLM_MODEL named in backend/.env (skips ones already present)
   ollama-pull:

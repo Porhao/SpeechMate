@@ -10,8 +10,9 @@ applied afterwards (language.adjust_pronunciation_for_accent).
 
 import logging
 from dataclasses import asdict, dataclass, field
-from functools import lru_cache
 from pathlib import Path
+
+from app.services.live._ml import load_once
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class PronunciationResult:
         return asdict(self)
 
 
-@lru_cache(maxsize=1)
+@load_once
 def _model():
     from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 

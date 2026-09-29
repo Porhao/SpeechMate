@@ -20,11 +20,10 @@ import logging
 import re
 import threading
 import wave
-from functools import lru_cache
 from pathlib import Path
 
 from app.config import settings
-from app.services.live._ml import available
+from app.services.live._ml import available, load_once
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ def _device() -> str:
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
-@lru_cache(maxsize=1)
+@load_once
 def _load():
     import torch
     from distilcodec import DistilCodec

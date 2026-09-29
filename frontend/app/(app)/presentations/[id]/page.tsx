@@ -25,6 +25,7 @@ const PRACTICE_STAGE: Record<string, string> = {
 const AUDIO_SOURCE_LABEL: Record<string, string> = {
   elevenlabs_clone: "your cloned voice",
   malaysian_tts: "Malaysian TTS voice",
+  kokoro: "Kokoro voice",
   openai_tts: "standard AI voice",
   espeak: "offline synthetic voice",
   silence: "silent (no voice available)",

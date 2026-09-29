@@ -95,7 +95,7 @@ All keys are optional. The AI layer is local-first: an LLM served by Ollama (`LL
 | Coach OIS feedback | LLM, JSON-validated, re-prompted once if invalid or over 150 words | Rule-based OIS from the metrics |
 | Audience feedback | LLM role-plays your target audience | Rule-based from the metrics |
 | Chat | LLM with deck, attempt and history context | Replies with your saved suggestions |
-| Live session: AI partner + TTS | `OPENAI_API_KEY`: the partner's replies (`/api/chat/message`) and its voice (`/api/tts/speak`) | `503`: the frontend falls back to scripted prompts and the browser's speech synthesis |
+| Live session: AI partner + TTS | the LLM writes the partner's replies (`/api/chat/message`); its voice (`/api/tts/speak`) comes from a local Kokoro server (`TTS_BASE_URL`), then OpenAI TTS, then the Malaysian TTS on a GPU | `503`: the frontend falls back to scripted prompts and the browser's speech synthesis |
 | Live session: general coach | `OPENAI_API_KEY`, with the user's profile and recent results as context | `503` with a clear message |
 | Live session: speech recognition | Local faster-whisper (+ code-switch model), else OpenAI Whisper with word timestamps | Word-level metrics skipped; pauses and stutter blocks are still measured from the audio |
 
@@ -236,6 +236,7 @@ Interactive docs are at `/docs`. All routes are under `/api` except `/health`.
 |---|---|---|
 | `POST` | `/api/chat/message` | the live-session AI partner: `{messages, mode, topic?}` → `{reply}` (one persona per mode) |
 | `POST` | `/api/coach/chat` | the general AI coach: `{question, history}` → `{answer}`. With a token, it also sees your profile and last 3 analysed sessions. |
+| `POST` | `/api/stt` | multipart `file`: one spoken turn (WAV/WebM) → `{text, engine}`. Local faster-whisper (English by default, `STT_LANGUAGE`), else OpenAI; `503` makes the frontend use the browser's recogniser. |
 | `POST` | `/api/tts/speak` | `{text, voice?}` → streamed MP3 |
 | `GET` | `/api/tts/voices` | the available voices |
 

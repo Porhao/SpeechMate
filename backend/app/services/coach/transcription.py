@@ -16,10 +16,10 @@ VERBATIM_PROMPT = "Umm, so, uh, I think, like, you know... Hmm, let me, erm, sta
 
 
 def _transcribe_local(audio_wav: Path) -> str:
-    from app.services.live.asr import _whisper_model  # lazy: live.asr imports this module
+    from app.services.live.asr import _whisper_model, whisper_language  # lazy: live.asr imports this module
 
     segments, _ = _whisper_model().transcribe(
-        str(audio_wav), language="en", initial_prompt=VERBATIM_PROMPT, vad_filter=True
+        str(audio_wav), language=whisper_language(), initial_prompt=VERBATIM_PROMPT, vad_filter=True
     )
     return " ".join(seg.text.strip() for seg in segments).strip()
 

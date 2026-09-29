@@ -50,6 +50,21 @@ def get_llm_client() -> AsyncOpenAI | None:
     return _llm_client
 
 
+_tts_client: AsyncOpenAI | None = None
+
+
+def get_tts_client() -> AsyncOpenAI | None:
+    """Client for a local OpenAI-compatible TTS server (TTS_BASE_URL, e.g. Kokoro), or None."""
+    global _tts_client
+    if not settings.tts_base_url:
+        return None
+    if _tts_client is None:
+        _tts_client = AsyncOpenAI(
+            api_key="not-needed", base_url=settings.tts_base_url, timeout=settings.ai_timeout_sec, max_retries=0
+        )
+    return _tts_client
+
+
 async def unload_local_model(model: str) -> None:
     """Ask an Ollama server to drop `model` from memory now instead of after its idle timeout.
 

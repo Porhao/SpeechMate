@@ -14,7 +14,7 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 
 | Stage | Local model (`backend/requirements-ml.txt`) | Cloud (`OPENAI_API_KEY`) | Neither available |
 |---|---|---|---|
-| Speech recognition | ✅ **Primary**: faster-whisper `small` (CPU int8) | Fallback: OpenAI Whisper API | no transcript; word-level metrics skipped |
+| Speech recognition | ✅ **Primary**: Mesolitica **Malaysian Whisper large-v3-turbo** via faster-whisper (CPU int8), also for each live-conversation turn (`/api/stt`, ~3–5 s per turn) | Fallback: OpenAI Whisper API | no transcript (conversation: browser recogniser) |
 | Malay / code-switched ASR | ✅ Mesolitica `wav2vec2-xls-r-300m-mixed` | — | Whisper transcript kept, with a warning |
 | Pronunciation | ✅ Wav2Vec2 `facebook/wav2vec2-base-960h` | — | shown as unavailable |
 | Stutter prolongations | ✅ librosa energy analysis | — | transcript-only hint |
@@ -22,7 +22,7 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 | Facial emotion | ✅ ViT `trpakov/vit-face-expression` | — | shown as unavailable |
 | Fluency, pauses, fillers, language ratio, scoring, recommendations | ✅ plain code (ffmpeg + rules, no model) | — | always runs |
 | AI conversation partner | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | scripted prompts |
-| Partner's voice | Malaysian TTS, only on a GPU (too slow on CPU) | OpenAI TTS | browser speech synthesis |
+| Partner's voice | ✅ **Kokoro-82M** (natural, ~3.5× faster than real time on CPU); Malaysian TTS on a GPU | OpenAI TTS | browser speech synthesis |
 | General AI coach chat | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | unavailable (`503`) |
 
 **Presentation coaching:**
@@ -37,7 +37,7 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 **Current setup:** fully local, with no cloud keys.
 - `backend/.env` points the LLM at the bundled Ollama (`qwen2.5:3b` text, `qwen2.5vl:3b` vision).
 - The Docker image installs the speech, vision and TTS models (`INSTALL_ML=true`).
-- The only thing that falls back is the live partner's *voice*, which uses the browser's speech synthesis on CPU-only machines.
+- The live partner's voice is Kokoro (`TTS_BASE_URL`). Nothing depends on a cloud service.
 
 **Planned vs. built:** the design documents name **Gemini Flash** as the LLM. The code talks to any OpenAI-compatible server, currently local **Qwen2.5 / Qwen2.5-VL on Ollama** (the same model family the PresentCoach paper uses); Gemini, OpenAI or DashScope work by changing `LLM_BASE_URL` / `LLM_MODEL`.
 
@@ -55,8 +55,10 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
   - [~] Accent-fair pronunciation. *Done:* Wav2Vec2 CTC-confidence scoring over proportional word spans, plus a +5% Malaysian-English allowance (`pronunciation.py`, `language.py`). *Left:* real GOP forced-alignment scoring with relaxed thresholds, and splitting deviations into "regional" vs. "intelligibility" (the assessment page's `pronunciation_flags` still shows sample data).
   - [~] Gaze tracking. *Done:* MediaPipe iris-based gaze classification (camera / left / right / down) on the backend, and live face and pose tracking in the browser. *Left:* map it to the tri-zone (left / right / slide) distribution metric.
   - [x] Code-switching ASR routing: faster-whisper, re-run through Mesolitica's mixed-language model when the speech isn't confidently English, plus a Bahasa Malaysia / Manglish lexicon for the language ratio and particle detection.
-- [ ] **Initial Benchmarking**
-  - Record initial baseline metrics for Word Error Rate (WER), Precision, Recall, and F1 scores against the evaluation framework. The ASR router can already produce both the Whisper-only and the code-switched transcript to compare.
+- [~] **Initial Benchmarking**
+  - [x] ASR baseline (`docs/benchmarks/stt-benchmark-2026-09-30.md`): Whisper medium vs. Mesolitica Malaysian Whisper small-v3 / large-v3-turbo-v3 on FLEURS Malay (real speakers) + Malaysian-accented English and Manglish. Turbo-v3 won with 7.9% WER overall (vs 51.3% for the previous medium setup) and is now the default.
+  - [ ] Re-run on a held-out set of real recordings from the app's own users, WER split by pure Malay / pure English / mixed.
+  - [ ] Precision, Recall and F1 for stutter and filler detection against manual annotations.
 
 ## Phase 6: Front-End and Back-End Development
 *Status: Mostly done*

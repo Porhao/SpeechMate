@@ -37,6 +37,8 @@ async def health_check():
             "model": settings.llm_model if llm_provider() else None,
             "vision_model": settings.vlm_model if llm_provider() else None,
         },
+        # Voice of the live AI partner (TTS_BASE_URL = e.g. local Kokoro)
+        "tts": {"base_url": settings.tts_base_url, "voice": settings.local_tts_voice if settings.tts_base_url else None},
         "providers": {
             "openai": bool(settings.openai_api_key),
             "elevenlabs": bool(settings.elevenlabs_api_key),

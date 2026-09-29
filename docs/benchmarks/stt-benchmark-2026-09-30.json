@@ -1,0 +1,462 @@
+[
+ {
+  "config": "whisper-medium (current, lang=en)",
+  "wer": {
+   "malay_real": 59.5,
+   "english": 6.0,
+   "mixed": 17.0
+  },
+  "wer_all": 51.3,
+  "rtf": 0.441,
+  "sec_per_5s_turn": 2.2,
+  "load_s": 3.4,
+  "ram_mb": 1174,
+  "samples": [
+   {
+    "category": "malay_real",
+    "ref": "beliau tidak dapat mengambil ubat yang diperlukan untuk menahan sakitnya kerana ia telah diharamkan dari perlawanan",
+    "hyp": "Beliau tidak dapat mengambil ubat yang diperlukan untuk melahan sakitnya kerana ia telah diharamkan dari pelawanan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "sepanjang malam di antara 150 hingga 200 salinan telah dibuat kini dikenali sebagai dunlap broadsides",
+    "hyp": "Sepanjang malam di antara 150 hingga 200 salinan telah dibuat, kini dikenali sebagai Tanab Roadside."
+   },
+   {
+    "category": "malay_real",
+    "ref": "jika anda telah pernah menonton filem national treasure' anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan",
+    "hyp": "Jika anda telah pernah menonton film National Treasure, anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "madagascar adalah yang terbesar dan benua sendiri apabila ia menjadi hidupan liar",
+    "hyp": "Madagascar is the biggest and the only land if it becomes a wild life."
+   },
+   {
+    "category": "malay_real",
+    "ref": "layton telah meminta perubahan pada rang undang-undang alam sekitar konservatif semasa pertemuan dengan pm meminta penulisan semula yang menyeluruh dan lengkap untuk rang undang-undang alam sekitar parti konservatif",
+    "hyp": "Leighton has asked for a change to the conservative environmental laws during his meeting with PM. He asked for a comprehensive and complete rewriting of the conservation environmental laws."
+   },
+   {
+    "category": "malay_real",
+    "ref": "akhir sekali terdapat banyak kucing bersaiz kecil termasuk kucing liar yang memakan lebih banyak mangsa kecil seperti serangga tikus cicak dan burung",
+    "hyp": "After all, there are many small cats, including wild cats, who eat more small animals such as"
+   },
+   {
+    "category": "malay_real",
+    "ref": "komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroscopi inframerah ftir",
+    "hyp": "The composition of this crystal is a pattern that is found in the animal's uterus that is affected when compared to the infrared spectroscopy, FTIR."
+   },
+   {
+    "category": "malay_real",
+    "ref": "kepulauan itu terbentang 120 km utara di semenanjung pulau yang terbesar adalah king george island dengan penempatan villa las estrellas",
+    "hyp": "The island is located at an altitude of 120 km north of Sabananjung. The largest island is King George Island with the location of Villa Las Estrellas."
+   },
+   {
+    "category": "malay_real",
+    "ref": "penyakit tersebut dibawa babi yang kemudian berpindah ke manusia melalui nyamuk",
+    "hyp": "The disease is not caused by a dog that then moves to a human through a mosquito."
+   },
+   {
+    "category": "malay_real",
+    "ref": "fenomena cuaca teruk serantau dan bermusim termasuk ribut salji ribut ais dan ribut debu",
+    "hyp": "Fenomena cuaca teruk serantau dan bermusim termasuk ribut selji, ribut ais dan ribut debu."
+   },
+   {
+    "category": "malay_real",
+    "ref": "ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya selepas melangkah masuk ke gua ini ia sunyi sepenuhnya",
+    "hyp": "Ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya. Selepas melangkah masuk ke gua ini, ia sunyi sepenuhnya."
+   },
+   {
+    "category": "malay_real",
+    "ref": "hasil karya beliau mempunyai kualiti dan perincian yang sangat dikenali sehingga beliau merupakan seorang yang termasyhur antara ahli filatel ada beberapa yang menjadi pakar dalam mengumpulkan hasil karyanya sahaja",
+    "hyp": "Hasil karir beliau mempunyai equaliti dan perlincan yang sangat dikenali sehingga beliau mempunyai seorang yang termasuk antara Alivi Latel. Ada berapa yang menjadi paka dalam mempunyai hasil karirnya sahaja."
+   },
+   {
+    "category": "english",
+    "ref": "My final year project helps students practise public speaking with an AI coach.",
+    "hyp": "My final year project helped students practice public speaking with an A coach."
+   },
+   {
+    "category": "english",
+    "ref": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning.",
+    "hyp": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning."
+   },
+   {
+    "category": "english",
+    "ref": "During the interview I was nervous, but my answers were quite clear.",
+    "hyp": "During the interview, I was nervous, but my answers were quite clear."
+   },
+   {
+    "category": "english",
+    "ref": "The supervisor asked me to explain the method more clearly next week.",
+    "hyp": "The supervisor asked me to explain the method more clearly next week."
+   },
+   {
+    "category": "mixed",
+    "ref": "Saya rasa presentation tadi okay, tapi slide kedua terlalu banyak text.",
+    "hyp": "Saya rasa presenten ni okey, okey, tapi slide kedua terlalu banyak teks."
+   },
+   {
+    "category": "mixed",
+    "ref": "Actually I nak explain dulu the main problem, then baru masuk solution.",
+    "hyp": "Actually, nak explain dulu the main problem, then baru masuk solution."
+   },
+   {
+    "category": "mixed",
+    "ref": "Semalam I pergi Ipoh dengan family, makan chicken rice sampai kenyang lah.",
+    "hyp": "Semalam saya perdi Ipoh dengan family, makan chicken rice sampai kenyang lah."
+   },
+   {
+    "category": "mixed",
+    "ref": "Kalau you boleh slow down sikit, audience senang nak faham point you.",
+    "hyp": "Kalau you boleh slow down sikit, audience senang nak faham point you."
+   }
+  ]
+ },
+ {
+  "config": "whisper-medium, lang=ms",
+  "wer": {
+   "malay_real": 12.1,
+   "english": 50.0,
+   "mixed": 14.9
+  },
+  "wer_all": 15.6,
+  "rtf": 0.482,
+  "sec_per_5s_turn": 2.41,
+  "load_s": 3.3,
+  "ram_mb": 1398,
+  "samples": [
+   {
+    "category": "malay_real",
+    "ref": "beliau tidak dapat mengambil ubat yang diperlukan untuk menahan sakitnya kerana ia telah diharamkan dari perlawanan",
+    "hyp": "Beliau tidak dapat mengambil ubat yang diperlukan untuk melahan sakitnya kerana ia telah diharamkan dari pelawanan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "sepanjang malam di antara 150 hingga 200 salinan telah dibuat kini dikenali sebagai dunlap broadsides",
+    "hyp": "Sepanjang malam, di antara 150 hingga 200 salinan telah dibuat, kini dikenali sebagai Tanab Roadside."
+   },
+   {
+    "category": "malay_real",
+    "ref": "jika anda telah pernah menonton filem national treasure' anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan",
+    "hyp": "Jika anda telah pernah menonton film National Treasure, anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "madagascar adalah yang terbesar dan benua sendiri apabila ia menjadi hidupan liar",
+    "hyp": "Mereka askar adalah yang terbesar dan menuat tersendiri apabila ia menjadi hidupan liar."
+   },
+   {
+    "category": "malay_real",
+    "ref": "layton telah meminta perubahan pada rang undang-undang alam sekitar konservatif semasa pertemuan dengan pm meminta penulisan semula yang menyeluruh dan lengkap untuk rang undang-undang alam sekitar parti konservatif",
+    "hyp": "Leighton telah meminta perubahan pada rang Undang-Undang Alam Sekitar Konservatif semasa pertemuan dengan PM. Meminta penulisan semula yang menyeluruh dan lengkap untuk rang Undang-Undang Alam Sekitar Parti Konservatif."
+   },
+   {
+    "category": "malay_real",
+    "ref": "akhir sekali terdapat banyak kucing bersaiz kecil termasuk kucing liar yang memakan lebih banyak mangsa kecil seperti serangga tikus cicak dan burung",
+    "hyp": "Akhir sekali, terdapat banyak kucing bersaiz kecil, termasuk kucing liar, yang makan lebih banyak mangsa kecil seperti seraga, tikus, cicak dan purung."
+   },
+   {
+    "category": "malay_real",
+    "ref": "komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroscopi inframerah ftir",
+    "hyp": "Komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroskopi inframerah, FTIR."
+   },
+   {
+    "category": "malay_real",
+    "ref": "kepulauan itu terbentang 120 km utara di semenanjung pulau yang terbesar adalah king george island dengan penempatan villa las estrellas",
+    "hyp": "Kepulauan itu terbentang 120km utara di Semenanjung, pulau yang terbesar adalah King George Island dengan penempatan Villa Las Estrellas."
+   },
+   {
+    "category": "malay_real",
+    "ref": "penyakit tersebut dibawa babi yang kemudian berpindah ke manusia melalui nyamuk",
+    "hyp": "Penyakit tak sebut di bawah babi yang kemudian berpindah ke manusia melalui nyamuk."
+   },
+   {
+    "category": "malay_real",
+    "ref": "fenomena cuaca teruk serantau dan bermusim termasuk ribut salji ribut ais dan ribut debu",
+    "hyp": "Fenomena cuaca teruk serantau dan bermusim termasuk ribut selji, ribut ais dan ribut debu."
+   },
+   {
+    "category": "malay_real",
+    "ref": "ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya selepas melangkah masuk ke gua ini ia sunyi sepenuhnya",
+    "hyp": "Ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya. Selepas melangkah masuk ke gua ini, ia sunyi sepenuhnya."
+   },
+   {
+    "category": "malay_real",
+    "ref": "hasil karya beliau mempunyai kualiti dan perincian yang sangat dikenali sehingga beliau merupakan seorang yang termasyhur antara ahli filatel ada beberapa yang menjadi pakar dalam mengumpulkan hasil karyanya sahaja",
+    "hyp": "Hasil karya beliau mempunyai equaliti dan perlincan yang sangat dikenali sehingga beliau mempunyai seorang yang termasuk antara Alivy Latel. Ada beberapa yang menjadi paka dalam mempunyai hasil karya nya sahaja."
+   },
+   {
+    "category": "english",
+    "ref": "My final year project helps students practise public speaking with an AI coach.",
+    "hyp": "Projek tahun terakhir saya membantu pelajar belajar bahasa publik dengan seorang koc."
+   },
+   {
+    "category": "english",
+    "ref": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning.",
+    "hyp": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning."
+   },
+   {
+    "category": "english",
+    "ref": "During the interview I was nervous, but my answers were quite clear.",
+    "hyp": "Pada temu bual, saya rasa ngeri, tetapi jawapan saya cukup jelas."
+   },
+   {
+    "category": "english",
+    "ref": "The supervisor asked me to explain the method more clearly next week.",
+    "hyp": "The supervisor asked me to explain the method more clearly next week."
+   },
+   {
+    "category": "mixed",
+    "ref": "Saya rasa presentation tadi okay, tapi slide kedua terlalu banyak text.",
+    "hyp": "Saya rasa presentenya okey, okey, tapi slide kedua terlalu banyak teks."
+   },
+   {
+    "category": "mixed",
+    "ref": "Actually I nak explain dulu the main problem, then baru masuk solution.",
+    "hyp": "Actually, nak explain dulu the main problem, then baru masuk solution?"
+   },
+   {
+    "category": "mixed",
+    "ref": "Semalam I pergi Ipoh dengan family, makan chicken rice sampai kenyang lah.",
+    "hyp": "Semalam saya perdi Ipoh dengan family, makan chicken rice sampai kenyang lah."
+   },
+   {
+    "category": "mixed",
+    "ref": "Kalau you boleh slow down sikit, audience senang nak faham point you.",
+    "hyp": "Kalau you boleh slow down sikit, audience senang nak faham point you."
+   }
+  ]
+ },
+ {
+  "config": "mesolitica small-v3, lang=ms",
+  "wer": {
+   "malay_real": 9.5,
+   "english": 90.0,
+   "mixed": 34.0
+  },
+  "wer_all": 18.6,
+  "rtf": 0.181,
+  "sec_per_5s_turn": 0.9,
+  "load_s": 0.4,
+  "ram_mb": 117,
+  "samples": [
+   {
+    "category": "malay_real",
+    "ref": "beliau tidak dapat mengambil ubat yang diperlukan untuk menahan sakitnya kerana ia telah diharamkan dari perlawanan",
+    "hyp": "Beliau tidak dapat mengembalikan ubat yang diperlukan untuk menahan sakitnya kerana ia telah diharamkan dari pelawanan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "sepanjang malam di antara 150 hingga 200 salinan telah dibuat kini dikenali sebagai dunlap broadsides",
+    "hyp": "Sepanjang malam di antara 150 hingga 200 salinan telah dibuat, kini dikenali sebagai tunnel roadside."
+   },
+   {
+    "category": "malay_real",
+    "ref": "jika anda telah pernah menonton filem national treasure' anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan",
+    "hyp": "Jika anda telah pernah menonton filem National Treasure, anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "madagascar adalah yang terbesar dan benua sendiri apabila ia menjadi hidupan liar",
+    "hyp": "Malagashkar adalah yang terbesar dan menuat sendiri apabila ia menjadi hidupan liar."
+   },
+   {
+    "category": "malay_real",
+    "ref": "layton telah meminta perubahan pada rang undang-undang alam sekitar konservatif semasa pertemuan dengan pm meminta penulisan semula yang menyeluruh dan lengkap untuk rang undang-undang alam sekitar parti konservatif",
+    "hyp": "Layton telah meminta perubahan pada rang undang-undang alam sekitar konservatif semasa pertemuan dengan PM. Meminta penulisan semula yang menyeluruh dan lengkap untuk rang undang-undang alam sekitar parti konservatif."
+   },
+   {
+    "category": "malay_real",
+    "ref": "akhir sekali terdapat banyak kucing bersaiz kecil termasuk kucing liar yang memakan lebih banyak mangsa kecil seperti serangga tikus cicak dan burung",
+    "hyp": "Akhir sekali, terdapat banyak kucing bersaiz kecil termasuk kucing liar yang memakai lebih banyak mangsa kecil seperti serangga, tikus, cicak dan burung."
+   },
+   {
+    "category": "malay_real",
+    "ref": "komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroscopi inframerah ftir",
+    "hyp": "Komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroskopi infra merah, FTIR."
+   },
+   {
+    "category": "malay_real",
+    "ref": "kepulauan itu terbentang 120 km utara di semenanjung pulau yang terbesar adalah king george island dengan penempatan villa las estrellas",
+    "hyp": "Kepulauan itu terbentang 120 km utara di Sebenanjung. Pulau yang terbesar adalah King George Island dengan penempatan Villa Las Estrelas."
+   },
+   {
+    "category": "malay_real",
+    "ref": "penyakit tersebut dibawa babi yang kemudian berpindah ke manusia melalui nyamuk",
+    "hyp": "Penyakit tak sebut di bawah babi yang kemudian berpindah ke manusia melalui nyamuk."
+   },
+   {
+    "category": "malay_real",
+    "ref": "fenomena cuaca teruk serantau dan bermusim termasuk ribut salji ribut ais dan ribut debu",
+    "hyp": "Fenomena cuaca teruk serantau dan bermusim termasuk ribut salji, ribut ais, dan ribut debu."
+   },
+   {
+    "category": "malay_real",
+    "ref": "ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya selepas melangkah masuk ke gua ini ia sunyi sepenuhnya",
+    "hyp": "Ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya. Selepas melangkah masuk ke gua ini, ia sunyi sepenuhnya."
+   },
+   {
+    "category": "malay_real",
+    "ref": "hasil karya beliau mempunyai kualiti dan perincian yang sangat dikenali sehingga beliau merupakan seorang yang termasyhur antara ahli filatel ada beberapa yang menjadi pakar dalam mengumpulkan hasil karyanya sahaja",
+    "hyp": "Hasil karya belia mempunyai kualiti dan penyelenggaraan yang sangat dikenalin sehingga belia mempunyai seorang yang termasyur antara Alifilatel. Ada beberapa yang menjadi pakar dalam mengumpulkan hasil karya-karya sahaja."
+   },
+   {
+    "category": "english",
+    "ref": "My final year project helps students practise public speaking with an AI coach.",
+    "hyp": "Projek Tahun Akhir saya membantu pelajar berlatih persembahan awam dengan seorang jurulatih."
+   },
+   {
+    "category": "english",
+    "ref": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning.",
+    "hyp": "Saya biasanya mengambil kereta dari Petaling Jaya ke Kuala Lumpur setiap pagi."
+   },
+   {
+    "category": "english",
+    "ref": "During the interview I was nervous, but my answers were quite clear.",
+    "hyp": "Semasa temu bual, saya bersemangat tetapi jawapan saya agak jelas."
+   },
+   {
+    "category": "english",
+    "ref": "The supervisor asked me to explain the method more clearly next week.",
+    "hyp": "Supervisor meminta saya untuk menjelaskan kaedah dengan lebih jelas minggu depan."
+   },
+   {
+    "category": "mixed",
+    "ref": "Saya rasa presentation tadi okay, tapi slide kedua terlalu banyak text.",
+    "hyp": "Saya rasa presenting dia okey. Okey. Tapi slide kedua terlalu banyak teks."
+   },
+   {
+    "category": "mixed",
+    "ref": "Actually I nak explain dulu the main problem, then baru masuk solution.",
+    "hyp": "Sebenarnya, saya nak jelaskan dulu masalah utama dan baru masuk penyelesaian."
+   },
+   {
+    "category": "mixed",
+    "ref": "Semalam I pergi Ipoh dengan family, makan chicken rice sampai kenyang lah.",
+    "hyp": "Semalam air perdi ipo dengan family, makan chicken rice sampai kenyang lah."
+   },
+   {
+    "category": "mixed",
+    "ref": "Kalau you boleh slow down sikit, audience senang nak faham point you.",
+    "hyp": "Kalau you boleh slow down sikit, audience senang nak faham point you."
+   }
+  ]
+ },
+ {
+  "config": "mesolitica large-v3-turbo-v3, ms",
+  "wer": {
+   "malay_real": 7.4,
+   "english": 4.0,
+   "mixed": 17.0
+  },
+  "wer_all": 7.9,
+  "rtf": 0.553,
+  "sec_per_5s_turn": 2.77,
+  "load_s": 0.8,
+  "ram_mb": 653,
+  "samples": [
+   {
+    "category": "malay_real",
+    "ref": "beliau tidak dapat mengambil ubat yang diperlukan untuk menahan sakitnya kerana ia telah diharamkan dari perlawanan",
+    "hyp": "Beliau tidak dapat mengambil ubat yang diperlukan untuk menahan sakitnya kerana ia telah diharamkan dari perlawanan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "sepanjang malam di antara 150 hingga 200 salinan telah dibuat kini dikenali sebagai dunlap broadsides",
+    "hyp": "sepanjang malam antara 150 hingga 200 salinan telah dibuat, kini dikenali sebagai Tanlap Roadside."
+   },
+   {
+    "category": "malay_real",
+    "ref": "jika anda telah pernah menonton filem national treasure' anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan",
+    "hyp": "Jika anda telah pernah menonton filem National Treasure, anda mungkin terfikir satu peta harta karun tertulis di belakang deklarasi kemerdekaan."
+   },
+   {
+    "category": "malay_real",
+    "ref": "madagascar adalah yang terbesar dan benua sendiri apabila ia menjadi hidupan liar",
+    "hyp": "Malagashkar adalah yang terbesar dan menua tersendiri apabila ia menjadi hidupan liar."
+   },
+   {
+    "category": "malay_real",
+    "ref": "layton telah meminta perubahan pada rang undang-undang alam sekitar konservatif semasa pertemuan dengan pm meminta penulisan semula yang menyeluruh dan lengkap untuk rang undang-undang alam sekitar parti konservatif",
+    "hyp": "Layton telah meminta perubahan pada rang undang-undang alam sekitar konservatif semasa pertemuan dengan PM, meminta penulisan semula yang menyeluruh dan lengkap untuk rang undang-undang alam sekitar parti konservatif."
+   },
+   {
+    "category": "malay_real",
+    "ref": "akhir sekali terdapat banyak kucing bersaiz kecil termasuk kucing liar yang memakan lebih banyak mangsa kecil seperti serangga tikus cicak dan burung",
+    "hyp": "Akhir sekali, terdapat banyak kucing bersaiz kecil termasuk kucing liar yang memakai lebih banyak mangsa kecil seperti serangga, tikus, cicak, dapurung."
+   },
+   {
+    "category": "malay_real",
+    "ref": "komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroscopi inframerah ftir",
+    "hyp": "Komposisi kristal ini berpadanan yang dikesan dalam kencing haiwan peliharaan yang terjejas apabila dibanding melalui spektroskopi inframerah FTIR."
+   },
+   {
+    "category": "malay_real",
+    "ref": "kepulauan itu terbentang 120 km utara di semenanjung pulau yang terbesar adalah king george island dengan penempatan villa las estrellas",
+    "hyp": "Kepulauan itu terbentang 120 km utara di Semenanjung. Pulau yang terbesar adalah King George Island dengan penempatan Villa Las Esrelas."
+   },
+   {
+    "category": "malay_real",
+    "ref": "penyakit tersebut dibawa babi yang kemudian berpindah ke manusia melalui nyamuk",
+    "hyp": "penyakit tersebut di bawah babi yang kemudian berpindah ke manusia melalui nyamuk."
+   },
+   {
+    "category": "malay_real",
+    "ref": "fenomena cuaca teruk serantau dan bermusim termasuk ribut salji ribut ais dan ribut debu",
+    "hyp": "Fenomena cuaca teruk serantau dan bermusim termasuk ribut salji, ribut ais dan ribut debu."
+   },
+   {
+    "category": "malay_real",
+    "ref": "ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya selepas melangkah masuk ke gua ini ia sunyi sepenuhnya",
+    "hyp": "Ia sebenarnya tidak mudah dijumpai walaupun seseorang mengetahui kewujudannya. Selepas melangkah masuk ke gua ini, ia sunyi sepenuhnya."
+   },
+   {
+    "category": "malay_real",
+    "ref": "hasil karya beliau mempunyai kualiti dan perincian yang sangat dikenali sehingga beliau merupakan seorang yang termasyhur antara ahli filatel ada beberapa yang menjadi pakar dalam mengumpulkan hasil karyanya sahaja",
+    "hyp": "Hasil karya belia mempunyai kualiti dan perincian yang sangat dikenali sehingga belia merupakan seorang yang termasuk antara Alivi Latel. Ada beberapa yang menjadi pakar dalam mengumpulkan hasil karyanya sahaja."
+   },
+   {
+    "category": "english",
+    "ref": "My final year project helps students practise public speaking with an AI coach.",
+    "hyp": "My Final Year Project helps students practice public speaking with an AA coach."
+   },
+   {
+    "category": "english",
+    "ref": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning.",
+    "hyp": "I usually take the train from Petaling Jaya to Kuala Lumpur every morning"
+   },
+   {
+    "category": "english",
+    "ref": "During the interview I was nervous, but my answers were quite clear.",
+    "hyp": "During the interview, I was nervous, but my answers were quite clear."
+   },
+   {
+    "category": "english",
+    "ref": "The supervisor asked me to explain the method more clearly next week.",
+    "hyp": "The supervisor asked me to explain the method more clearly next week."
+   },
+   {
+    "category": "mixed",
+    "ref": "Saya rasa presentation tadi okay, tapi slide kedua terlalu banyak text.",
+    "hyp": "Saya rasa presenter dia okey. Okey, tapi slide kedua terlalu banyak teks."
+   },
+   {
+    "category": "mixed",
+    "ref": "Actually I nak explain dulu the main problem, then baru masuk solution.",
+    "hyp": "Ashley nak explain dulu the main problem then baru masuk solution."
+   },
+   {
+    "category": "mixed",
+    "ref": "Semalam I pergi Ipoh dengan family, makan chicken rice sampai kenyang lah.",
+    "hyp": "Semalam air pergi Ipoh dengan family makan chicken rice sampai kenyang lah."
+   },
+   {
+    "category": "mixed",
+    "ref": "Kalau you boleh slow down sikit, audience senang nak faham point you.",
+    "hyp": "Kalau you boleh slow down sikit, audience senang nak faham point you."
+   }
+  ]
+ }
+]

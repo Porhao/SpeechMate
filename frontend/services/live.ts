@@ -46,6 +46,13 @@ export const conversationService = {
   coach: (question: string, history: { role: "user" | "assistant"; content: string }[]) =>
     api.post<{ answer: string }>("/coach/chat", { question, history }),
 
+  /** Transcribe one spoken turn on the backend (local faster-whisper). 503 = not available. */
+  transcribe: async (audio: Blob): Promise<string> => {
+    const form = new FormData();
+    form.append("file", audio, "turn.wav");
+    return (await api.upload<{ text: string }>("/stt", form)).text;
+  },
+
   speak: async (text: string, voice = "nova"): Promise<Blob> => {
     const res = await api.fetch("/tts/speak", {
       method: "POST",
