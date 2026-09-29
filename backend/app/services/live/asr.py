@@ -63,7 +63,9 @@ def _whisper_model():
     from faster_whisper import WhisperModel
 
     logger.info("Loading faster-whisper '%s' (CPU, int8)…", settings.whisper_model_size)
-    return WhisperModel(settings.whisper_model_size, device="cpu", compute_type="int8")
+    return WhisperModel(
+        settings.whisper_model_size, device="cpu", compute_type="int8", cpu_threads=settings.whisper_cpu_threads
+    )
 
 
 @load_once

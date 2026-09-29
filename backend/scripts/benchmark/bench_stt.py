@@ -16,7 +16,7 @@ from faster_whisper import WhisperModel
 PROMPT = "Malaysian English conversation. The speaker may use words like lah, kan, tapi, sebenarnya."
 EVAL = Path("/tmp/eval"); EVAL.mkdir(exist_ok=True)
 TURBO = "/models/ct2/malaysian-whisper-large-v3-turbo-v3"
-# (name, model, language, beam size)
+# (name, model, language, beam size[, cpu threads])
 CONFIGS = [
     ("whisper-medium (current, lang=en)", "medium", "en", 5),
     ("whisper-medium, lang=ms",           "medium", "ms", 5),
@@ -25,6 +25,8 @@ CONFIGS = [
 ]
 if "--beam" in sys.argv:  # beam size 5 (faster-whisper default) vs 1 (greedy) on turbo
     CONFIGS = [("turbo-v3, beam 5", TURBO, "ms", 5), ("turbo-v3, beam 1", TURBO, "ms", 1)]
+if "--threads" in sys.argv:  # faster-whisper uses 4 CPU threads unless told otherwise
+    CONFIGS = [(f"turbo-v3, beam 5, {n} threads", TURBO, "ms", 5, n) for n in (4, 8, 12, 16)]
 N_FLEURS = 25
 
 
@@ -86,9 +88,9 @@ print("test set:", {c: sum(1 for it in items if it["category"] == c) for c in ca
 
 # ── Run ─────────────────────────────────────────────────────────────────────
 results = []
-for name, model_id, lang, beam in CONFIGS:
+for name, model_id, lang, beam, *threads in CONFIGS:
     gc.collect(); base = rss_mb(); t = time.time()
-    model = WhisperModel(model_id, device="cpu", compute_type="int8")
+    model = WhisperModel(model_id, device="cpu", compute_type="int8", cpu_threads=threads[0] if threads else 0)
     load_s, mem = time.time() - t, rss_mb() - base
     model.transcribe(items[0]["path"], language=lang)          # warm-up, not timed
     per = {c: [0, 0] for c in cats}; audio_s = proc_s = 0.0; samples = []
@@ -113,5 +115,5 @@ for name, model_id, lang, beam in CONFIGS:
           flush=True)
     del model; gc.collect()
 
-Path("/models/eval/results_beam.json" if "--beam" in sys.argv else "/models/eval/results.json").write_text(json.dumps(results, indent=1, ensure_ascii=False))
+Path("/models/eval/" + ("results_beam.json" if "--beam" in sys.argv else "results_threads.json" if "--threads" in sys.argv else "results.json")).write_text(json.dumps(results, indent=1, ensure_ascii=False))
 print("BENCH_DONE")

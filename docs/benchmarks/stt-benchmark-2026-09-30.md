@@ -36,6 +36,29 @@ Per-utterance transcripts: `stt-benchmark-2026-09-30.json`.
   Malay stays Malay, Manglish stays mixed — and is best or joint-best in every category,
   with about half the RAM of `medium`. **Adopted as SpeechMate's default.**
 
+## Tuning turbo-v3 for speed (same test set)
+
+Both experiments reproduce the table above exactly for the default setting (7.9% WER).
+
+| Setting | WER all | Time per 5 s turn |
+|---|---|---|
+| Beam size 5 (default) | **7.9%** | 2.97 s |
+| Beam size 1 (greedy) | 8.3% | 2.70 s |
+
+Beam size barely matters for speed: turbo has a 32-layer encoder but only a 4-layer decoder,
+and beam search only affects the decoder. The encoder, which always processes a 30 s
+window even for a short turn, dominates. **Kept beam size 5.**
+
+| CPU threads (beam 5) | WER all | Time per 5 s turn |
+|---|---|---|
+| 4 (faster-whisper default) | 7.9% | 2.89 s |
+| **8** | 7.9% | **2.27 s** |
+| 12 | 7.9% | 2.24 s |
+| 16 | 7.9% | 3.28 s |
+
+**Adopted: 8 threads (`WHISPER_CPU_THREADS=8`)** — 21% faster with identical accuracy;
+beyond ~12 threads they start competing and it gets slower.
+
 ## Caveats
 
 - The English and Manglish clips are synthetic: the TTS samples its output and sometimes
