@@ -11,16 +11,15 @@ from app.services.ai import get_openai_client, with_retries
 logger = logging.getLogger(__name__)
 
 # Whisper tends to "clean up" disfluencies. A prompt written with fillers
-# nudges it to transcribe them verbatim, which the filler metric depends on.
-VERBATIM_PROMPT = "Umm, so, uh, I think, like, you know... Hmm, let me, erm, start again."
+# nudges it to transcribe them verbatim, which the filler metric depends on;
+# the Manglish in it nudges Whisper to keep code-switched words as spoken.
+VERBATIM_PROMPT = "Umm, okay lah, so, uh, macam this week saya busy sikit, you know... but boleh la."
 
 
 def _transcribe_local(audio_wav: Path) -> str:
-    from app.services.live.asr import _whisper_model, whisper_language  # lazy: live.asr imports this module
+    from app.services.live.asr import whisper_language, whisper_segments  # lazy: live.asr imports this module
 
-    segments, _ = _whisper_model().transcribe(
-        str(audio_wav), language=whisper_language(), initial_prompt=VERBATIM_PROMPT, vad_filter=True
-    )
+    segments, _ = whisper_segments(audio_wav, whisper_language())
     return " ".join(seg.text.strip() for seg in segments).strip()
 
 

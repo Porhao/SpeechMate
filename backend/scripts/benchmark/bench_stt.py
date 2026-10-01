@@ -13,7 +13,8 @@ from pathlib import Path
 
 from faster_whisper import WhisperModel
 
-PROMPT = "Malaysian English conversation. The speaker may use words like lah, kan, tapi, sebenarnya."
+PROMPT = "Umm, okay lah, so, uh, macam this week saya busy sikit, you know... but boleh la."  # = app VERBATIM_PROMPT
+OLD_PROMPT = "Malaysian English conversation. The speaker may use words like lah, kan, tapi, sebenarnya."
 EVAL = Path("/tmp/eval"); EVAL.mkdir(exist_ok=True)
 TURBO = "/models/ct2/malaysian-whisper-large-v3-turbo-v3"
 # (name, model, language, beam size[, cpu threads])
@@ -27,6 +28,9 @@ if "--beam" in sys.argv:  # beam size 5 (faster-whisper default) vs 1 (greedy) o
     CONFIGS = [("turbo-v3, beam 5", TURBO, "ms", 5), ("turbo-v3, beam 1", TURBO, "ms", 1)]
 if "--auto" in sys.argv:  # forcing the Malay token vs. letting the model detect the language
     CONFIGS = [("turbo-v3, lang=ms (forced)", TURBO, "ms", 5, 8), ("turbo-v3, auto-detect", TURBO, None, 5, 8)]
+if "--prompt" in sys.argv:  # previous /stt prompt vs. the verbatim Manglish prompt (+ 500 ms VAD silence)
+    CONFIGS = [("turbo-v3, auto, old prompt", TURBO, None, 5, 8, OLD_PROMPT, 2000),
+               ("turbo-v3, auto, Manglish prompt", TURBO, None, 5, 8, PROMPT, 500)]
 if "--threads" in sys.argv:  # faster-whisper uses 4 CPU threads unless told otherwise
     CONFIGS = [(f"turbo-v3, beam 5, {n} threads", TURBO, "ms", 5, n) for n in (4, 8, 12, 16)]
 N_FLEURS = 25
@@ -94,15 +98,17 @@ print("test set:", {c: sum(1 for it in items if it["category"] == c) for c in ca
 
 # ── Run ─────────────────────────────────────────────────────────────────────
 results = []
-for name, model_id, lang, beam, *threads in CONFIGS:
+for name, model_id, lang, beam, *rest in CONFIGS:
+    threads, prompt, silence_ms = (rest + [0, PROMPT, 2000][len(rest):])[:3]
     gc.collect(); base = rss_mb(); t = time.time()
-    model = WhisperModel(model_id, device="cpu", compute_type="int8", cpu_threads=threads[0] if threads else 0)
+    model = WhisperModel(model_id, device="cpu", compute_type="int8", cpu_threads=threads)
     load_s, mem = time.time() - t, rss_mb() - base
     model.transcribe(items[0]["path"], language=lang)          # warm-up, not timed
     per = {c: [0, 0] for c in cats}; audio_s = proc_s = 0.0; samples = []
     for it in items:
         t = time.time()
-        segs, _ = model.transcribe(it["path"], language=lang, initial_prompt=PROMPT, vad_filter=True,
+        segs, _ = model.transcribe(it["path"], language=lang, initial_prompt=prompt, vad_filter=True,
+                                   vad_parameters={"min_silence_duration_ms": silence_ms},
                                    condition_on_previous_text=False, beam_size=beam)
         hyp = " ".join(s.text.strip() for s in segs)
         proc_s += time.time() - t; audio_s += duration(it["path"])
@@ -123,5 +129,5 @@ for name, model_id, lang, beam, *threads in CONFIGS:
     del model; gc.collect()
 
 Path("/models/eval/" + ("results_beam.json" if "--beam" in sys.argv else "results_threads.json" if "--threads" in sys.argv
-                        else "results_auto.json" if "--auto" in sys.argv else "results.json")).write_text(json.dumps(results, indent=1, ensure_ascii=False))
+                        else "results_auto.json" if "--auto" in sys.argv else "results_prompt.json" if "--prompt" in sys.argv else "results.json")).write_text(json.dumps(results, indent=1, ensure_ascii=False))
 print("BENCH_DONE")

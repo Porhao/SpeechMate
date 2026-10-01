@@ -21,6 +21,7 @@ from app.models.user import User
 from app.schemas.live import ConversationMessage, ConversationRequest, TTSRequest
 from app.services import malaysian_tts, practice_plans
 from app.services.ai import get_llm_client, get_openai_client, get_tts_client
+from app.services.coach.transcription import VERBATIM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -181,29 +182,14 @@ def _stream_speech(client, model: str, voice: str, text: str) -> StreamingRespon
     return StreamingResponse(stream(), media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
 
-# Whisper sometimes "hears" these in near-silence or noise (YouTube-style outros)
-_STT_HALLUCINATIONS = (
-    "thank you for watching", "thanks for watching", "please subscribe", "subscribe to",
-    "see you in the next video", "like and subscribe",
-)
-STT_PROMPT = "Malaysian English conversation. The speaker may use words like lah, kan, tapi, sebenarnya."
 MAX_STT_BYTES = 15 * 1024 * 1024
 
 
 def _local_stt(path: Path) -> str:
-    from app.services.live.asr import _whisper_model, whisper_language
+    from app.services.live.asr import whisper_language, whisper_segments
 
-    language = whisper_language()
-    segments, _ = _whisper_model().transcribe(
-        str(path), language=language, initial_prompt=STT_PROMPT, vad_filter=True,
-        condition_on_previous_text=False,
-    )
-    kept = [
-        seg.text.strip() for seg in segments
-        if not (seg.no_speech_prob > 0.6 and seg.avg_logprob < -1.0)
-        and not any(h in seg.text.lower() for h in _STT_HALLUCINATIONS)
-    ]
-    return " ".join(t for t in kept if t).strip()
+    segments, _ = whisper_segments(path, whisper_language())
+    return " ".join(t for seg in segments if (t := seg.text.strip())).strip()
 
 
 @router.post("/stt")
@@ -229,7 +215,7 @@ async def speech_to_text(file: UploadFile = File(..., description="One spoken tu
         extra = {} if settings.stt_language == "auto" else {"language": settings.stt_language or "en"}
         with path.open("rb") as f:
             resp = await client.audio.transcriptions.create(
-                model=settings.transcription_model, file=f, prompt=STT_PROMPT, **extra
+                model=settings.transcription_model, file=f, prompt=VERBATIM_PROMPT, **extra
             )
         return {"text": resp.text.strip(), "engine": f"openai:{settings.transcription_model}"}
     finally:

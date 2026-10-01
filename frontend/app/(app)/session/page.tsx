@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any -- the Web Speech API and MediaPipe handles have no bundled types */
+/* eslint-disable @typescript-eslint/no-explicit-any -- MediaPipe handles have no bundled types */
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -575,10 +575,11 @@ function SessionContent() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const animRef    = useRef<number>(0);
-  const recognRef  = useRef<any>(null);
-  // Speech-to-text for the user's turns: "server" = mic turns transcribed by the backend's
-  // faster-whisper (accurate for Malaysian English); "browser" = Chrome's speech recognition
-  const sttModeRef       = useRef<"server" | "browser">("browser");
+  // Speech-to-text for the user's turns is the backend's (local faster-whisper, else OpenAI).
+  // No browser fallback: Chrome's recogniser sends audio to Google and is English-only
+  // (docs/manglish-transcription-spec.md). Without a backend model the user types instead.
+  const [sttAvailable,   setSttAvailable]   = useState(true);
+  const sttAvailableRef  = useRef(true);
   const voiceListenerRef = useRef<VoiceTurnListener | null>(null);
   const mpRef      = useRef<any>(null);
   const mediaRecorderRef    = useRef<MediaRecorder | null>(null);
@@ -676,12 +677,6 @@ function SessionContent() {
   // The mic is fully closed (recogniser detached) while it's the AI's turn, so the
   // AI never hears itself and no late recogniser event can reopen or double it.
   const detachRecognizer = useCallback(() => {
-    const rec = recognRef.current;
-    recognRef.current = null;
-    if (rec) {
-      rec.onresult = null; rec.onend = null; rec.onerror = null;
-      try { rec.stop(); } catch { /* already stopped */ }
-    }
     voiceListenerRef.current?.stop();
     voiceListenerRef.current = null;
     // The session recording (sent for analysis) only keeps the user's turns: AI turns
@@ -966,9 +961,9 @@ function SessionContent() {
     animRef.current = requestAnimationFrame(runDetection);
   }, [updateLiveFeedback]);
 
-  // ── Web Speech API ────────────────────────────────────────────────────────
+  // ── Speech-to-text (backend) ─────────────────────────────────────────────
   const startSpeech = useCallback(() => {
-    if (recognRef.current || voiceListenerRef.current) return;  // never two listeners at once
+    if (voiceListenerRef.current) return;  // never two listeners at once
 
     // First sound after the AI's turn: how long the user took to start answering
     const noteAnswerStarted = () => {
@@ -978,7 +973,7 @@ function SessionContent() {
       latenciesRef.current.push(Math.round((performance.now() - opened) / 100) / 10);
     };
 
-    // One finished utterance from either recogniser
+    // One finished utterance
     const onFinal = (text: string, conf: number, replyDelayMs: number) => {
       lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
       appendTranscript(text);
@@ -1015,67 +1010,31 @@ function SessionContent() {
       if (mr?.state === "paused") { try { mr.resume(); } catch { /* unsupported */ } }
     };
 
-    // ── Preferred: backend transcription (faster-whisper) of each spoken turn ──
-    if (sttModeRef.current === "server" && streamRef.current) {
-      const listener: VoiceTurnListener = new VoiceTurnListener(conversationService.transcribe, {
-        onSpeechStart: () => {
-          noteAnswerStarted();
-          // The user is (still) talking: don't answer yet
-          lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
-          if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
-          setInterimText("Hearing you…");
-        },
-        onTranscribing: () => setInterimText("Transcribing…"),
-        // The listener already waited ~1 s of silence, so reply sooner than the browser path
-        onText: (text) => { setInterimText(""); if (text) onFinal(text, 0.85, 1200); },
-        onError: () => {
-          // Backend STT unavailable: switch to the browser's recogniser for the rest of the session
-          listener.stop();
-          if (voiceListenerRef.current === listener) voiceListenerRef.current = null;
-          sttModeRef.current = "browser"; setInterimText("");
-          startSpeechRef.current();
-        },
-      });
-      try { listener.start(streamRef.current); voiceListenerRef.current = listener; opened(); return; }
-      catch { sttModeRef.current = "browser"; }
-    }
-
-    // ── Fallback: the browser's speech recognition (Chrome) ──
-    const w = window as any;
-    const SR = typeof window !== "undefined" ? (w.SpeechRecognition ?? w.webkitSpeechRecognition) : null;
-    if (!SR) return;
-    const rec: any = new SR();
-    // Chrome has no Malaysian English ("en-MY") model; US English is its most accurate one
-    rec.continuous = true; rec.interimResults = true; rec.lang = "en-US"; rec.maxAlternatives = 1;
-    rec.onresult = (ev: any) => {
-      noteAnswerStarted();
-      lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
-      let interim = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const text: string = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) {
-          onFinal(text, ev.results[i][0].confidence ?? 0.7, 2500);
-          setInterimText("");
-        } else { interim += text; }
-      }
-      if (interim) setInterimText(interim);
+    const unavailable = () => {
+      sttAvailableRef.current = false; setSttAvailable(false); setInterimText("");
     };
-    rec.onerror = (ev: any) => {
-      // Mic permission / hardware problems end the turn; "no-speech" etc. just restart via onend
-      if (ev.error === "not-allowed" || ev.error === "service-not-allowed" || ev.error === "audio-capture") {
-        rec.onend = null; recognRef.current = null; setSpeechActive(false);
-      }
-    };
-    rec.onend = () => {
-      // Chrome ends continuous recognition after a stretch of silence: quietly restart it,
-      // keeping the "listening" state steady instead of flickering
-      if (recognRef.current !== rec) return;
-      if (activeRef.current && !aiSpeakingRef.current && !aiTypingRef.current) {
-        try { rec.start(); return; } catch { /* fall through */ }
-      }
-      recognRef.current = null; setSpeechActive(false);
-    };
-    try { rec.start(); recognRef.current = rec; opened(); } catch { setSpeechActive(false); }
+    // Backend transcription (faster-whisper) of each spoken turn
+    if (!sttAvailableRef.current || !streamRef.current) return;
+    const listener: VoiceTurnListener = new VoiceTurnListener(conversationService.transcribe, {
+      onSpeechStart: () => {
+        noteAnswerStarted();
+        // The user is (still) talking: don't answer yet
+        lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
+        if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
+        setInterimText("Hearing you…");
+      },
+      onTranscribing: () => setInterimText("Transcribing…"),
+      // The listener already waited ~1 s of silence before sending the turn
+      onText: (text) => { setInterimText(""); if (text) onFinal(text, 0.85, 1200); },
+      onError: () => {
+        // Backend STT unavailable: the user types for the rest of the session
+        listener.stop();
+        if (voiceListenerRef.current === listener) voiceListenerRef.current = null;
+        setSpeechActive(false); unavailable();
+      },
+    });
+    try { listener.start(streamRef.current); voiceListenerRef.current = listener; opened(); }
+    catch { unavailable(); }
   }, [appendTranscript]);
 
   useEffect(() => { startSpeechRef.current = startSpeech; }, [startSpeech]);
@@ -1204,7 +1163,8 @@ function SessionContent() {
       startCamera(),
     ]);
     // Transcribe the user's turns on the backend when it has a speech model
-    sttModeRef.current = health && (health.local_ml?.faster_whisper || health.providers?.openai) ? "server" : "browser";
+    const stt = Boolean(health && (health.local_ml?.faster_whisper || health.providers?.openai));
+    sttAvailableRef.current = stt; setSttAvailable(stt);
     backendSessionIdRef.current = backendSession?.id ?? null;
     if (backendSession) startLiveSession(backendSession, mode as SessionType);
 
@@ -1769,6 +1729,7 @@ function SessionContent() {
                   !sessionStarted   ? "Start the interview first…" :
                   aiSpeaking        ? "Alex is speaking — listen carefully…" :
                   thinking          ? "Alex is formulating a question…" :
+                  !sttAvailable     ? "Speech recognition unavailable — type your answer…" :
                   speechActive      ? "Speaking captured — or type here…" :
                   "Speak your answer aloud, or type it here…"
                 }
@@ -1984,6 +1945,7 @@ function SessionContent() {
                     !sessionStarted ? "Start the session first…" :
                     aiSpeaking ? "Listening to your partner…" :
                     thinking   ? "Your partner is replying…" :
+                    !sttAvailable ? "Speech recognition unavailable — type your response…" :
                     speechActive ? "Speaking captured — or type here…" :
                     "Speak aloud, or type your response…"
                   }

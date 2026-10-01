@@ -115,7 +115,7 @@ type AIRow = { fn: string; used: string; model: string; input: string; output: s
 // Every AI function in the system: what runs it, and how its quality is checked
 const AI_FUNCTIONS: AIRow[] = [
   { fn: "Speech recognition", used: "All three", model: "Mesolitica Malaysian Whisper large-v3-turbo (faster-whisper, CPU int8)",
-    input: "16 kHz audio", output: "Transcript + word timings", fallback: "OpenAI Whisper → browser recogniser (live turns)", quality: "WER by language (benchmarked 6.1%)" },
+    input: "16 kHz audio", output: "Transcript + word timings", fallback: "OpenAI Whisper → typed input (live turns)", quality: "WER by language (benchmarked 6.1%)" },
   { fn: "Code-switch re-check", used: "All three", model: "Mesolitica wav2vec2-xls-r-300m-mixed",
     input: "Audio not confidently English", output: "Malay / mixed transcript", fallback: "Whisper transcript + warning", quality: "WER on mixed speech" },
   { fn: "AI partner (conversation)", used: "Conversation", model: "Ollama qwen2.5:3b",

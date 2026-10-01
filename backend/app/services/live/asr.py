@@ -82,6 +82,37 @@ def _codeswitch_model():
     return Wav2Vec2Processor.from_pretrained(CODESWITCH_MODEL_ID), model
 
 
+# Whisper sometimes "hears" these in near-silence or noise (YouTube-style outros)
+_HALLUCINATIONS = (
+    "thank you for watching", "thanks for watching", "please subscribe", "subscribe to",
+    "see you in the next video", "like and subscribe",
+)
+
+
+def whisper_segments(path: Path, language: str | None, word_timestamps: bool = False):
+    """faster-whisper with the Manglish settings (docs/manglish-transcription-spec.md §7):
+    verbatim Manglish prompt, VAD, no conditioning on previous text, and segments that look
+    like silence hallucinations dropped. Returns (segments, info); info is None when VAD
+    found no speech at all."""
+    try:
+        segments, info = _whisper_model().transcribe(
+            str(path), task="transcribe", language=language, initial_prompt=VERBATIM_PROMPT,
+            vad_filter=True, vad_parameters={"min_silence_duration_ms": 500},
+            condition_on_previous_text=False, word_timestamps=word_timestamps,
+        )
+    except ValueError:
+        # faster-whisper 1.0.3 can't auto-detect the language of zero seconds of speech
+        if language is not None:
+            raise
+        return [], None
+    kept = [
+        seg for seg in segments
+        if not (seg.no_speech_prob > 0.6 and seg.avg_logprob < -1.0)
+        and not any(h in seg.text.lower() for h in _HALLUCINATIONS)
+    ]
+    return kept, info
+
+
 def _codeswitch_transcribe(wav_16k: Path) -> str:
     import torch
 
@@ -97,12 +128,11 @@ def _codeswitch_transcribe(wav_16k: Path) -> str:
 
 def _transcribe_local(wav_16k: Path, warnings: list[str]) -> ASRResult:
     malaysian = is_malaysian_model()
-    segments, info = _whisper_model().transcribe(
-        str(wav_16k), task="transcribe", vad_filter=True, word_timestamps=True,
-        # Auto-detect for both: the detected language is the routing signal below
-        language=whisper_language(default_for_standard=None),
-    )
-    segments = list(segments)  # single-use generator
+    # Auto-detect for both: the detected language is the routing signal below
+    segments, info = whisper_segments(wav_16k, whisper_language(default_for_standard=None), word_timestamps=True)
+    if info is None:  # silence: nothing to transcribe or route
+        return ASRResult(transcript="", language="en", confidence=0.0,
+                         engine=f"faster-whisper ({Path(settings.whisper_model_size).name})")
     words = [
         {"word": w.word.strip(), "start": w.start, "end": w.end}
         for seg in segments for w in (seg.words or [])
