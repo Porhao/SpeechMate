@@ -94,6 +94,13 @@ In http://localhost:8000/docs:
 - http://localhost:8000/health shows which local models are installed (`local_ml`), where LLM calls go (`llm`), and which cloud keys are set (`providers`).
 - Stop Ollama (`docker compose stop ollama`) and chat again. The coach should return a clear "No LLM configured / unavailable" message instead of crashing.
 
+### G. Newer features
+1. **Theme:** the moon/sun button in the top bar, or Settings → Appearance (Light / Dark / System).
+2. **Notifications:** start a live session and end it, or upload a deck while signed in. When it's done, the bell at the top left shows a count. Click an item to open its results.
+3. **Reference matrix:** top bar → Reference. Three tabs: live metrics, presentation practice, project evaluation.
+4. **Deck insights:** upload `docs/samples/sample_deck.pptx` (or a PDF). After "Analysing content", the insights panel appears while the video is still building.
+5. **Camera and lighting:** in a live session the large view is a clean mirror. The corner inset shows the MediaPipe tracking, and *Lighting & contrast* gives advice once a second (try turning off the light in front of you).
+
 ### Automated tests
 ```bash
 docker compose exec backend sh -c "pip install -r requirements-dev.txt && pytest"   # backend

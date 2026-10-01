@@ -6,8 +6,9 @@ from app.models.practice_session import PracticeSession
 from app.models.chat_message import ChatMessage
 from app.models.user import User
 from app.models.live_session import LiveSession, ProgressRecord, Report
+from app.models.notification import Notification
 
 __all__ = [
     "Session", "Slide", "PracticeSession", "ChatMessage",
-    "User", "LiveSession", "ProgressRecord", "Report",
+    "User", "LiveSession", "ProgressRecord", "Report", "Notification",
 ]

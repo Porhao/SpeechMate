@@ -19,6 +19,8 @@ from app.services.coach.feedback import (
     generate_coach_feedback,
 )
 from app.services.coach.metrics import compute_metrics
+from app.services.deck_insights import coach_context
+from app.services.notifications import notify
 from app.services.coach.transcription import transcribe
 from app.services.media import SLIDE_GAP_SEC, MediaError, detect_silences, normalize_to_wav, wav_duration
 from app.services.storage import storage_service
@@ -30,6 +32,12 @@ async def _set_status(db: AsyncSession, practice: PracticeSession, status: str, 
     practice.status = status
     for key, value in fields.items():
         setattr(practice, key, value)
+    await db.commit()
+
+
+async def _notify_failed(db: AsyncSession, practice: PracticeSession, reason: str) -> None:
+    owner = (await db.execute(select(Session.user_id).where(Session.id == practice.session_id))).scalar_one_or_none()
+    notify(db, owner, "practice_failed", "Practice analysis failed", reason, f"/presentations/{practice.session_id}")
     await db.commit()
 
 
@@ -108,6 +116,9 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
                 metrics=metrics,
                 transcript=transcript,
             )
+            # What the deck is about, so feedback can judge content, not just delivery
+            if session.insights:
+                analysis_input = coach_context(session.insights) + "\n\n" + analysis_input
             feedback, warn = await generate_coach_feedback(analysis_input, metrics)
             if warn:
                 warnings.append(warn)
@@ -121,6 +132,10 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
                 db, practice, "complete",
                 feedback=feedback, audience_feedback=audience, warnings=warnings or None,
             )
+            notify(db, session.user_id, "practice_feedback", "Your practice feedback is ready",
+                   f"Coaching on your {'slide ' + str(practice.slide_index) if practice.slide_index else 'whole-deck'} "
+                   f"attempt of “{session.original_filename}”.", f"/presentations/{session.id}")
+            await db.commit()
             logger.info("Coach feedback ready for practice %s", practice_id)
 
         except MediaError as e:
@@ -128,6 +143,7 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
             await db.rollback()
             await db.refresh(practice)
             await _set_status(db, practice, "failed", error_detail=str(e), warnings=warnings or None)
+            await _notify_failed(db, practice, str(e))
         except Exception as e:  # noqa: BLE001
             logger.exception("Unexpected coach pipeline error for practice %s", practice_id)
             await db.rollback()
@@ -135,3 +151,4 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
             await _set_status(
                 db, practice, "failed", error_detail=f"Internal error: {e}", warnings=warnings or None
             )
+            await _notify_failed(db, practice, "internal error — please record again")

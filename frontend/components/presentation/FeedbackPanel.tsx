@@ -1,16 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Eye, Zap, Lightbulb, Users, AlertTriangle, ChevronDown } from "lucide-react";
+import { ThumbsUp, Eye, Zap, Lightbulb, Users, AlertTriangle, ChevronDown } from "lucide-react";
 import type { PracticeRun } from "@/types";
 import { formatDuration } from "@/utils/format";
+import { inkOf } from "@/lib/utils";
 
 function Tile({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl px-3 py-2.5" style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}>
-      <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#9B988E" }}>{label}</p>
-      <p className="text-lg font-bold tabular-nums" style={{ color: "#17181C" }}>{value}</p>
-      {hint && <p className="text-[11px]" style={{ color: "#6E6C63" }}>{hint}</p>}
+    <div className="rounded-xl px-3 py-2.5" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+      <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "var(--faint)" }}>{label}</p>
+      <p className="text-lg font-bold tabular-nums" style={{ color: "var(--ink)" }}>{value}</p>
+      {hint && <p className="text-[11px]" style={{ color: "var(--muted)" }}>{hint}</p>}
     </div>
   );
 }
@@ -19,7 +20,7 @@ function Dots({ score }: { score: number }) {
   return (
     <span className="inline-flex gap-0.5" aria-label={`${score} out of 5`}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className="w-2 h-2 rounded-full" style={{ background: i <= score ? "#23345C" : "#E6E2D8" }} />
+        <span key={i} className="w-2 h-2 rounded-full" style={{ background: i <= score ? "#23345C" : "var(--line)" }} />
       ))}
     </span>
   );
@@ -45,17 +46,17 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
 
       {fb && (
         <div className="rounded-xl p-4" style={{ background: "rgba(63,107,76,0.07)", border: "1px solid rgba(63,107,76,0.22)" }}>
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide mb-1" style={{ color: "#3F6B4C" }}>
-            <Sparkles className="w-3.5 h-3.5" /> Encouragement
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide mb-1" style={{ color: "var(--ok)" }}>
+            <ThumbsUp className="w-3.5 h-3.5" /> What went well
           </p>
-          <p className="text-sm leading-relaxed" style={{ color: "#24252B" }}>{fb.encouragement}</p>
+          <p className="text-sm leading-relaxed" style={{ color: "var(--ink-3)" }}>{fb.encouragement}</p>
         </div>
       )}
 
       {fb?.observations.map((o, i) => (
         <div key={i} className="glass-card rounded-xl p-4 space-y-3">
           {o.slide_index != null && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#23345C14", color: "#23345C" }}>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "#23345C14", color: "var(--accent-ink)" }}>
               Slide {o.slide_index}
             </span>
           )}
@@ -65,10 +66,10 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
             ["Suggestion", o.suggestion, Lightbulb, "#3F6B4C"],
           ] as const).map(([label, text, Icon, color]) => (
             <div key={label} className="flex gap-2.5">
-              <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color }} />
+              <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: inkOf(color) }} />
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color }}>{label}</p>
-                <p className="text-sm leading-relaxed" style={{ color: "#24252B" }}>{text}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: inkOf(color) }}>{label}</p>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--ink-3)" }}>{text}</p>
               </div>
             </div>
           ))}
@@ -77,7 +78,7 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
 
       {m && (
         <div>
-          <p className="text-xs font-semibold mb-2" style={{ color: "#6E6C63" }}>Delivery metrics</p>
+          <p className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>Delivery metrics</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <Tile label="Duration" value={secs(m.duration_sec)} hint={m.ideal_duration_sec ? `ideal ${secs(m.ideal_duration_sec)}` : undefined} />
             {m.wpm != null && <Tile label="Pace" value={`${Math.round(m.wpm)} wpm`} hint={m.ideal_wpm ? `ideal ${Math.round(m.ideal_wpm)} wpm` : undefined} />}
@@ -91,15 +92,15 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
             )}
           </div>
           {m.filler_words && Object.keys(m.filler_words).length > 0 && (
-            <p className="text-xs mt-2" style={{ color: "#6E6C63" }}>
+            <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>
               Fillers: {Object.entries(m.filler_words).map(([w, n]) => `“${w}” ×${n}`).join(", ")}
             </p>
           )}
           {m.missed_key_terms && m.missed_key_terms.length > 0 && (
-            <p className="text-xs mt-1" style={{ color: "#6E6C63" }}>Missed key terms: {m.missed_key_terms.join(", ")}</p>
+            <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>Missed key terms: {m.missed_key_terms.join(", ")}</p>
           )}
           {m.long_pauses.length > 0 && (
-            <p className="text-xs mt-1" style={{ color: "#6E6C63" }}>
+            <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
               Long pauses at: {m.long_pauses.map((p) => `${secs(p.at_sec)} (${p.duration_sec}s)`).join(", ")}
             </p>
           )}
@@ -111,12 +112,12 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: "#5A5470" }}>
             <Users className="w-3.5 h-3.5" /> Audience view · {aud.audience_profile}
           </p>
-          {aud.overall_impression && <p className="text-sm italic" style={{ color: "#24252B" }}>&ldquo;{aud.overall_impression}&rdquo;</p>}
-          <div className="flex gap-5 text-xs" style={{ color: "#4B4C52" }}>
+          {aud.overall_impression && <p className="text-sm italic" style={{ color: "var(--ink-3)" }}>&ldquo;{aud.overall_impression}&rdquo;</p>}
+          <div className="flex gap-5 text-xs" style={{ color: "var(--ink-2)" }}>
             <span className="flex items-center gap-2">Clarity <Dots score={aud.clarity_score} /></span>
             <span className="flex items-center gap-2">Engagement <Dots score={aud.engagement_score} /></span>
           </div>
-          <p className="text-sm" style={{ color: "#24252B" }}><b>Key takeaway:</b> {aud.key_takeaway}</p>
+          <p className="text-sm" style={{ color: "var(--ink-3)" }}><b>Key takeaway:</b> {aud.key_takeaway}</p>
           {[
             ["What held my attention", aud.engaging_moments],
             ["Where I got lost", aud.confusing_moments],
@@ -124,8 +125,8 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
           ].map(([title, items]) =>
             items && (items as string[]).length > 0 ? (
               <div key={title as string}>
-                <p className="text-xs font-semibold" style={{ color: "#6E6C63" }}>{title as string}</p>
-                <ul className="list-disc pl-5 text-sm" style={{ color: "#24252B" }}>
+                <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>{title as string}</p>
+                <ul className="list-disc pl-5 text-sm" style={{ color: "var(--ink-3)" }}>
                   {(items as string[]).map((x, i) => <li key={i}>{x}</li>)}
                 </ul>
               </div>
@@ -136,12 +137,12 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
 
       {run.transcript && (
         <div>
-          <button onClick={() => setShowTranscript((v) => !v)} className="flex items-center gap-1 text-xs font-semibold" style={{ color: "#6E6C63" }}>
+          <button onClick={() => setShowTranscript((v) => !v)} className="flex items-center gap-1 text-xs font-semibold" style={{ color: "var(--muted)" }}>
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTranscript ? "rotate-180" : ""}`} />
             {showTranscript ? "Hide" : "Show"} transcript
           </button>
           {showTranscript && (
-            <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap p-3 rounded-lg" style={{ background: "#F5F2EB", color: "#24252B" }}>
+            <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap p-3 rounded-lg" style={{ background: "var(--surface-2)", color: "var(--ink-3)" }}>
               {run.transcript}
             </p>
           )}

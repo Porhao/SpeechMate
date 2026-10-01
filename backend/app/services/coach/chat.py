@@ -14,6 +14,7 @@ from app.models.practice_session import PracticeSession
 from app.models.session import Session
 from app.models.slide import Slide
 from app.services.ai import get_llm_client, with_retries
+from app.services.deck_insights import coach_context
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +50,7 @@ def build_chat_context(
 ) -> str:
     parts = [
         f"Presenter's goal/audience: {session.requirement_prompt or 'not specified'}",
+        coach_context(session.insights) or "Deck insights: not available",
         "Ideal narration script:\n" + "\n".join(f"[Slide {s.slide_index}] {s.script_text}" for s in slides),
         f"This attempt ({practice.recording_granularity}"
         + (f", slide {practice.slide_index}" if practice.slide_index else "")

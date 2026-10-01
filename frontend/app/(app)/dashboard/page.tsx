@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { tint, inkOf } from "@/lib/utils";
+import SampleDataNotice from "@/components/ui/SampleDataNotice";
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 const RADAR_DATA = [
@@ -33,10 +35,10 @@ const PROGRESS_DATA = [
 ];
 
 const METRIC_LINES = [
-  { key: "Fluency",       color: "#23345C" },
+  { key: "Fluency",       color: "var(--accent-ink)" },
   { key: "Pronunciation", color: "#5A5470" },
-  { key: "Confidence",    color: "#8A5A22" },
-  { key: "Eye Contact",   color: "#3F6B4C" },
+  { key: "Confidence",    color: "var(--warn)" },
+  { key: "Eye Contact",   color: "var(--ok)" },
 ];
 
 const RECENT_SESSIONS = [
@@ -76,14 +78,14 @@ function ScoreGauge({ score }: { score: number }) {
   const color = gradeColor(score);
   return (
     <svg width="110" height="110" viewBox="0 0 110 110" className="flex-shrink-0">
-      <circle cx="55" cy="55" r={r} fill="none" stroke="#F0EDE5" strokeWidth="8" />
+      <circle cx="55" cy="55" r={r} fill="none" stroke="var(--line-2)" strokeWidth="8" />
       <motion.circle cx="55" cy="55" r={r} fill="none" stroke={color} strokeWidth="8"
         strokeLinecap="round" transform="rotate(-90 55 55)"
         initial={{ strokeDasharray: `0 ${circ}` }}
         animate={{ strokeDasharray: `${(score / 100) * circ} ${circ}` }}
         transition={{ duration: 1.1, ease: "easeOut", delay: 0.1 }}
       />
-      <text x="55" y="50" textAnchor="middle" fill="#17181C" fontSize="20" fontWeight="700">{score}</text>
+      <text x="55" y="50" textAnchor="middle" fill="var(--ink)" fontSize="20" fontWeight="700">{score}</text>
       <text x="55" y="65" textAnchor="middle" fill={color} fontSize="9" fontWeight="600">{gradeLabel(score)}</text>
     </svg>
   );
@@ -107,15 +109,16 @@ export default function DashboardPage() {
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1320px] mx-auto space-y-6">
+      <SampleDataNotice what="charts and scores" />
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>
+          <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>
             {timeGreeting()},&nbsp;
-            <span style={{ color: "#23345C" }}>{firstName}</span>
+            <span style={{ color: "var(--accent-ink)" }}>{firstName}</span>
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: "#9B988E" }}>Here's your communication progress.</p>
+          <p className="text-sm mt-0.5" style={{ color: "var(--faint)" }}>Here's your communication progress.</p>
         </div>
 
         {/* Streak + Level — high-contrast badges */}
@@ -127,7 +130,7 @@ export default function DashboardPage() {
               border: "1px solid rgba(138,90,34,0.25)",
             }}
           >
-            <Flame className="w-4 h-4" style={{ color: "#8A5A22" }} />
+            <Flame className="w-4 h-4" style={{ color: "var(--warn)" }} />
             <span className="text-sm font-semibold" style={{ color: "#6B4419" }}>12-day streak</span>
           </div>
           <div
@@ -137,13 +140,13 @@ export default function DashboardPage() {
               border: "1px solid rgba(35,52,92,0.25)",
             }}
           >
-            <Zap className="w-4 h-4" style={{ color: "#23345C" }} />
+            <Zap className="w-4 h-4" style={{ color: "var(--accent-ink)" }} />
             <span className="text-sm font-semibold" style={{ color: "#17233E" }}>Level 2 · Developing</span>
           </div>
           <Link
             href="/home"
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all press-effect"
-            style={{ background: "#23345C" }}
+            style={{ background: "var(--accent)" }}
           >
             <Mic className="w-4 h-4" /> Start Practice
           </Link>
@@ -156,9 +159,9 @@ export default function DashboardPage() {
         <div className="glass-card rounded-2xl p-5 flex items-center gap-4 slide-up" style={{ animationDelay: "0s" }}>
           <ScoreGauge score={overallScore} />
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#9B988E" }}>Overall</p>
-            <p className="text-sm leading-snug" style={{ color: "#4B4C52" }}>Communication<br />Performance</p>
-            <p className="text-xs font-semibold mt-2 flex items-center gap-1" style={{ color: "#3F6B4C" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--faint)" }}>Overall</p>
+            <p className="text-sm leading-snug" style={{ color: "var(--ink-2)" }}>Communication<br />Performance</p>
+            <p className="text-xs font-semibold mt-2 flex items-center gap-1" style={{ color: "var(--ok)" }}>
               <TrendingUp className="w-3 h-3" /> +4.7% this week
             </p>
           </div>
@@ -167,23 +170,23 @@ export default function DashboardPage() {
         {/* Streak */}
         <div className="glass-card rounded-2xl p-5 slide-up" style={{ animationDelay: "0.05s" }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9B988E" }}>Streak</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--faint)" }}>Streak</p>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(138,90,34,0.10)" }}>
-              <Flame className="w-4 h-4" style={{ color: "#8A5A22" }} />
+              <Flame className="w-4 h-4" style={{ color: "var(--warn)" }} />
             </div>
           </div>
-          <p className="text-3xl font-bold" style={{ color: "#17181C" }}>
-            <AnimatedNumber value={12} /> <span className="text-sm font-normal" style={{ color: "#9B988E" }}>days</span>
+          <p className="text-3xl font-bold" style={{ color: "var(--ink)" }}>
+            <AnimatedNumber value={12} /> <span className="text-sm font-normal" style={{ color: "var(--faint)" }}>days</span>
           </p>
           <div className="mt-3 space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span style={{ color: "#9B988E" }}>Longest streak</span>
-              <span className="font-semibold" style={{ color: "#34343A" }}>24 days</span>
+              <span style={{ color: "var(--faint)" }}>Longest streak</span>
+              <span className="font-semibold" style={{ color: "var(--ink-3)" }}>24 days</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span style={{ color: "#9B988E" }}>Total days</span>
-              <span className="font-semibold" style={{ color: "#34343A" }}>38 days</span>
+              <span style={{ color: "var(--faint)" }}>Total days</span>
+              <span className="font-semibold" style={{ color: "var(--ink-3)" }}>38 days</span>
             </div>
           </div>
         </div>
@@ -191,23 +194,23 @@ export default function DashboardPage() {
         {/* Practice Time */}
         <div className="glass-card rounded-2xl p-5 slide-up" style={{ animationDelay: "0.1s" }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9B988E" }}>Practice Time</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--faint)" }}>Practice Time</p>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(35,52,92,0.10)" }}>
-              <Clock className="w-4 h-4" style={{ color: "#23345C" }} />
+              <Clock className="w-4 h-4" style={{ color: "var(--accent-ink)" }} />
             </div>
           </div>
-          <p className="text-3xl font-bold" style={{ color: "#17181C" }}>
-            <AnimatedNumber value={24.5} decimals={1} /> <span className="text-sm font-normal" style={{ color: "#9B988E" }}>hours</span>
+          <p className="text-3xl font-bold" style={{ color: "var(--ink)" }}>
+            <AnimatedNumber value={24.5} decimals={1} /> <span className="text-sm font-normal" style={{ color: "var(--faint)" }}>hours</span>
           </p>
           <div className="mt-3 space-y-1.5">
             <div className="flex justify-between text-xs">
-              <span style={{ color: "#9B988E" }}>This week</span>
-              <span className="font-semibold" style={{ color: "#34343A" }}>3.2 hours</span>
+              <span style={{ color: "var(--faint)" }}>This week</span>
+              <span className="font-semibold" style={{ color: "var(--ink-3)" }}>3.2 hours</span>
             </div>
             <div className="flex justify-between text-xs">
-              <span style={{ color: "#9B988E" }}>This month</span>
-              <span className="font-semibold" style={{ color: "#34343A" }}>14.8 hours</span>
+              <span style={{ color: "var(--faint)" }}>This month</span>
+              <span className="font-semibold" style={{ color: "var(--ink-3)" }}>14.8 hours</span>
             </div>
           </div>
         </div>
@@ -215,21 +218,21 @@ export default function DashboardPage() {
         {/* Sessions */}
         <div className="glass-card rounded-2xl p-5 slide-up" style={{ animationDelay: "0.15s" }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#9B988E" }}>Sessions</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--faint)" }}>Sessions</p>
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: "rgba(35,52,92,0.10)" }}>
-              <BarChart2 className="w-4 h-4" style={{ color: "#23345C" }} />
+              <BarChart2 className="w-4 h-4" style={{ color: "var(--accent-ink)" }} />
             </div>
           </div>
-          <p className="text-3xl font-bold" style={{ color: "#17181C" }}>
-            <AnimatedNumber value={48} /> <span className="text-sm font-normal" style={{ color: "#9B988E" }}>total</span>
+          <p className="text-3xl font-bold" style={{ color: "var(--ink)" }}>
+            <AnimatedNumber value={48} /> <span className="text-sm font-normal" style={{ color: "var(--faint)" }}>total</span>
           </p>
           <div className="mt-3 grid grid-cols-2 gap-y-1.5 text-xs">
             {[["Conversation", 20], ["Interview", 12], ["Presentation", 10], ["Pronunciation", 6]].map(
               ([type, count]) => (
                 <div key={String(type)} className="flex justify-between gap-2">
-                  <span style={{ color: "#9B988E" }}>{type}</span>
-                  <span className="font-semibold" style={{ color: "#34343A" }}>{count}</span>
+                  <span style={{ color: "var(--faint)" }}>{type}</span>
+                  <span className="font-semibold" style={{ color: "var(--ink-3)" }}>{count}</span>
                 </div>
               ),
             )}
@@ -250,17 +253,17 @@ export default function DashboardPage() {
           const up = change > 0, flat = change === 0;
           return (
             <div key={label} className="glass-card rounded-2xl p-4 slide-up" style={{ animationDelay: `${i * 0.05}s` }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "#9B988E" }}>{label}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--faint)" }}>{label}</p>
               <div className="flex items-end gap-1.5 mb-2">
-                <span className="text-2xl font-bold" style={{ color }}><AnimatedNumber value={score} duration={1 + i * 0.1} /></span>
-                <span className="text-xs mb-0.5" style={{ color: "#CDC9BE" }}>/ 100</span>
+                <span className="text-2xl font-bold" style={{ color: inkOf(color) }}><AnimatedNumber value={score} duration={1 + i * 0.1} /></span>
+                <span className="text-xs mb-0.5" style={{ color: "var(--disabled)" }}>/ 100</span>
               </div>
-              <div className="h-1.5 rounded-full mb-3 overflow-hidden" style={{ background: "#F0EDE5" }}>
+              <div className="h-1.5 rounded-full mb-3 overflow-hidden" style={{ background: "var(--line-2)" }}>
                 <div className="h-full rounded-full transition-all duration-1000 ease-out" style={{ width: mounted ? `${score}%` : "0%", backgroundColor: color }} />
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span style={{ color: "#9B988E" }}>Prev: {prev}</span>
-                <span className="flex items-center gap-0.5 font-semibold" style={{ color: flat ? "#9B988E" : up ? "#3F6B4C" : "#8C3B32" }}>
+                <span style={{ color: "var(--faint)" }}>Prev: {prev}</span>
+                <span className="flex items-center gap-0.5 font-semibold" style={{ color: flat ? "var(--faint)" : up ? "#3F6B4C" : "#8C3B32" }}>
                   {flat ? <Minus className="w-3 h-3" /> : up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {flat ? "0%" : `${up ? "+" : ""}${change}%`}
                 </span>
@@ -274,18 +277,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* Radar */}
         <div className="xl:col-span-2 glass-card rounded-2xl p-6">
-          <h2 className="text-base font-semibold mb-0.5" style={{ color: "#17181C" }}>Communication Radar</h2>
-          <p className="text-xs mb-5" style={{ color: "#9B988E" }}>Holistic view across 6 skill dimensions</p>
+          <h2 className="text-base font-semibold mb-0.5" style={{ color: "var(--ink)" }}>Communication Radar</h2>
+          <p className="text-xs mb-5" style={{ color: "var(--faint)" }}>Holistic view across 6 skill dimensions</p>
           {mounted ? (
             <ResponsiveContainer width="100%" height={280}>
               <RadarChart data={RADAR_DATA} margin={{ top: 16, right: 40, bottom: 16, left: 40 }}>
-                <PolarGrid stroke="#F0EDE5" />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: "#6E6C63", fontSize: 10, fontWeight: 500 }} />
+                <PolarGrid stroke="var(--line-2)" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--muted)", fontSize: 10, fontWeight: 500 }} />
                 <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar name="Previous" dataKey="previous" stroke="#CDC9BE" fill="#F1EEE6" fillOpacity={1} strokeWidth={1.5} strokeDasharray="4 2" />
+                <Radar name="Previous" dataKey="previous" stroke="var(--disabled)" fill="var(--surface-3)" fillOpacity={1} strokeWidth={1.5} strokeDasharray="4 2" />
                 <Radar name="Current"  dataKey="current"  stroke="#23345C" fill="#23345C" fillOpacity={0.16} strokeWidth={2} />
-                <Legend iconType="line" iconSize={14} formatter={(v) => <span style={{ color: "#6E6C63", fontSize: 11 }}>{v}</span>} />
-                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E6E2D8", background: "#FFFFFF", color: "#17181C", fontSize: 12, boxShadow: "0 8px 24px rgba(23,24,28,0.1)" }} />
+                <Legend iconType="line" iconSize={14} formatter={(v) => <span style={{ color: "var(--muted)", fontSize: 11 }}>{v}</span>} />
+                <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)", fontSize: 12, boxShadow: "0 8px 24px rgba(23,24,28,0.1)" }} />
               </RadarChart>
             </ResponsiveContainer>
           ) : (
@@ -298,8 +301,8 @@ export default function DashboardPage() {
         {/* Recent Sessions */}
         <div className="glass-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold" style={{ color: "#17181C" }}>Recent Sessions</h2>
-            <Link href="/home" className="text-xs font-medium flex items-center gap-0.5 transition-colors" style={{ color: "#23345C" }}>
+            <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>Recent Sessions</h2>
+            <Link href="/home" className="text-xs font-medium flex items-center gap-0.5 transition-colors" style={{ color: "var(--accent-ink)" }}>
               New session <ChevronRight className="w-3 h-3" />
             </Link>
           </div>
@@ -307,31 +310,31 @@ export default function DashboardPage() {
             {RECENT_SESSIONS.map((s, i) => (
               <div key={i} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
                 style={{ background: "#F6F3EC" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#F1EEE6")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "#F6F3EC")}>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${s.color}16` }}>
-                  <Activity className="w-4 h-4" style={{ color: s.color }} />
+                  style={{ background: `${tint(s.color, "16")}` }}>
+                  <Activity className="w-4 h-4" style={{ color: inkOf(s.color) }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: "#24252B" }}>{s.type}</p>
-                  <p className="text-xs" style={{ color: "#9B988E" }}>{s.time} · {s.duration}</p>
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--ink-3)" }}>{s.type}</p>
+                  <p className="text-xs" style={{ color: "var(--faint)" }}>{s.time} · {s.duration}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-bold" style={{ color: gradeColor(s.score) }}>{s.score}</p>
-                  <p className="text-[10px]" style={{ color: "#CDC9BE" }}>{gradeLabel(s.score)}</p>
+                  <p className="text-sm font-bold" style={{ color: inkOf(gradeColor(s.score)) }}>{s.score}</p>
+                  <p className="text-[10px]" style={{ color: "var(--disabled)" }}>{gradeLabel(s.score)}</p>
                 </div>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4" style={{ borderTop: "1px solid #F0EDE5" }}>
-            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "#9B988E" }}>This Week</p>
+          <div className="mt-4 pt-4" style={{ borderTop: "1px solid var(--line-2)" }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--faint)" }}>This Week</p>
             <div className="grid grid-cols-3 gap-2 text-center">
               {[{ label: "Sessions", value: "4" }, { label: "Hours", value: "2.2h" }, { label: "Avg Score", value: "77" }].map(({ label, value }) => (
                 <div key={label} className="rounded-xl py-2.5"
                   style={{ background: "rgba(35,52,92,0.07)", border: "1px solid rgba(35,52,92,0.14)" }}>
-                  <p className="text-sm font-bold" style={{ color: "#17181C" }}>{value}</p>
-                  <p className="text-[10px]" style={{ color: "#9B988E" }}>{label}</p>
+                  <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>{value}</p>
+                  <p className="text-[10px]" style={{ color: "var(--faint)" }}>{label}</p>
                 </div>
               ))}
             </div>
@@ -343,16 +346,16 @@ export default function DashboardPage() {
       <div className="glass-card rounded-2xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
           <div>
-            <h2 className="text-base font-semibold" style={{ color: "#17181C" }}>Progress Trends</h2>
-            <p className="text-xs mt-0.5" style={{ color: "#9B988E" }}>4-week history — click a metric to toggle</p>
+            <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>Progress Trends</h2>
+            <p className="text-xs mt-0.5" style={{ color: "var(--faint)" }}>4-week history — click a metric to toggle</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {METRIC_LINES.map(({ key, color }) => (
               <button key={key} onClick={() => toggleLine(key)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all"
                 style={activeLines[key]
-                  ? { background: `${color}12`, color, borderColor: `${color}30` }
-                  : { background: "transparent", color: "#CDC9BE", borderColor: "#E6E2D8" }}>
+                  ? { background: `${tint(color, "12")}`, color, borderColor: `${tint(color, "30")}` }
+                  : { background: "transparent", color: "var(--disabled)", borderColor: "var(--line)" }}>
                 <span className="w-2 h-2 rounded-full" style={{ background: color }} />{key}
               </button>
             ))}
@@ -361,10 +364,10 @@ export default function DashboardPage() {
         {mounted ? (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={PROGRESS_DATA} margin={{ left: -20, right: 8, top: 4, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1EEE6" vertical={false} />
-              <XAxis dataKey="week" tick={{ fill: "#9B988E", fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis domain={[50, 100]} tick={{ fill: "#9B988E", fontSize: 12 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #E6E2D8", background: "#FFFFFF", color: "#17181C", fontSize: 12, boxShadow: "0 8px 24px rgba(23,24,28,0.1)" }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-3)" vertical={false} />
+              <XAxis dataKey="week" tick={{ fill: "var(--faint)", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[50, 100]} tick={{ fill: "var(--faint)", fontSize: 12 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--line)", background: "var(--surface)", color: "var(--ink)", fontSize: 12, boxShadow: "0 8px 24px rgba(23,24,28,0.1)" }} />
               {METRIC_LINES.map(({ key, color }) => (
                 <Line key={key} type="monotone" dataKey={key} stroke={color} strokeWidth={2} hide={!activeLines[key]}
                   dot={{ fill: color, r: 3, strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0, fill: color }} />
@@ -376,15 +379,15 @@ export default function DashboardPage() {
             <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: "#23345C", borderTopColor: "transparent" }} />
           </div>
         )}
-        <div className="mt-4 pt-4 flex items-center gap-3" style={{ borderTop: "1px solid #F1EEE6" }}>
+        <div className="mt-4 pt-4 flex items-center gap-3" style={{ borderTop: "1px solid var(--surface-3)" }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: "rgba(35,52,92,0.10)" }}>
-            <TrendingUp className="w-4 h-4" style={{ color: "#23345C" }} />
+            <TrendingUp className="w-4 h-4" style={{ color: "var(--accent-ink)" }} />
           </div>
-          <p className="text-xs" style={{ color: "#9B988E" }}>
-            <span className="font-semibold" style={{ color: "#4B4C52" }}>Forecast:</span> At your current pace,
+          <p className="text-xs" style={{ color: "var(--faint)" }}>
+            <span className="font-semibold" style={{ color: "var(--ink-2)" }}>Forecast:</span> At your current pace,
             your score is predicted to reach{" "}
-            <span className="font-semibold" style={{ color: "#23345C" }}>90</span> within 4 weeks.
+            <span className="font-semibold" style={{ color: "var(--accent-ink)" }}>90</span> within 4 weeks.
           </p>
         </div>
       </div>
@@ -394,7 +397,7 @@ export default function DashboardPage() {
         {/* Level card */}
         <div
           className="rounded-2xl p-6 text-white overflow-hidden relative"
-          style={{ background: "#23345C" }}
+          style={{ background: "var(--accent)" }}
         >
           <div className="relative flex items-center justify-between mb-5">
             <div>
@@ -409,7 +412,7 @@ export default function DashboardPage() {
             <span>Progress to Level 3</span><span>680 / 1000 XP</span>
           </div>
           <div className="relative h-2 bg-white/15 rounded-full mb-2">
-            <div className="h-full bg-white rounded-full" style={{ width: "68%" }} />
+            <div className="h-full bg-[var(--surface)] rounded-full" style={{ width: "68%" }} />
           </div>
           <p className="relative text-xs" style={{ color: "#E8E9EF" }}>320 XP remaining to Confident Speaker</p>
 
@@ -437,8 +440,8 @@ export default function DashboardPage() {
         {/* Achievements */}
         <div className="glass-card rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold" style={{ color: "#17181C" }}>Achievements</h2>
-            <span className="text-xs" style={{ color: "#9B988E" }}>3 / 6 unlocked</span>
+            <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>Achievements</h2>
+            <span className="text-xs" style={{ color: "var(--faint)" }}>3 / 6 unlocked</span>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {ACHIEVEMENTS.map(({ title, desc, unlocked, Icon, xp }) => (
@@ -446,21 +449,21 @@ export default function DashboardPage() {
                 className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center border transition-all"
                 style={unlocked
                   ? { background: "rgba(35,52,92,0.08)", borderColor: "rgba(35,52,92,0.22)" }
-                  : { background: "#F6F3EC", borderColor: "#F0EDE5", opacity: 0.55 }}>
+                  : { background: "#F6F3EC", borderColor: "var(--line-2)", opacity: 0.55 }}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: unlocked ? "#23345C" : "#E6E2D8" }}>
-                  {unlocked ? <Icon className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4" style={{ color: "#9B988E" }} />}
+                  style={{ background: unlocked ? "#23345C" : "var(--line)" }}>
+                  {unlocked ? <Icon className="w-4 h-4 text-white" /> : <Lock className="w-4 h-4" style={{ color: "var(--faint)" }} />}
                 </div>
-                <p className="text-[10px] font-semibold leading-tight" style={{ color: "#34343A" }}>{title}</p>
-                <p className="text-[9px]" style={{ color: "#9B988E" }}>+{xp} XP</p>
+                <p className="text-[10px] font-semibold leading-tight" style={{ color: "var(--ink-3)" }}>{title}</p>
+                <p className="text-[9px]" style={{ color: "var(--faint)" }}>+{xp} XP</p>
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 flex items-center justify-between" style={{ borderTop: "1px solid #F1EEE6" }}>
-            <p className="text-xs" style={{ color: "#9B988E" }}>XP earned this week</p>
+          <div className="mt-4 pt-4 flex items-center justify-between" style={{ borderTop: "1px solid var(--surface-3)" }}>
+            <p className="text-xs" style={{ color: "var(--faint)" }}>XP earned this week</p>
             <div className="flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5" style={{ color: "#8A5A22" }} />
-              <span className="text-sm font-bold" style={{ color: "#17181C" }}>+120 XP</span>
+              <Zap className="w-3.5 h-3.5" style={{ color: "var(--warn)" }} />
+              <span className="text-sm font-bold" style={{ color: "var(--ink)" }}>+120 XP</span>
             </div>
           </div>
         </div>

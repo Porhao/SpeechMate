@@ -6,6 +6,7 @@ import { Shield, Bell, User, Lock, Eye, EyeOff, Check, Trash2, Download } from "
 import { useUserStore } from "@/store/useUserStore";
 import { useRouter } from "next/navigation";
 import { Slider } from "@/components/ui/Slider";
+import { ThemeSelector } from "@/components/theme/ThemeToggle";
 
 const RETENTION_OPTIONS = ["90 days", "180 days", "1 year", "Forever"];
 
@@ -15,10 +16,10 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
       type="button"
       onClick={() => onChange(!value)}
       className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
-      style={{ background: value ? "#23345C" : "#E6E2D8" }}
+      style={{ background: value ? "#23345C" : "var(--line)" }}
     >
       <span
-        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform"
+        className="absolute top-0.5 left-0.5 w-4 h-4 bg-[var(--surface)] rounded-full shadow transition-transform"
         style={{ transform: value ? "translateX(20px)" : "translateX(0)" }}
       />
     </button>
@@ -28,8 +29,8 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="glass-card rounded-2xl overflow-hidden">
-      <div className="px-6 py-4" style={{ borderBottom: "1px solid #F0EDE5" }}>
-        <h2 className="text-sm font-semibold" style={{ color: "#17181C" }}>{title}</h2>
+      <div className="px-6 py-4" style={{ borderBottom: "1px solid var(--line-2)" }}>
+        <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{title}</h2>
       </div>
       <div className="px-6 py-5 space-y-5">{children}</div>
     </div>
@@ -40,8 +41,8 @@ function Row({ label, description, children }: { label: string; description?: st
   return (
     <div className="flex items-center justify-between gap-3 sm:gap-4">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium" style={{ color: "#17181C" }}>{label}</p>
-        {description && <p className="text-xs mt-0.5" style={{ color: "#9B988E" }}>{description}</p>}
+        <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>{label}</p>
+        {description && <p className="text-xs mt-0.5" style={{ color: "var(--faint)" }}>{description}</p>}
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
@@ -78,13 +79,13 @@ function DeleteAccountRow() {
             className="flex items-center justify-between gap-3 sm:gap-4"
           >
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium" style={{ color: "#17181C" }}>Delete Account</p>
-              <p className="text-xs mt-0.5" style={{ color: "#9B988E" }}>Permanently delete your account and all data</p>
+              <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>Delete Account</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--faint)" }}>Permanently delete your account and all data</p>
             </div>
             <button
               onClick={() => setStage("confirm")}
               className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg press-effect"
-              style={{ background: "rgba(140,59,50,0.06)", border: "1px solid rgba(140,59,50,0.25)", color: "#8C3B32" }}
+              style={{ background: "rgba(140,59,50,0.06)", border: "1px solid rgba(140,59,50,0.25)", color: "var(--bad)" }}
             >
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
@@ -99,14 +100,14 @@ function DeleteAccountRow() {
             className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5"
             style={{ background: "rgba(140,59,50,0.06)", border: "1px solid rgba(140,59,50,0.25)" }}
           >
-            <p className="text-xs font-medium min-w-0 flex-1" style={{ color: "#8C3B32" }}>
+            <p className="text-xs font-medium min-w-0 flex-1" style={{ color: "var(--bad)" }}>
               This can&apos;t be undone after 6 seconds. Sure?
             </p>
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={() => setStage("idle")}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg press-effect"
-                style={{ background: "#FFFFFF", border: "1px solid #E6E2D8", color: "#4B4C52" }}
+                style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--ink-2)" }}
               >
                 Cancel
               </button>
@@ -127,7 +128,7 @@ function DeleteAccountRow() {
             initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 400, damping: 26 }}
             className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5"
-            style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
           >
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <motion.span
@@ -136,12 +137,12 @@ function DeleteAccountRow() {
                 animate={{ opacity: [1, 0.3, 1] }}
                 transition={{ duration: 1.1, repeat: Infinity }}
               />
-              <p className="text-xs font-medium truncate" style={{ color: "#4B4C52" }}>Account scheduled for deletion…</p>
+              <p className="text-xs font-medium truncate" style={{ color: "var(--ink-2)" }}>Account scheduled for deletion…</p>
             </div>
             <button
               onClick={undo}
               className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg press-effect"
-              style={{ color: "#23345C" }}
+              style={{ color: "var(--accent-ink)" }}
             >
               Undo
             </button>
@@ -162,7 +163,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]["id"];
 
 export default function SettingsPage() {
-  const { logout } = useUserStore();
+  const { logout, user } = useUserStore();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("account");
 
@@ -200,8 +201,8 @@ export default function SettingsPage() {
 
       {/* Header */}
       <div>
-        <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>Settings</h1>
-        <p className="text-sm mt-1" style={{ color: "#9B988E" }}>
+        <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Settings</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--faint)" }}>
           Manage your account preferences and privacy
         </p>
       </div>
@@ -209,20 +210,20 @@ export default function SettingsPage() {
       {/* Tabs */}
       <div
         className="flex gap-1 rounded-2xl p-1"
-        style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}
+        style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
       >
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className="relative flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors"
-            style={{ color: tab === id ? "#17233E" : "#6E6C63" }}
+            style={{ color: tab === id ? "#17233E" : "var(--muted)" }}
           >
             {tab === id && (
               <motion.div
                 layoutId="settings-tab-pill"
                 className="absolute inset-0 rounded-xl"
-                style={{ background: "#FFFFFF", boxShadow: "0 0 0 1px rgba(35,52,92,0.25), 0 2px 8px rgba(35,52,92,0.10)" }}
+                style={{ background: "var(--surface)", boxShadow: "0 0 0 1px rgba(35,52,92,0.25), 0 2px 8px rgba(35,52,92,0.10)" }}
                 transition={{ type: "spring", stiffness: 480, damping: 34 }}
               />
             )}
@@ -235,20 +236,25 @@ export default function SettingsPage() {
       {/* Account */}
       {tab === "account" && (
         <div className="space-y-4">
+          <Section title="Appearance">
+            <Row label="Theme" description="Light, dark, or follow your device setting">
+              <ThemeSelector />
+            </Row>
+          </Section>
           <Section title="Account">
             <Row label="Full Name" description="Your display name across the app">
-              <span className="text-sm" style={{ color: "#4B4C52" }}>Ahmad Rizwan</span>
+              <span className="text-sm" style={{ color: "var(--ink-2)" }} suppressHydrationWarning>{user?.full_name ?? "Not signed in"}</span>
             </Row>
-            <div style={{ borderTop: "1px solid #F0EDE5" }} />
+            <div style={{ borderTop: "1px solid var(--line-2)" }} />
             <Row label="Email Address" description="Used for login and reports">
-              <span className="text-sm" style={{ color: "#4B4C52" }}>ahmad@example.com</span>
+              <span className="text-sm" style={{ color: "var(--ink-2)" }} suppressHydrationWarning>{user?.email ?? "—"}</span>
             </Row>
-            <div style={{ borderTop: "1px solid #F0EDE5" }} />
+            <div style={{ borderTop: "1px solid var(--line-2)" }} />
             <Row label="Edit Profile" description="Update name, language, and goals">
               <button
                 onClick={() => router.push("/profile")}
                 className="text-xs font-semibold transition-colors"
-                style={{ color: "#23345C" }}
+                style={{ color: "var(--accent-ink)" }}
               >
                 Go to Profile →
               </button>
@@ -260,12 +266,12 @@ export default function SettingsPage() {
               <button
                 onClick={handleLogout}
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#4B4C52" }}
+                style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink-2)" }}
               >
                 Sign Out
               </button>
             </Row>
-            <div style={{ borderTop: "1px solid #F0EDE5" }} />
+            <div style={{ borderTop: "1px solid var(--line-2)" }} />
             <DeleteAccountRow />
           </Section>
         </div>
@@ -282,7 +288,7 @@ export default function SettingsPage() {
             { key: "tips",            label: "AI Coaching Tips",        desc: "Daily personalized tips from your AI coach" },
           ] as const).map(({ key, label, desc }, i) => (
             <div key={key}>
-              {i > 0 && <div style={{ borderTop: "1px solid #F0EDE5" }} />}
+              {i > 0 && <div style={{ borderTop: "1px solid var(--line-2)" }} />}
               <Row label={label} description={desc}>
                 <Toggle value={notifs[key]} onChange={(v) => setNotifs((n) => ({ ...n, [key]: v }))} />
               </Row>
@@ -301,7 +307,7 @@ export default function SettingsPage() {
               { key: "storeVideo",     label: "Store Video Recordings",     desc: "Keep video recordings for posture/eye contact AI analysis" },
             ] as const).map(({ key, label, desc }, i) => (
               <div key={key}>
-                {i > 0 && <div style={{ borderTop: "1px solid #F0EDE5" }} />}
+                {i > 0 && <div style={{ borderTop: "1px solid var(--line-2)" }} />}
                 <Row label={label} description={desc}>
                   <Toggle value={privacy[key]} onChange={(v) => setPrivacy((p) => ({ ...p, [key]: v }))} />
                 </Row>
@@ -313,16 +319,16 @@ export default function SettingsPage() {
             <Row label="Export My Data" description="Download all your session data, scores, and history as CSV">
               <button
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg"
-                style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#4B4C52" }}
+                style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink-2)" }}
               >
                 <Download className="w-3.5 h-3.5" /> Export
               </button>
             </Row>
-            <div style={{ borderTop: "1px solid #F0EDE5" }} />
+            <div style={{ borderTop: "1px solid var(--line-2)" }} />
             <div>
-              <p className="text-sm font-medium" style={{ color: "#17181C" }}>Data Retention</p>
-              <p className="text-xs mt-0.5 mb-4" style={{ color: "#9B988E" }}>
-                Session data is kept for <strong style={{ color: "#34343A" }}>{RETENTION_OPTIONS[retention]}</strong> before automatic deletion
+              <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>Data Retention</p>
+              <p className="text-xs mt-0.5 mb-4" style={{ color: "var(--faint)" }}>
+                Session data is kept for <strong style={{ color: "var(--ink-3)" }}>{RETENTION_OPTIONS[retention]}</strong> before automatic deletion
               </p>
               <div className="max-w-[360px]">
                 <Slider
@@ -334,7 +340,7 @@ export default function SettingsPage() {
                 />
                 <div className="flex justify-between mt-1.5">
                   {RETENTION_OPTIONS.map((label) => (
-                    <span key={label} className="text-[10px]" style={{ color: "#CDC9BE" }}>{label}</span>
+                    <span key={label} className="text-[10px]" style={{ color: "var(--disabled)" }}>{label}</span>
                   ))}
                 </div>
               </div>
@@ -345,8 +351,8 @@ export default function SettingsPage() {
             className="rounded-2xl px-5 py-4"
             style={{ background: "rgba(35,52,92,0.06)", border: "1px solid rgba(35,52,92,0.16)" }}
           >
-            <p className="text-xs leading-relaxed" style={{ color: "#4B4C52" }}>
-              SpeechMate complies with <strong style={{ color: "#17181C" }}>Malaysia PDPA</strong>. Your personal data is encrypted at rest (AES-256) and in transit (TLS 1.3). We never sell your data to third parties.
+            <p className="text-xs leading-relaxed" style={{ color: "var(--ink-2)" }}>
+              SpeechMate complies with <strong style={{ color: "var(--ink)" }}>Malaysia PDPA</strong>. Your personal data is encrypted at rest (AES-256) and in transit (TLS 1.3). We never sell your data to third parties.
             </p>
           </div>
         </div>
@@ -360,7 +366,7 @@ export default function SettingsPage() {
               const labels = { current: "Current Password", next: "New Password", confirm: "Confirm New Password" };
               return (
                 <div key={field}>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: "#6E6C63" }}>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--muted)" }}>
                     {labels[field]}
                   </label>
                   <div className="relative">
@@ -370,15 +376,15 @@ export default function SettingsPage() {
                       onChange={(e) => setPwForm((p) => ({ ...p, [field]: e.target.value }))}
                       placeholder="••••••••"
                       className="w-full pr-10 px-3 py-2.5 rounded-xl text-sm outline-none transition-all placeholder:text-slate-400"
-                      style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+                      style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
                       onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(35,52,92,0.5)"; }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = "#E6E2D8"; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = "var(--line)"; }}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPw((p) => ({ ...p, [field]: !p[field] }))}
                       className="absolute right-3 top-1/2 -translate-y-1/2"
-                      style={{ color: "#9B988E" }}
+                      style={{ color: "var(--faint)" }}
                     >
                       {showPw[field] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -388,11 +394,11 @@ export default function SettingsPage() {
             })}
 
             {pwForm.next && pwForm.confirm && pwForm.next !== pwForm.confirm && (
-              <p className="text-xs" style={{ color: "#8C3B32" }}>Passwords do not match.</p>
+              <p className="text-xs" style={{ color: "var(--bad)" }}>Passwords do not match.</p>
             )}
 
             <div className="flex items-center justify-between pt-2">
-              <p className="text-xs" style={{ color: "#9B988E" }}>Minimum 8 characters required.</p>
+              <p className="text-xs" style={{ color: "var(--faint)" }}>Minimum 8 characters required.</p>
               <button
                 type="submit"
                 disabled={!pwForm.current || !pwForm.next || pwForm.next !== pwForm.confirm}

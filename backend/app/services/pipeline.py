@@ -21,6 +21,8 @@ from app.database import async_session_factory
 from app.models.session import Session
 from app.models.slide import Slide
 from app.services import malaysian_tts
+from app.services.deck_insights import analyse_deck, script_context
+from app.services.notifications import notify
 from app.services.ai import unload_local_model
 from app.services.media import (
     MediaError,
@@ -66,27 +68,37 @@ async def run_ideal_presentation_pipeline(session_id: uuid.UUID) -> None:
 
         try:
             slides = await _stage_process_slides(db, session)
+            await _stage_analyze_content(db, session, slides)
             await _stage_generate_scripts(db, session, slides)
             await _stage_synthesize_audio(db, session, slides)
             await _stage_assemble_video(db, session, slides)
             await _set_status(db, session, "complete")
+            notify(db, session.user_id, "deck_ready", "Your example presentation is ready",
+                   f"“{session.original_filename}” — watch it, then record your practice.", f"/presentations/{session.id}")
+            await db.commit()
         except (PipelineError, SlideProcessorError, MediaError) as e:
             logger.error("Pipeline failed for session %s: %s", session_id, e)
             await db.rollback()
             await db.refresh(session)
             await _set_status(db, session, "failed", error_detail=str(e))
+            notify(db, session.user_id, "deck_failed", "Example presentation failed",
+                   f"“{session.original_filename}”: {e}", f"/presentations/{session.id}")
+            await db.commit()
         except Exception as e:  # noqa: BLE001
             logger.exception("Unexpected pipeline error for session %s", session_id)
             await db.rollback()
             await db.refresh(session)
             await _set_status(db, session, "failed", error_detail=f"Internal error: {e}")
+            notify(db, session.user_id, "deck_failed", "Example presentation failed",
+                   f"“{session.original_filename}” hit an internal error — try Retry.", f"/presentations/{session.id}")
+            await db.commit()
 
 
 # ── Stage 1: Slide Processing ────────────────────────────────────────────────
 async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slide]:
     await _set_status(
         db, session, "processing_slides",
-        error_detail=None, warnings=None, video_storage_path=None, voice_cloning_used=None,
+        error_detail=None, warnings=None, video_storage_path=None, voice_cloning_used=None, insights=None,
     )
     # Retries start from a clean slate
     await db.execute(delete(Slide).where(Slide.session_id == session.id))
@@ -116,6 +128,16 @@ async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slid
     return slides
 
 
+# ── Stage 1b: Content analysis (deck insights) ──────────────────────────────
+async def _stage_analyze_content(db: AsyncSession, session: Session, slides: list[Slide]) -> None:
+    await _set_status(db, session, "analyzing_content")
+    insights, warning = await analyse_deck([s.slide_text or "" for s in slides], session.requirement_prompt)
+    session.insights = insights
+    if warning:
+        _add_warning(session, warning)
+    await db.commit()
+
+
 # ── Stage 2: Script Generation (VLM) ─────────────────────────────────────────
 async def _stage_generate_scripts(db: AsyncSession, session: Session, slides: list[Slide]) -> None:
     await _set_status(db, session, "generating_scripts")
@@ -131,6 +153,7 @@ async def _stage_generate_scripts(db: AsyncSession, session: Session, slides: li
             slide_text=slide.slide_text or "",
             requirement_prompt=session.requirement_prompt,
             previous_script=previous,
+            deck_context=script_context(session.insights, slide.slide_index),
         )
         slide.script_text = result.text
         slide.script_word_count = result.word_count

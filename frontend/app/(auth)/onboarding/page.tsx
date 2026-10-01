@@ -19,6 +19,7 @@ import {
   Brain,
 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
+import { tint, inkOf } from "@/lib/utils";
 
 // ── Step data ─────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ const SKILL_LEVELS = [
 ] as const;
 
 const CHALLENGES = [
-  { value: "Filler Words",   icon: Mic,      color: "#23345C" },
+  { value: "Filler Words",   icon: Mic,      color: "var(--accent-ink)" },
   { value: "Pronunciation",  icon: Volume2,   color: "#5A5470" },
   { value: "Eye Contact",    icon: Eye,       color: "#4D7A59" },
   { value: "Speaking Pace",  icon: Activity,  color: "#9C6A28" },
@@ -79,10 +80,10 @@ function StepDot({ step, current, total }: { step: number; current: number; tota
     <div
       className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
         done
-          ? "bg-[#23345C] text-white"
+          ? "bg-[var(--accent)] text-white"
           : active
-          ? "bg-[#23345C] text-white ring-4 ring-[#23345C]/20"
-          : "bg-[#E6E2D8] text-[#9B988E]"
+          ? "bg-[var(--accent)] text-white ring-4 ring-[#23345C]/20"
+          : "bg-[var(--line)] text-[var(--faint)]"
       }`}
     >
       {done ? <CheckCircle2 className="w-4 h-4" /> : step}
@@ -126,6 +127,7 @@ export default function OnboardingPage() {
   };
 
   return (
+    <div className="min-h-dvh flex items-center justify-center p-4">
     <div className="w-full max-w-[560px] mx-auto">
 
       {/* ── Step indicator ─────────────────────────────────────────────── */}
@@ -134,22 +136,22 @@ export default function OnboardingPage() {
           <div key={s} className="flex items-center flex-1 last:flex-none">
             <StepDot step={s} current={step} total={TOTAL} />
             {s < TOTAL && (
-              <div className={`flex-1 h-0.5 mx-1 ${s < step ? "bg-[#23345C]" : "bg-[#E6E2D8]"}`} />
+              <div className={`flex-1 h-0.5 mx-1 ${s < step ? "bg-[var(--accent)]" : "bg-[var(--line)]"}`} />
             )}
           </div>
         ))}
       </div>
 
       {/* ── Card ───────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.10)] p-8">
+      <div className="bg-[var(--surface)] rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.10)] p-8">
 
         {/* ── Step 1: Goal ─────────────────────────────────────────────── */}
         {step === 1 && (
           <>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-[#23345C] uppercase tracking-widest mb-1">Step 1 of 4</p>
-              <h1 className="font-display text-2xl text-[#17181C]">What's your main goal?</h1>
-              <p className="text-sm text-[#6E6C63] mt-1">We'll personalise your practice sessions based on your answer.</p>
+              <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 1 of 4</p>
+              <h1 className="font-display text-2xl text-[var(--ink)]">What's your main goal?</h1>
+              <p className="text-sm text-[var(--muted)] mt-1">We'll personalise your practice sessions based on your answer.</p>
             </div>
             <div className="space-y-2">
               {GOALS.map(({ value, label, icon: Icon, desc }) => {
@@ -159,17 +161,17 @@ export default function OnboardingPage() {
                     key={value}
                     onClick={() => setGoal(value)}
                     className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all ${
-                      active ? "border-[#23345C] bg-[#E8E9EF]" : "border-[#E6E2D8] hover:bg-[#F5F2EB]"
+                      active ? "border-[#23345C] bg-[#E8E9EF]" : "border-[var(--line)] hover:bg-[var(--surface-2)]"
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[#23345C]" : "bg-[#F5F2EB]"}`}>
-                      <Icon className={`w-5 h-5 ${active ? "text-white" : "text-[#6E6C63]"}`} />
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[var(--accent)]" : "bg-[var(--surface-2)]"}`}>
+                      <Icon className={`w-5 h-5 ${active ? "text-white" : "text-[var(--muted)]"}`} />
                     </div>
                     <div>
-                      <p className={`text-sm font-semibold ${active ? "text-[#23345C]" : "text-[#17181C]"}`}>{label}</p>
-                      <p className="text-xs text-[#6E6C63] mt-0.5">{desc}</p>
+                      <p className={`text-sm font-semibold ${active ? "text-[var(--accent-ink)]" : "text-[var(--ink)]"}`}>{label}</p>
+                      <p className="text-xs text-[var(--muted)] mt-0.5">{desc}</p>
                     </div>
-                    {active && <CheckCircle2 className="w-5 h-5 text-[#23345C] ml-auto flex-shrink-0" />}
+                    {active && <CheckCircle2 className="w-5 h-5 text-[var(--accent-ink)] ml-auto flex-shrink-0" />}
                   </button>
                 );
               })}
@@ -181,9 +183,9 @@ export default function OnboardingPage() {
         {step === 2 && (
           <>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-[#23345C] uppercase tracking-widest mb-1">Step 2 of 4</p>
-              <h1 className="font-display text-2xl text-[#17181C]">How would you rate your speaking?</h1>
-              <p className="text-sm text-[#6E6C63] mt-1">Be honest — we'll calibrate feedback difficulty to your level.</p>
+              <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 2 of 4</p>
+              <h1 className="font-display text-2xl text-[var(--ink)]">How would you rate your speaking?</h1>
+              <p className="text-sm text-[var(--muted)] mt-1">Be honest — we'll calibrate feedback difficulty to your level.</p>
             </div>
             <div className="space-y-3">
               {SKILL_LEVELS.map(({ value, label, desc, color, bg }) => {
@@ -193,21 +195,21 @@ export default function OnboardingPage() {
                     key={value}
                     onClick={() => setSkill(value)}
                     className={`w-full flex items-center gap-4 p-5 rounded-2xl border text-left transition-all ${
-                      active ? "border-transparent" : "border-[#E6E2D8] hover:bg-[#F5F2EB]"
+                      active ? "border-transparent" : "border-[var(--line)] hover:bg-[var(--surface-2)]"
                     }`}
                     style={active ? { backgroundColor: bg, borderColor: color } : {}}
                   >
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-bold"
-                      style={{ backgroundColor: active ? color : "#F1EEE6", color: active ? "#fff" : "#9B988E" }}
+                      style={{ backgroundColor: active ? color : "var(--surface-3)", color: active ? "#fff" : "var(--faint)" }}
                     >
                       {value[0]}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-bold" style={{ color: active ? color : "#17181C" }}>{label}</p>
-                      <p className="text-xs text-[#6E6C63] mt-0.5">{desc}</p>
+                      <p className="text-sm font-bold" style={{ color: active ? color : "var(--ink)" }}>{label}</p>
+                      <p className="text-xs text-[var(--muted)] mt-0.5">{desc}</p>
                     </div>
-                    {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color }} />}
+                    {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: inkOf(color) }} />}
                   </button>
                 );
               })}
@@ -219,9 +221,9 @@ export default function OnboardingPage() {
         {step === 3 && (
           <>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-[#23345C] uppercase tracking-widest mb-1">Step 3 of 4</p>
-              <h1 className="font-display text-2xl text-[#17181C]">What are your main challenges?</h1>
-              <p className="text-sm text-[#6E6C63] mt-1">Select all that apply. We'll focus extra coaching here.</p>
+              <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 3 of 4</p>
+              <h1 className="font-display text-2xl text-[var(--ink)]">What are your main challenges?</h1>
+              <p className="text-sm text-[var(--muted)] mt-1">Select all that apply. We'll focus extra coaching here.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {CHALLENGES.map(({ value, icon: Icon, color }) => {
@@ -231,19 +233,19 @@ export default function OnboardingPage() {
                     key={value}
                     onClick={() => toggleChallenge(value)}
                     className={`flex items-center gap-3 p-4 rounded-2xl border text-left transition-all ${
-                      active ? "border-transparent" : "border-[#E6E2D8] hover:bg-[#F5F2EB]"
+                      active ? "border-transparent" : "border-[var(--line)] hover:bg-[var(--surface-2)]"
                     }`}
-                    style={active ? { backgroundColor: `${color}12`, borderColor: color } : {}}
+                    style={active ? { backgroundColor: `${tint(color, "12")}`, borderColor: color } : {}}
                   >
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: active ? color : "#F1EEE6" }}
+                      style={{ backgroundColor: active ? color : "var(--surface-3)" }}
                     >
-                      <Icon className="w-4 h-4" style={{ color: active ? "#fff" : "#9B988E" }} />
+                      <Icon className="w-4 h-4" style={{ color: active ? "#fff" : "var(--faint)" }} />
                     </div>
-                    <span className="text-sm font-semibold" style={{ color: active ? color : "#17181C" }}>{value}</span>
+                    <span className="text-sm font-semibold" style={{ color: active ? color : "var(--ink)" }}>{value}</span>
                     {active && (
-                      <CheckCircle2 className="w-4 h-4 flex-shrink-0 ml-auto" style={{ color }} />
+                      <CheckCircle2 className="w-4 h-4 flex-shrink-0 ml-auto" style={{ color: inkOf(color) }} />
                     )}
                   </button>
                 );
@@ -256,9 +258,9 @@ export default function OnboardingPage() {
         {step === 4 && (
           <>
             <div className="mb-6">
-              <p className="text-xs font-semibold text-[#23345C] uppercase tracking-widest mb-1">Step 4 of 4</p>
-              <h1 className="font-display text-2xl text-[#17181C]">Preferred practice style?</h1>
-              <p className="text-sm text-[#6E6C63] mt-1">Don't worry — you can use all modes anytime.</p>
+              <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 4 of 4</p>
+              <h1 className="font-display text-2xl text-[var(--ink)]">Preferred practice style?</h1>
+              <p className="text-sm text-[var(--muted)] mt-1">Don't worry — you can use all modes anytime.</p>
             </div>
             <div className="space-y-2">
               {PRACTICE_TYPES.map(({ value, label, icon: Icon, color, desc }) => {
@@ -268,21 +270,21 @@ export default function OnboardingPage() {
                     key={value}
                     onClick={() => setPracticeType(value)}
                     className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all ${
-                      active ? "border-transparent" : "border-[#E6E2D8] hover:bg-[#F5F2EB]"
+                      active ? "border-transparent" : "border-[var(--line)] hover:bg-[var(--surface-2)]"
                     }`}
-                    style={active ? { backgroundColor: `${color}10`, borderColor: color } : {}}
+                    style={active ? { backgroundColor: `${tint(color, "10")}`, borderColor: color } : {}}
                   >
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: active ? color : "#F5F2EB" }}
+                      style={{ backgroundColor: active ? color : "var(--surface-2)" }}
                     >
-                      <Icon className="w-5 h-5" style={{ color: active ? "#fff" : "#6E6C63" }} />
+                      <Icon className="w-5 h-5" style={{ color: active ? "#fff" : "var(--muted)" }} />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold" style={{ color: active ? color : "#17181C" }}>{label}</p>
-                      <p className="text-xs text-[#6E6C63] mt-0.5">{desc}</p>
+                      <p className="text-sm font-semibold" style={{ color: active ? color : "var(--ink)" }}>{label}</p>
+                      <p className="text-xs text-[var(--muted)] mt-0.5">{desc}</p>
                     </div>
-                    {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color }} />}
+                    {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: inkOf(color) }} />}
                   </button>
                 );
               })}
@@ -291,11 +293,11 @@ export default function OnboardingPage() {
         )}
 
         {/* ── Navigation ─────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-[#F1EEE6]">
+        <div className="flex items-center justify-between mt-8 pt-6 border-t border-[var(--surface-3)]">
           {step > 1 ? (
             <button
               onClick={() => setStep((s) => s - 1)}
-              className="flex items-center gap-1.5 text-sm text-[#6E6C63] hover:text-[#17181C] px-4 py-2 rounded-xl hover:bg-[#F5F2EB] transition-colors"
+              className="flex items-center gap-1.5 text-sm text-[var(--muted)] hover:text-[var(--ink)] px-4 py-2 rounded-xl hover:bg-[var(--surface-2)] transition-colors"
             >
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
@@ -307,7 +309,7 @@ export default function OnboardingPage() {
             <button
               disabled={!canNext}
               onClick={() => setStep((s) => s + 1)}
-              className="flex items-center gap-1.5 bg-[#23345C] hover:bg-[#17233E] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all press-effect"
+              className="flex items-center gap-1.5 bg-[var(--accent)] hover:bg-[#17233E] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all press-effect"
             >
               Continue <ChevronRight className="w-4 h-4" />
             </button>
@@ -315,7 +317,7 @@ export default function OnboardingPage() {
             <button
               disabled={!canNext}
               onClick={handleFinish}
-              className="flex items-center gap-2 bg-[#23345C] hover:bg-[#17233E] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all"
+              className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[#17233E] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all"
             >
               <CheckCircle2 className="w-4 h-4" /> Start Practicing!
             </button>
@@ -324,14 +326,15 @@ export default function OnboardingPage() {
       </div>
 
       {/* ── Skip link ──────────────────────────────────────────────────── */}
-      <p className="text-center mt-4 text-xs text-[#9B988E]">
+      <p className="text-center mt-4 text-xs text-[var(--faint)]">
         <button
           onClick={() => router.push("/dashboard")}
-          className="hover:text-[#6E6C63] underline underline-offset-2 transition-colors"
+          className="hover:text-[var(--muted)] underline underline-offset-2 transition-colors"
         >
           Skip for now
         </button>
       </p>
+    </div>
     </div>
   );
 }

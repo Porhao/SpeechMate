@@ -61,7 +61,7 @@ export default function CoachChat({ sessionId, practiceId, compact = false }: {
           <div className="flex flex-wrap gap-2">
             {STARTERS.map((q) => (
               <button key={q} onClick={() => send(q)} className="text-xs px-3 py-1.5 rounded-lg"
-                style={{ background: "#23345C10", color: "#23345C", border: "1px solid #23345C25" }}>
+                style={{ background: "#23345C10", color: "var(--accent-ink)", border: "1px solid #23345C25" }}>
                 {q}
               </button>
             ))}
@@ -70,24 +70,24 @@ export default function CoachChat({ sessionId, practiceId, compact = false }: {
         {messages.map((msg, i) => (
           <div key={i} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
             {msg.role === "assistant" && (
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#23345C" }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "var(--accent)" }}>
                 <Bot className="w-3.5 h-3.5 text-white" />
               </div>
             )}
             <div
               className="px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap max-w-[85%]"
               style={msg.role === "assistant"
-                ? { background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#24252B", borderRadius: "14px 14px 14px 4px" }
-                : { background: "#23345C", color: "white", borderRadius: "14px 14px 4px 14px" }}
+                ? { background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink-3)", borderRadius: "14px 14px 14px 4px" }
+                : { background: "var(--accent)", color: "white", borderRadius: "14px 14px 4px 14px" }}
             >
               {msg.content}
             </div>
           </div>
         ))}
-        {loading && <Loader2 className="w-4 h-4 animate-spin" style={{ color: "#23345C" }} />}
+        {loading && <Loader2 className="w-4 h-4 animate-spin" style={{ color: "var(--accent-ink)" }} />}
       </div>
 
-      {error && <p className="text-xs mt-2" style={{ color: "#8C3B32" }}>{error}</p>}
+      {error && <p className="text-xs mt-2" style={{ color: "var(--bad)" }}>{error}</p>}
 
       <div className="flex gap-2 mt-3 flex-shrink-0">
         <input
@@ -98,10 +98,10 @@ export default function CoachChat({ sessionId, practiceId, compact = false }: {
           maxLength={4000}
           placeholder="Ask the coach about this attempt…"
           className="flex-1 px-3 py-2 rounded-xl text-sm outline-none placeholder:text-slate-400 disabled:opacity-60"
-          style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
         />
         <button onClick={() => send()} disabled={loading || !input.trim()} aria-label="Send"
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-white disabled:opacity-40" style={{ background: "#23345C" }}>
+          className="w-9 h-9 flex items-center justify-center rounded-xl text-white disabled:opacity-40" style={{ background: "var(--accent)" }}>
           <Send className="w-4 h-4" />
         </button>
       </div>

@@ -23,23 +23,79 @@
   --color-border:          #E6E2D8;
   --font-sans:             "var(--font-inter)", "Inter", "Segoe UI", sans-serif;
   --font-serif:            "var(--font-serif)", "Source Serif 4", Georgia, serif;
-  --radius-sm:  6px;
-  --radius-md:  8px;
-  --radius-lg:  12px;
-  --radius-xl:  16px;
+  /* Near-square corners everywhere: rounded-* classes resolve to these, so cards,
+     buttons and inputs read as drawn edges rather than soft "app tiles". Only
+     rounded-full (avatars, status dots) stays round. */
+  --radius-xs:  1px;
+  --radius-sm:  2px;
+  --radius-md:  2px;
+  --radius-lg:  3px;
+  --radius-xl:  3px;
+  --radius-2xl: 4px;
+  --radius-3xl: 4px;
+  --radius-4xl: 4px;
   --shadow-card:  0px 1px 2px rgba(23,24,28,0.05);
   --shadow-hover: 0px 8px 20px rgba(23,24,28,0.08);
   --shadow-modal: 0px 20px 48px rgba(23,24,28,0.16);
 }
 
 :root {
-  --background: #FBFAF7;
-  --foreground: #17181C;
+  /* Semantic colours — every page uses these, so light/dark is one switch.
+     Text on its usual background is ≥ 4.5:1 (WCAG AA) in both themes. */
+  --bg:          #FBFAF7;
+  --surface:     #FFFFFF;
+  --surface-2:   #F5F2EB;
+  --surface-3:   #F1EEE6;
+  --line:        #E6E2D8;
+  --line-2:      #F0EDE5;
+  --line-strong: #D8D3C6;
+  --ink:         #17181C;   /* headings, primary text      16.9:1 on --bg */
+  --ink-3:       #24252B;   /* body text                   14.6:1 */
+  --ink-2:       #4B4C52;   /* secondary text               8.0:1 */
+  --muted:       #6E6C63;   /* labels, captions             5.2:1 */
+  --faint:       #8A877E;   /* hints, timestamps            3.6:1 (large/non-essential) */
+  --disabled:    #CDC9BE;
+  --accent:      #23345C;   /* filled buttons (white text 11.6:1) */
+  --accent-ink:  #23345C;   /* links / accent text         11.2:1 */
+  --ok:          #3F6B4C;
+  --warn:        #8A5A22;
+  --bad:         #8C3B32;
+  --violet-ink:  #5A5470;
+  --teal-ink:    #3C6E78;
+  --slate-ink:   #5C729B;
+  --background:  var(--bg);
+  --foreground:  var(--ink);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg:          #111214;
+  --surface:     #1A1B1F;
+  --surface-2:   #222328;
+  --surface-3:   #2A2B31;
+  --line:        #34353C;
+  --line-2:      #2A2B31;
+  --line-strong: #474851;
+  --ink:         #EEECE6;   /* 15.4:1 on --bg */
+  --ink-3:       #DEDBD3;   /* 13.0:1 */
+  --ink-2:       #C3C0B7;   /* 10.1:1 */
+  --muted:       #A3A097;   /*  7.0:1 */
+  --faint:       #85827A;   /*  4.6:1 */
+  --disabled:    #55534D;
+  --accent:      #3A5795;   /* filled buttons (white text 6.9:1) */
+  --accent-ink:  #A9BCE6;   /* 9.6:1 */
+  --ok:          #8CC09C;
+  --warn:        #E0A869;
+  --bad:         #EE968A;
+  --violet-ink:  #BDB6D6;
+  --teal-ink:    #8CC3CC;
+  --slate-ink:   #A9B9D8;
+  color-scheme: dark;
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
 body {
-  background: #FBFAF7;
+  background: var(--bg);
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -129,14 +185,14 @@ select:focus-visible,
    a hairline border for definition, and only the barest shadow. No blur,
    no glow, no color-tinted shadow on hover — just a slightly firmer line. */
 .glass-card {
-  background: #FFFFFF;
-  border: 1px solid var(--color-border);
+  background: var(--surface);
+  border: 1px solid var(--line);
   box-shadow: var(--shadow-card);
   transition: border-color 0.2s ease;
 }
 
 .glass-card:hover {
-  border-color: #C9C4B6;
+  border-color: var(--line-strong);
 }
 
 /* Light glass — kept for the one true overlay use (mobile nav backdrop, in
@@ -179,17 +235,15 @@ select:focus-visible,
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  border-color: #C9C4B6;
+  border-color: var(--line-strong);
 }
 
-/* Micro interactions — quick compress on press, springy overshoot on release
-   (the "pop" — press down fast, settle past 1.0 then back, like a real button). */
+/* Micro interactions — a small, plain press; no springy overshoot. */
 .press-effect {
-  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.12s ease-out;
 }
 .press-effect:active {
-  transform: scale(0.96);
-  transition: transform 0.08s ease-out;
+  transform: translateY(1px);
 }
 
 /* Every clickable control gets this by default, not just the ones
@@ -200,15 +254,12 @@ select:focus-visible,
    where a scale-down would look wrong (e.g. something already being
    dragged) or where a whole row/card is clickable and shouldn't jump. */
 button:not(:disabled):not(.no-press),
-[role="button"]:not(.no-press),
-a[href]:not(.no-press) {
-  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+[role="button"]:not(.no-press) {
+  transition: transform 0.12s ease-out;
 }
 button:not(:disabled):not(.no-press):active,
-[role="button"]:not(.no-press):active,
-a[href]:not(.no-press):active {
-  transform: scale(0.95);
-  transition: transform 0.08s ease-out;
+[role="button"]:not(.no-press):active {
+  transform: translateY(1px);
 }
 
 /* Slide-up reveal */

@@ -5,18 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Upload, FileText, Mic, Square, RotateCcw, Trash2, Loader2, ChevronRight,
-  AlertTriangle, CheckCircle2, XCircle, Sparkles, X,
+  AlertTriangle, CheckCircle2, XCircle, ArrowRight, X,
 } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
 import { useRecorder } from "@/hooks/useRecorder";
 import type { BackendHealth, DeckListItem, NarratorVoices } from "@/types";
 import { formatDate, formatDuration } from "@/utils/format";
+import { tint, inkOf } from "@/lib/utils";
 
 const ACCENT = "#8A5A22";
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
   processing_slides: "Parsing slides",
+  analyzing_content: "Analysing content",
   generating_scripts: "Writing scripts",
   synthesizing_audio: "Synthesizing voice",
   assembling_video: "Assembling video",
@@ -30,7 +32,7 @@ function StatusPill({ status }: { status: string }) {
   return (
     <span
       className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full"
-      style={{ background: `${color}14`, color, border: `1px solid ${color}28` }}
+      style={{ background: `${tint(color, "14")}`, color, border: `1px solid ${tint(color, "28")}` }}
     >
       <Icon className={`w-3 h-3 ${DECK_IN_PROGRESS.has(status) ? "animate-spin" : ""}`} />
       {STATUS_LABEL[status] ?? status}
@@ -87,8 +89,8 @@ export default function PresentationsPage() {
 
   const pickPptx = (file: File | undefined) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".pptx")) {
-      setSubmitError("Please choose a PowerPoint .pptx file.");
+    if (!/\.(pptx|pdf)$/i.test(file.name)) {
+      setSubmitError("Please choose a PowerPoint (.pptx) or PDF file.");
       return;
     }
     setSubmitError(null);
@@ -125,8 +127,8 @@ export default function PresentationsPage() {
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1100px] mx-auto space-y-6">
       <div>
-        <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>Presentation Coach</h1>
-        <p className="text-sm mt-1" style={{ color: "#6E6C63" }}>
+        <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Presentation Coach</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
           Upload your slides. SpeechMate writes a script for each one and narrates the deck as an example
           presentation (in your own voice if you add a sample). Then you practise and get coached against it.
         </p>
@@ -147,7 +149,7 @@ export default function PresentationsPage() {
 
       {/* ── Stage 1: setup ─────────────────────────────────────────────── */}
       <div className="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
-        <h2 className="text-base font-semibold" style={{ color: "#17181C" }}>New presentation</h2>
+        <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>New presentation</h2>
 
         {/* PPTX drop zone */}
         <div
@@ -160,30 +162,30 @@ export default function PresentationsPage() {
           onDrop={(e) => { e.preventDefault(); setDragging(false); pickPptx(e.dataTransfer.files[0]); }}
           className="rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors"
           style={{
-            border: `1.5px dashed ${dragging ? ACCENT : "#D8D3C6"}`,
-            background: dragging ? "rgba(138,90,34,0.05)" : "#FBFAF7",
+            border: `1.5px dashed ${dragging ? ACCENT : "var(--line-strong)"}`,
+            background: dragging ? "rgba(138,90,34,0.05)" : "var(--bg)",
           }}
         >
           <input
             ref={pptxInput}
             type="file"
-            accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            accept=".pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
             className="hidden"
             onChange={(e) => pickPptx(e.target.files?.[0])}
           />
           {pptx ? (
             <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8" style={{ color: ACCENT }} />
+              <FileText className="w-8 h-8" style={{ color: inkOf(ACCENT) }} />
               <div className="text-left">
-                <p className="text-sm font-semibold" style={{ color: "#17181C" }}>{pptx.name}</p>
-                <p className="text-xs" style={{ color: "#9B988E" }}>{(pptx.size / 1024 / 1024).toFixed(1)} MB · click to change</p>
+                <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{pptx.name}</p>
+                <p className="text-xs" style={{ color: "var(--faint)" }}>{(pptx.size / 1024 / 1024).toFixed(1)} MB · click to change</p>
               </div>
             </div>
           ) : (
             <>
-              <Upload className="w-7 h-7 mb-2" style={{ color: ACCENT }} />
-              <p className="text-sm font-medium" style={{ color: "#17181C" }}>Drop a .pptx here or click to browse</p>
-              <p className="text-xs mt-1" style={{ color: "#9B988E" }}>Required</p>
+              <Upload className="w-7 h-7 mb-2" style={{ color: inkOf(ACCENT) }} />
+              <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>Drop a .pptx or .pdf here, or click to browse</p>
+              <p className="text-xs mt-1" style={{ color: "var(--faint)" }}>Required</p>
             </>
           )}
         </div>
@@ -191,8 +193,8 @@ export default function PresentationsPage() {
         {/* Narrator voice (local Malaysian TTS) */}
         {voices?.available && (
           <div>
-            <label htmlFor="narrator" className="text-sm font-medium" style={{ color: "#17181C" }}>Narrator voice</label>
-            <p className="text-xs mt-0.5 mb-2" style={{ color: "#6E6C63" }}>
+            <label htmlFor="narrator" className="text-sm font-medium" style={{ color: "var(--ink)" }}>Narrator voice</label>
+            <p className="text-xs mt-0.5 mb-2" style={{ color: "var(--muted)" }}>
               Open-source Malaysian TTS (Mesolitica). It handles Malay, English and code-switching, and runs on this server.
             </p>
             <select
@@ -200,7 +202,7 @@ export default function PresentationsPage() {
               value={narrator}
               onChange={(e) => setNarrator(e.target.value)}
               className="text-sm px-3 py-2 rounded-lg outline-none"
-              style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+              style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
             >
               {voices.voices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
@@ -209,8 +211,8 @@ export default function PresentationsPage() {
 
         {/* Voice sample (cloning — optional, needs ElevenLabs) */}
         <div>
-          <p className="text-sm font-medium mb-1" style={{ color: "#17181C" }}>Voice sample <span style={{ color: "#9B988E" }}>(optional)</span></p>
-          <p className="text-xs mb-3" style={{ color: "#6E6C63" }}>
+          <p className="text-sm font-medium mb-1" style={{ color: "var(--ink)" }}>Voice sample <span style={{ color: "var(--faint)" }}>(optional)</span></p>
+          <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
             Only used for cloning your own voice, which needs an ElevenLabs key on the backend. Without one, the
             narrator voice above is used. For cloning, record 30–60 seconds of clear speech in a quiet room.
           </p>
@@ -222,7 +224,7 @@ export default function PresentationsPage() {
                 className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
                 style={voiceMode === m
                   ? { background: ACCENT, color: "white" }
-                  : { background: "#F5F2EB", color: "#4B4C52", border: "1px solid #E6E2D8" }}
+                  : { background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}
               >
                 {m === "none" ? "Skip" : m === "record" ? "Record now" : "Upload file"}
               </button>
@@ -230,8 +232,8 @@ export default function PresentationsPage() {
           </div>
 
           {voiceMode === "record" && (
-            <div className="rounded-xl p-4 space-y-3" style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}>
-              <p className="text-xs italic" style={{ color: "#6E6C63" }}>
+            <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+              <p className="text-xs italic" style={{ color: "var(--muted)" }}>
                 Read aloud: &ldquo;Good morning everyone. Today I&rsquo;d like to walk you through an idea I&rsquo;ve been
                 working on, why it matters, and what I think we should do next. Please stop me with questions at any point.&rdquo;
               </p>
@@ -247,7 +249,7 @@ export default function PresentationsPage() {
                 )}
                 {rec.url && !rec.recording && <audio src={rec.url} controls className="h-9 max-w-full" />}
               </div>
-              {rec.error && <p className="text-xs" style={{ color: "#8C3B32" }}>{rec.error}</p>}
+              {rec.error && <p className="text-xs" style={{ color: "var(--bad)" }}>{rec.error}</p>}
             </div>
           )}
 
@@ -256,11 +258,11 @@ export default function PresentationsPage() {
               <input ref={voiceInput} type="file" accept="audio/*,.m4a,.webm,.ogg,.flac" className="hidden"
                 onChange={(e) => setVoiceFile(e.target.files?.[0] ?? null)} />
               <button onClick={() => voiceInput.current?.click()} className="text-xs font-medium px-3 py-2 rounded-lg"
-                style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}>
+                style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}>
                 Choose audio file
               </button>
               {voiceFile && (
-                <span className="flex items-center gap-1 text-xs" style={{ color: "#4B4C52" }}>
+                <span className="flex items-center gap-1 text-xs" style={{ color: "var(--ink-2)" }}>
                   {voiceFile.name}
                   <button onClick={() => setVoiceFile(null)} aria-label="Remove voice file"><X className="w-3 h-3" /></button>
                 </span>
@@ -271,8 +273,8 @@ export default function PresentationsPage() {
 
         {/* Requirement */}
         <div>
-          <label htmlFor="requirement" className="text-sm font-medium" style={{ color: "#17181C" }}>
-            Audience and purpose <span style={{ color: "#9B988E" }}>(optional)</span>
+          <label htmlFor="requirement" className="text-sm font-medium" style={{ color: "var(--ink)" }}>
+            Audience and purpose <span style={{ color: "var(--faint)" }}>(optional)</span>
           </label>
           <textarea
             id="requirement"
@@ -281,11 +283,11 @@ export default function PresentationsPage() {
             rows={2}
             placeholder="e.g. First-year students, non-specialist audience, 5-minute talk"
             className="mt-2 w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none placeholder:text-slate-400"
-            style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+            style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
           />
         </div>
 
-        {submitError && <p className="text-sm" style={{ color: "#8C3B32" }}>{submitError}</p>}
+        {submitError && <p className="text-sm" style={{ color: "var(--bad)" }}>{submitError}</p>}
 
         <button
           onClick={submit}
@@ -293,37 +295,37 @@ export default function PresentationsPage() {
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40"
           style={{ background: ACCENT }}
         >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
           {submitting ? "Uploading…" : "Generate example presentation"}
         </button>
       </div>
 
       {/* ── Past decks ─────────────────────────────────────────────────── */}
       <div className="glass-card rounded-2xl p-5 sm:p-6">
-        <h2 className="text-base font-semibold mb-4" style={{ color: "#17181C" }}>Your presentations</h2>
+        <h2 className="text-base font-semibold mb-4" style={{ color: "var(--ink)" }}>Your presentations</h2>
         {loadError && (
-          <div className="flex items-center gap-2 text-sm mb-3" style={{ color: "#8C3B32" }}>
+          <div className="flex items-center gap-2 text-sm mb-3" style={{ color: "var(--bad)" }}>
             <AlertTriangle className="w-4 h-4" /> {loadError}
             <button onClick={load} className="ml-2 underline text-xs">Retry</button>
           </div>
         )}
-        {decks === null && !loadError && <Loader2 className="w-5 h-5 animate-spin" style={{ color: "#9B988E" }} />}
-        {decks?.length === 0 && <p className="text-sm" style={{ color: "#9B988E" }}>No presentations yet. Upload a deck above to start.</p>}
+        {decks === null && !loadError && <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--faint)" }} />}
+        {decks?.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No presentations yet. Upload a deck above to start.</p>}
         <div className="space-y-1">
           {decks?.map((d) => (
-            <div key={d.session_id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#F5F2EB] transition-colors">
-              <FileText className="w-5 h-5 flex-shrink-0" style={{ color: ACCENT }} />
+            <div key={d.session_id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--surface-2)] transition-colors">
+              <FileText className="w-5 h-5 flex-shrink-0" style={{ color: inkOf(ACCENT) }} />
               <Link href={`/presentations/${d.session_id}`} className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: "#17181C" }}>{d.original_filename}</p>
-                <p className="text-xs" style={{ color: "#9B988E" }}>
+                <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>{d.original_filename}</p>
+                <p className="text-xs" style={{ color: "var(--faint)" }}>
                   {formatDate(d.created_at)}{d.slide_count ? ` · ${d.slide_count} slides` : ""}
                 </p>
               </Link>
               <StatusPill status={d.status} />
               {confirmDelete === d.session_id ? (
                 <span className="flex items-center gap-2 text-xs">
-                  <button onClick={() => remove(d.session_id)} className="font-semibold" style={{ color: "#8C3B32" }}>Delete</button>
-                  <button onClick={() => setConfirmDelete(null)} style={{ color: "#6E6C63" }}>Cancel</button>
+                  <button onClick={() => remove(d.session_id)} className="font-semibold" style={{ color: "var(--bad)" }}>Delete</button>
+                  <button onClick={() => setConfirmDelete(null)} style={{ color: "var(--muted)" }}>Cancel</button>
                 </span>
               ) : (
                 <button
@@ -333,15 +335,15 @@ export default function PresentationsPage() {
                   aria-label="Delete presentation"
                   title={DECK_IN_PROGRESS.has(d.status) ? "Wait for generation to finish" : "Delete"}
                 >
-                  <Trash2 className="w-4 h-4" style={{ color: "#9B988E" }} />
+                  <Trash2 className="w-4 h-4" style={{ color: "var(--faint)" }} />
                 </button>
               )}
-              <Link href={`/presentations/${d.session_id}`} aria-label="Open"><ChevronRight className="w-4 h-4" style={{ color: "#9B988E" }} /></Link>
+              <Link href={`/presentations/${d.session_id}`} aria-label="Open"><ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} /></Link>
             </div>
           ))}
         </div>
         {decks && decks.length > 0 && (
-          <button onClick={load} className="mt-3 flex items-center gap-1 text-xs" style={{ color: "#6E6C63" }}>
+          <button onClick={load} className="mt-3 flex items-center gap-1 text-xs" style={{ color: "var(--muted)" }}>
             <RotateCcw className="w-3 h-3" /> Refresh
           </button>
         )}

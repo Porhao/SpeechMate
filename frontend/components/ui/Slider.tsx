@@ -40,10 +40,10 @@ export function Slider({
         </div>
       )}
       <div className="relative h-6 flex items-center">
-        <div className="absolute inset-x-0 h-1.5 rounded-full" style={{ background: "#E6E2D8" }} />
+        <div className="absolute inset-x-0 h-1.5 rounded-full" style={{ background: "var(--line)" }} />
         <div
           className="absolute h-1.5 rounded-full"
-          style={{ width: `${pct}%`, background: disabled ? "#CDC9BE" : accent, transition: dragging ? "none" : "width 0.2s ease" }}
+          style={{ width: `${pct}%`, background: disabled ? "var(--disabled)" : accent, transition: dragging ? "none" : "width 0.2s ease" }}
         />
         <input
           type="range"
@@ -60,7 +60,7 @@ export function Slider({
           onBlur={endDrag}
           className="slider-input relative w-full cursor-pointer disabled:cursor-not-allowed"
           style={{
-            ["--slider-accent" as string]: disabled ? "#CDC9BE" : accent,
+            ["--slider-accent" as string]: disabled ? "var(--disabled)" : accent,
             ["--thumb-scale" as string]: dragging ? 1.4 : 1,
           }}
         />

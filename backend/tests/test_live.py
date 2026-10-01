@@ -14,7 +14,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.main import app
 from app.services import tasks
-from app.services.live import language, scoring, speech
+from app.services.live import coaching, language, scoring, speech
 from tests.test_e2e import _tone_wav
 
 
@@ -82,17 +82,74 @@ def test_scores_renormalise_over_available_metrics():
     ).confidence_score == 80.0
 
 
+def _candidates(**over):
+    base = dict(
+        fluency={"speaking_rate": 182.0}, fillers={"total_fillers": 9, "fillers_per_minute": 4.5,
+        "filler_breakdown": {"um": 6, "like": 3}, "top_filler": "um"},
+        stutter={"detected_events": [
+            {"type": "Block", "start_time": 41.0, "end_time": 43.4, "word": ""},
+            {"type": "Repetition", "start_time": 5.0, "end_time": 5.6, "word": "i"},
+        ]},
+        pronunciation=None,
+        eye={"eye_contact_score": 52.0, "look_away_percentage": 48.0, "dominant_gaze": "down"},
+        posture=None, emotion=None, duration_sec=120.0, session_type="Presentation",
+        previous={"speech": {"filler_per_minute": 6.0}},
+    )
+    return coaching.build_candidates(**{**base, **over})
+
+
+def test_recommendations_cite_measured_evidence():
+    recs = {r.area: r for r in _candidates()}
+    assert set(recs) == {"pace", "pauses", "fillers", "eye_contact"}  # 1 repetition isn't enough to flag
+    assert "182 words per minute" in recs["pace"].evidence
+    assert "0:41" in recs["pauses"].evidence and "2.4 s" in recs["pauses"].evidence
+    assert "“um” ×6" in recs["fillers"].evidence
+    assert "Better than last session (6/min → 4.5/min)" in recs["fillers"].evidence
+    assert "reading notes" in recs["eye_contact"].evidence
+    assert "now 4.5" in recs["fillers"].target  # targets are relative to the current value
+
+
 def test_recommendations_skip_unmeasured_metrics():
-    recs = scoring.generate_recommendations(
-        fluency=None, pronunciation=None, eye_contact=None, confidence=None, posture=None,
-        stuttering=None, filler_count=None, session_history_count=0,
+    none = coaching.build_candidates(
+        fluency=None, fillers=None, stutter=None, pronunciation=None, eye=None, posture=None,
+        emotion=None, duration_sec=120.0, session_type="Conversation",
     )
-    assert recs.exercises == []
-    recs = scoring.generate_recommendations(
-        fluency=50, pronunciation=None, eye_contact=40, confidence=None, posture=None,
-        stuttering=None, filler_count=12, session_history_count=3,
-    )
-    assert {e.title for e in recs.exercises} == {"Daily Fluency Drills", "Eye Contact Practice", "Filler Word Elimination"}
+    assert none == []
+    plan = coaching.rule_based_plan(none, ["Fluency"], "Conversation", 0)
+    assert plan.exercises == [] and "Fluency" in plan.summary
+
+
+class _FakeLLM:
+    """Returns queued replies from chat.completions.create."""
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.chat = self
+        self.completions = self
+
+    async def create(self, **_):
+        content = self.replies.pop(0)
+        return type("R", (), {"choices": [type("C", (), {"message": type("M", (), {"content": content})()})()]})()
+
+
+async def test_llm_plan_cannot_invent_unmeasured_issues(monkeypatch):
+    import json as _json
+    item = lambda area: {"area": area, "title": "Fix it now", "evidence": "measured number 4.5 per minute",
+                         "why": "listeners notice this", "drill": "do the drill for five minutes daily", "target": "under 3/min"}
+    invented = _json.dumps({"summary": "Good clear voice today.", "focus": [item("vocal_variety")]})
+    valid = _json.dumps({"summary": "Good clear voice today.", "focus": [item("fillers"), item("pace")]})
+    monkeypatch.setattr(coaching, "get_llm_client", lambda: _FakeLLM([invented, valid]))
+    plan = await coaching.build_plan(candidates=_candidates(), strengths=["Posture"], session_type="Presentation",
+                                     user_goal=None, session_history_count=1, transcript_excerpt="", warnings=[])
+    assert plan.source == "llm"
+    assert [e["area"] for e in plan.exercises] == ["fillers", "pace"]
+
+
+async def test_llm_plan_falls_back_to_measured_plan(monkeypatch):
+    monkeypatch.setattr(coaching, "get_llm_client", lambda: _FakeLLM(["not json", "still not json"]))
+    plan = await coaching.build_plan(candidates=_candidates(), strengths=[], session_type="Presentation",
+                                     user_goal=None, session_history_count=1, transcript_excerpt="", warnings=[])
+    assert plan.source == "rules"
+    assert len(plan.exercises) == 3 and plan.exercises[0]["evidence"]
 
 
 # ── API ─────────────────────────────────────────────────────────────────────

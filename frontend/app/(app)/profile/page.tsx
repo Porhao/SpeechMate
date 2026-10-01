@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Save, Check, Zap, Clock, Trophy, Target } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { authService } from "@/services/auth";
+import { tint, inkOf } from "@/lib/utils";
 
 const LANGUAGE_OPTIONS = [
   { value: "English",         label: "English" },
@@ -33,7 +34,7 @@ function Avatar({ name, size = 72 }: { name: string; size?: number }) {
   return (
     <div
       className="rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-      style={{ width: size, height: size, background: "#23345C", fontSize: size * 0.3 }}
+      style={{ width: size, height: size, background: "var(--accent)", fontSize: size * 0.3 }}
     >
       {initials}
     </div>
@@ -81,8 +82,8 @@ export default function ProfilePage() {
 
       {/* Header */}
       <div>
-        <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>Profile</h1>
-        <p className="text-sm mt-1" style={{ color: "#9B988E" }}>
+        <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Profile</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--faint)" }}>
           Manage your account and communication goals
         </p>
       </div>
@@ -93,8 +94,8 @@ export default function ProfilePage() {
         <div className="space-y-4">
           <div className="glass-card rounded-2xl p-6 flex flex-col items-center text-center">
             <Avatar name={name} size={80} />
-            <p className="text-lg font-bold mt-4" style={{ color: "#17181C" }}>{name}</p>
-            <p className="text-sm mt-0.5" style={{ color: "#9B988E" }}>{user?.email ?? "ahmad@example.com"}</p>
+            <p className="text-lg font-bold mt-4" style={{ color: "var(--ink)" }}>{name}</p>
+            <p className="text-sm mt-0.5" style={{ color: "var(--faint)" }}>{user?.email ?? "ahmad@example.com"}</p>
 
             <div className="flex items-center gap-2 mt-3">
               <span
@@ -111,7 +112,7 @@ export default function ProfilePage() {
               </span>
             </div>
 
-            <div className="w-full mt-5 pt-5 space-y-3" style={{ borderTop: "1px solid #F0EDE5" }}>
+            <div className="w-full mt-5 pt-5 space-y-3" style={{ borderTop: "1px solid var(--line-2)" }}>
               {[
                 { label: "Total Sessions", value: "42",    icon: Zap,    color: "#23345C" },
                 { label: "Practice Hours", value: "18h",   icon: Clock,  color: "#5A5470" },
@@ -120,10 +121,10 @@ export default function ProfilePage() {
               ].map(({ label, value, icon: Icon, color }) => (
                 <div key={label} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Icon className="w-3.5 h-3.5" style={{ color }} />
-                    <span className="text-xs" style={{ color: "#6E6C63" }}>{label}</span>
+                    <Icon className="w-3.5 h-3.5" style={{ color: inkOf(color) }} />
+                    <span className="text-xs" style={{ color: "var(--muted)" }}>{label}</span>
                   </div>
-                  <span className="text-sm font-bold" style={{ color: "#17181C" }}>{value}</span>
+                  <span className="text-sm font-bold" style={{ color: "var(--ink)" }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -133,8 +134,8 @@ export default function ProfilePage() {
             className="rounded-2xl px-5 py-4"
             style={{ background: "rgba(35,52,92,0.06)", border: "1px solid rgba(35,52,92,0.16)" }}
           >
-            <p className="text-xs leading-relaxed" style={{ color: "#6E6C63" }}>
-              Member since <strong style={{ color: "#17181C" }}>January 2026</strong>.
+            <p className="text-xs leading-relaxed" style={{ color: "var(--muted)" }}>
+              Member since <strong style={{ color: "var(--ink)" }}>January 2026</strong>.
               Your data is protected under Malaysia PDPA.
             </p>
           </div>
@@ -145,39 +146,39 @@ export default function ProfilePage() {
 
           {/* Personal Info */}
           <div>
-            <h2 className="text-sm font-semibold mb-4" style={{ color: "#17181C" }}>Personal Information</h2>
+            <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ink)" }}>Personal Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6E6C63" }}>Full Name</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--muted)" }}>Full Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all placeholder:text-slate-400"
-                  style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(35,52,92,0.5)"; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = "#E6E2D8"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "var(--line)"; }}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6E6C63" }}>Email Address</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--muted)" }}>Email Address</label>
                 <input
                   type="email"
                   value={user?.email ?? "ahmad@example.com"}
                   readOnly
                   className="w-full px-3 py-2.5 rounded-xl text-sm cursor-not-allowed"
-                  style={{ background: "#F1EEE6", border: "1px solid #E6E2D8", color: "#9B988E" }}
+                  style={{ background: "var(--surface-3)", border: "1px solid var(--line)", color: "var(--faint)" }}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "#6E6C63" }}>Language Preference</label>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--muted)" }}>Language Preference</label>
                 <select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-                  style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(35,52,92,0.5)"; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = "#E6E2D8"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "var(--line)"; }}
                 >
                   {LANGUAGE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -187,18 +188,18 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #F0EDE5" }} />
+          <div style={{ borderTop: "1px solid var(--line-2)" }} />
 
           {/* Communication Goal */}
           <div>
-            <h2 className="text-sm font-semibold mb-4" style={{ color: "#17181C" }}>Communication Goal</h2>
+            <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ink)" }}>Communication Goal</h2>
             <div className="grid grid-cols-1 gap-2">
               {GOAL_OPTIONS.map((o) => (
                 <label
                   key={o.value}
                   className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all"
                   style={{
-                    borderColor: goal === o.value ? "rgba(35,52,92,0.5)" : "#E6E2D8",
+                    borderColor: goal === o.value ? "rgba(35,52,92,0.5)" : "var(--line)",
                     background: goal === o.value ? "rgba(35,52,92,0.08)" : "#F6F3EC",
                   }}
                 >
@@ -210,17 +211,17 @@ export default function ProfilePage() {
                     onChange={() => setGoal(o.value)}
                     className="accent-[#23345C]"
                   />
-                  <span className="text-sm" style={{ color: "#17181C" }}>{o.label}</span>
+                  <span className="text-sm" style={{ color: "var(--ink)" }}>{o.label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #F0EDE5" }} />
+          <div style={{ borderTop: "1px solid var(--line-2)" }} />
 
           {/* Skill Level */}
           <div>
-            <h2 className="text-sm font-semibold mb-4" style={{ color: "#17181C" }}>Skill Level</h2>
+            <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ink)" }}>Skill Level</h2>
             <div className="flex gap-3">
               {SKILL_OPTIONS.map((s) => {
                 const colors: Record<SkillLevel, string> = { Beginner: "#3F6B4C", Intermediate: "#8A5A22", Advanced: "#8C3B32" };
@@ -232,8 +233,8 @@ export default function ProfilePage() {
                     onClick={() => setSkill(s)}
                     className="flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all"
                     style={active
-                      ? { backgroundColor: `${c}14`, borderColor: c, color: c }
-                      : { borderColor: "#E6E2D8", color: "#9B988E", background: "#F6F3EC" }
+                      ? { backgroundColor: `${tint(c, "14")}`, borderColor: c, color: inkOf(c) }
+                      : { borderColor: "var(--line)", color: "var(--faint)", background: "#F6F3EC" }
                     }
                   >
                     {s}
@@ -243,12 +244,12 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #F0EDE5" }} />
+          <div style={{ borderTop: "1px solid var(--line-2)" }} />
 
           {/* Challenges */}
           <div>
-            <h2 className="text-sm font-semibold mb-1" style={{ color: "#17181C" }}>Main Challenges</h2>
-            <p className="text-xs mb-3" style={{ color: "#9B988E" }}>Select all that apply</p>
+            <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--ink)" }}>Main Challenges</h2>
+            <p className="text-xs mb-3" style={{ color: "var(--faint)" }}>Select all that apply</p>
             <div className="flex flex-wrap gap-2">
               {CHALLENGE_OPTIONS.map((c) => {
                 const active = challenges.includes(c);
@@ -259,7 +260,7 @@ export default function ProfilePage() {
                     className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
                     style={active
                       ? { background: "rgba(35,52,92,0.14)", borderColor: "#23345C", color: "#17233E" }
-                      : { borderColor: "#E6E2D8", color: "#9B988E", background: "#F6F3EC" }
+                      : { borderColor: "var(--line)", color: "var(--faint)", background: "#F6F3EC" }
                     }
                   >
                     {c}
@@ -269,11 +270,11 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #F0EDE5" }} />
+          <div style={{ borderTop: "1px solid var(--line-2)" }} />
 
           {/* Save */}
           <div className="flex items-center justify-end gap-3">
-            {saveError && <p className="text-sm" style={{ color: "#8C3B32" }}>{saveError}</p>}
+            {saveError && <p className="text-sm" style={{ color: "var(--bad)" }}>{saveError}</p>}
             <button
               onClick={handleSave}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all press-effect"

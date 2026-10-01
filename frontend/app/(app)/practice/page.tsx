@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useMyStats } from "@/hooks/useMyStats";
 import {
   MessageCircle,
   Briefcase,
@@ -14,6 +15,7 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
+import { tint, inkOf } from "@/lib/utils";
 
 const MODES = [
   {
@@ -26,8 +28,6 @@ const MODES = [
     level: "All Levels",
     levelColor: "#3F6B4C",
     duration: "10–30 min",
-    sessions: 20,
-    avgScore: 82,
     tags: ["Fluency", "Confidence", "Spontaneity"],
   },
   {
@@ -40,8 +40,6 @@ const MODES = [
     level: "Intermediate+",
     levelColor: "#8A5A22",
     duration: "15–45 min",
-    sessions: 12,
-    avgScore: 74,
     tags: ["Professional", "Eye Contact", "Structure"],
   },
   {
@@ -54,8 +52,6 @@ const MODES = [
     level: "Advanced",
     levelColor: "#8C3B32",
     duration: "5–60 min",
-    sessions: 10,
-    avgScore: 71,
     tags: ["Posture", "Pace", "Structure"],
   },
   {
@@ -68,18 +64,10 @@ const MODES = [
     level: "All Levels",
     levelColor: "#3F6B4C",
     duration: "5–20 min",
-    sessions: 6,
-    avgScore: 75,
     tags: ["Phonemes", "BM English", "Accuracy"],
   },
 ];
 
-const RECENT = [
-  { type: "Presentation",  score: 78, duration: "45 min", date: "Today, 9:00 AM",     color: "#8A5A22" },
-  { type: "Conversation",  score: 82, duration: "30 min", date: "Yesterday, 3:30 PM", color: "#23345C" },
-  { type: "Interview",     score: 71, duration: "35 min", date: "Mon, 10:00 AM",      color: "#5A5470" },
-  { type: "Pronunciation", score: 75, duration: "20 min", date: "Fri, 4:00 PM",       color: "#3F6B4C" },
-];
 
 function gradeColor(score: number) {
   if (score >= 90) return "#3F6B4C";
@@ -90,6 +78,7 @@ function gradeColor(score: number) {
 
 export default function PracticePage() {
   const router = useRouter();
+  const { stats, signedIn } = useMyStats();
   // Presentation practice runs on the backend's upload → ideal video → coach flow.
   const startSession = (mode: string) =>
     router.push(mode === "Presentation" ? "/presentations" : `/session?mode=${encodeURIComponent(mode)}`);
@@ -100,18 +89,20 @@ export default function PracticePage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>Practice Center</h1>
-          <p className="text-sm mt-1" style={{ color: "#6E6C63" }}>
+          <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Practice Center</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
             Choose a mode and start improving your communication skills
           </p>
         </div>
         <div
           className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl"
-          style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#4B4C52" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink-2)" }}
         >
-          <Target className="w-4 h-4" style={{ color: "#23345C" }} />
-          Weekly goal: <span className="font-semibold ml-1" style={{ color: "#17181C" }}>5 sessions</span>
-          <span className="font-semibold ml-1" style={{ color: "#3F6B4C" }}>· 3 done</span>
+          <Target className="w-4 h-4" style={{ color: "var(--accent-ink)" }} />
+          This week:
+          <span className="font-semibold ml-1" style={{ color: "var(--ink)" }}>
+            {stats ? `${stats.thisWeek} session${stats.thisWeek === 1 ? "" : "s"}` : "—"}
+          </span>
         </div>
       </div>
 
@@ -123,7 +114,7 @@ export default function PracticePage() {
             className="glass-card rounded-2xl p-6 flex flex-col transition-all cursor-default slide-up"
             style={{ transition: "box-shadow 0.2s ease, transform 0.2s ease", animationDelay: `${i * 0.07}s` }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 32px ${mode.color}22, 0 0 0 1px ${mode.color}30`;
+              (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 32px ${tint(mode.color, "22")}, 0 0 0 1px ${tint(mode.color, "30")}`;
               (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
             }}
             onMouseLeave={(e) => {
@@ -135,20 +126,20 @@ export default function PracticePage() {
             <div className="flex items-start justify-between mb-4">
               <div
                 className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                style={{ background: `${mode.color}14`, border: `1px solid ${mode.color}30` }}
+                style={{ background: `${tint(mode.color, "14")}`, border: `1px solid ${tint(mode.color, "30")}` }}
               >
-                <mode.icon className="w-6 h-6" style={{ color: mode.color }} />
+                <mode.icon className="w-6 h-6" style={{ color: inkOf(mode.color) }} />
               </div>
               <span
                 className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                style={{ backgroundColor: `${mode.levelColor}14`, color: mode.levelColor, border: `1px solid ${mode.levelColor}28` }}
+                style={{ backgroundColor: `${tint(mode.levelColor, "14")}`, color: inkOf(mode.levelColor), border: `1px solid ${tint(mode.levelColor, "28")}` }}
               >
                 {mode.level}
               </span>
             </div>
 
-            <h2 className="text-lg font-bold mb-2" style={{ color: "#17181C" }}>{mode.title}</h2>
-            <p className="text-sm leading-relaxed flex-1" style={{ color: "#6E6C63" }}>{mode.description}</p>
+            <h2 className="text-lg font-bold mb-2" style={{ color: "var(--ink)" }}>{mode.title}</h2>
+            <p className="text-sm leading-relaxed flex-1" style={{ color: "var(--muted)" }}>{mode.description}</p>
 
             {/* Tags */}
             <div className="flex flex-wrap gap-2 mt-4">
@@ -156,7 +147,7 @@ export default function PracticePage() {
                 <span
                   key={tag}
                   className="text-[10px] font-medium px-2 py-0.5 rounded-md"
-                  style={{ backgroundColor: `${mode.color}12`, color: mode.color }}
+                  style={{ backgroundColor: `${tint(mode.color, "12")}`, color: inkOf(mode.color) }}
                 >
                   {tag}
                 </span>
@@ -166,18 +157,31 @@ export default function PracticePage() {
             {/* Stats */}
             <div
               className="flex items-center gap-5 mt-4 pt-4"
-              style={{ borderTop: "1px solid #F0EDE5" }}
+              style={{ borderTop: "1px solid var(--line-2)" }}
             >
-              <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9B988E" }}>
+              <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--faint)" }}>
                 <Clock className="w-3.5 h-3.5" /> {mode.duration}
               </div>
-              <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9B988E" }}>
-                <Zap className="w-3.5 h-3.5" /> {mode.sessions} sessions
-              </div>
-              <div className="flex items-center gap-1.5 text-xs" style={{ color: "#9B988E" }}>
-                <Star className="w-3.5 h-3.5" />
-                Avg: <span className="font-semibold ml-0.5" style={{ color: gradeColor(mode.avgScore) }}>{mode.avgScore}</span>
-              </div>
+              {mode.id === "Presentation" ? (
+                <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--faint)" }}>
+                  <Zap className="w-3.5 h-3.5" /> Upload a deck to start
+                </div>
+              ) : (() => {
+                const m = stats?.byMode[mode.id];
+                return (
+                  <>
+                    <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--faint)" }}>
+                      <Zap className="w-3.5 h-3.5" /> {stats ? `${m?.sessions ?? 0} done` : "—"}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs" style={{ color: "var(--faint)" }}>
+                      <Star className="w-3.5 h-3.5" />
+                      Avg score: <span className="font-semibold ml-0.5" style={{ color: m?.avgScore != null ? gradeColor(m.avgScore) : "var(--faint)" }}>
+                        {m?.avgScore ?? "—"}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* CTA */}
@@ -193,76 +197,76 @@ export default function PracticePage() {
         ))}
       </div>
 
-      {/* Quick Start Banner */}
-      <div
-        className="rounded-2xl p-5 flex items-center justify-between"
-        style={{ background: "#F1EEE6", border: "1px solid #E6E2D8" }}
-      >
-        <div className="flex items-center gap-4">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "rgba(35,52,92,0.14)", border: "1px solid rgba(35,52,92,0.25)" }}
-          >
-            <TrendingUp className="w-5 h-5" style={{ color: "#23345C" }} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: "#17181C" }}>
-              Recommended: Continue Presentation Practice
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: "#6E6C63" }}>
-              Your posture score dropped last session — 10 min daily will bring it back up
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => startSession("Presentation")}
-          className="flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors flex-shrink-0"
-          style={{ background: "#23345C" }}
-        >
-          Start now <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Recent Sessions */}
-      <div className="glass-card rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold" style={{ color: "#17181C" }}>Recent Sessions</h2>
-          <span className="text-xs" style={{ color: "#9B988E" }}>Last 7 days</span>
-        </div>
-        <div className="space-y-2">
-          {RECENT.map((s, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-4 p-3 rounded-xl transition-colors"
-              style={{ cursor: "default" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#F5F2EB"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${s.color}14`, border: `1px solid ${s.color}25` }}
-              >
-                <Zap className="w-4 h-4" style={{ color: s.color }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium" style={{ color: "#17181C" }}>{s.type}</p>
-                <p className="text-xs" style={{ color: "#9B988E" }}>{s.date} · {s.duration}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-bold" style={{ color: gradeColor(s.score) }}>{s.score}</span>
-                <button
-                  onClick={() => startSession(s.type)}
-                  className="text-xs font-medium flex items-center gap-0.5 transition-colors"
-                  style={{ color: "#23345C" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#17233E"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "#23345C"; }}
-                >
-                  Retry <ChevronRight className="w-3 h-3" />
-                </button>
+      {/* Next step — from the coaching plan of your latest analysed session */}
+      {(() => {
+        const plan = stats?.recent.find((x) => x.analysis?.recommendations.exercises.length)?.analysis?.recommendations;
+        const top = plan?.exercises[0];
+        if (!plan || !top) return null;
+        return (
+          <div className="p-5 flex flex-wrap items-center justify-between gap-4"
+            style={{ background: "var(--surface-3)", border: "1px solid var(--line)" }}>
+            <div className="flex items-start gap-4 min-w-0">
+              <TrendingUp className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: "var(--accent-ink)" }} />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Next focus: {top.title}</p>
+                {top.evidence && <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>{top.evidence}</p>}
+                {top.metric_target && <p className="text-xs mt-0.5" style={{ color: "var(--ink-2)" }}>Target: {top.metric_target}</p>}
               </div>
             </div>
-          ))}
+            <button
+              onClick={() => startSession(plan.next_session_type || top.practice_type)}
+              className="flex items-center gap-1.5 text-white text-sm font-semibold px-4 py-2 flex-shrink-0"
+              style={{ background: "var(--accent)" }}
+            >
+              Practise {(plan.next_session_type || top.practice_type).toLowerCase()} <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Recent sessions (real history) */}
+      <div className="glass-card rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>Recent sessions</h2>
+          <span className="text-xs" style={{ color: "var(--faint)" }}>Open one to see its full results</span>
         </div>
+        {!signedIn ? (
+          <p className="text-sm" style={{ color: "var(--muted)" }}>Sign in to keep a history of your sessions and results.</p>
+        ) : !stats ? (
+          <p className="text-sm" style={{ color: "var(--muted)" }}>Loading…</p>
+        ) : stats.recent.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--muted)" }}>No sessions yet. Pick a mode above to start your first one.</p>
+        ) : (
+          <ul>
+            {stats.recent.map((s) => {
+              const score = s.analysis?.communication_score.overall_score;
+              return (
+                <li key={s.id} className="flex items-center gap-4 py-3" style={{ borderTop: "1px solid var(--line-2)" }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>{s.session_type}</p>
+                    <p className="text-xs" style={{ color: "var(--faint)" }}>
+                      {new Date(s.created_at).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {" · "}{Math.max(1, Math.round(s.duration_sec / 60))} min
+                      {s.status !== "complete" && ` · ${s.status === "analyzing" ? "analysing…" : s.status === "failed" ? "analysis failed" : "not analysed"}`}
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold w-10 text-right" style={{ color: score != null ? gradeColor(score) : "var(--faint)" }}>
+                    {score != null ? Math.round(score) : "—"}
+                  </span>
+                  {s.status === "complete" ? (
+                    <button onClick={() => router.push(`/assessment?live=${s.id}`)} className="text-xs font-medium flex items-center gap-0.5" style={{ color: "var(--accent-ink)" }}>
+                      Results <ChevronRight className="w-3 h-3" />
+                    </button>
+                  ) : (
+                    <button onClick={() => startSession(s.session_type)} className="text-xs font-medium flex items-center gap-0.5" style={{ color: "var(--accent-ink)" }}>
+                      Retry <ChevronRight className="w-3 h-3" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
 
     </div>

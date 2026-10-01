@@ -55,12 +55,12 @@ export default function CoachPage() {
   return (
     <div className="px-3 sm:px-6 py-4 sm:py-6 max-w-[1320px] mx-auto">
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#23345C" }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "var(--accent)" }}>
           <Bot className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h1 className="font-display text-xl" style={{ color: "#17181C" }}>AI Coach</h1>
-          <p className="text-xs" style={{ color: "#6E6C63" }}>Ask for general coaching, or follow up on a presentation practice attempt.</p>
+          <h1 className="font-display text-xl" style={{ color: "var(--ink)" }}>AI Coach</h1>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>Ask for general coaching, or follow up on a presentation practice attempt.</p>
         </div>
       </div>
 
@@ -68,20 +68,20 @@ export default function CoachPage() {
         <div className="glass-card rounded-2xl p-3 space-y-1 lg:max-h-[calc(100dvh-220px)] overflow-y-auto">
           <button
             onClick={() => setSelected(GENERAL)}
-            className={cn("w-full text-left px-3 py-2 rounded-xl transition-colors", selected !== GENERAL && "hover:bg-[#F5F2EB]")}
+            className={cn("w-full text-left px-3 py-2 rounded-xl transition-colors", selected !== GENERAL && "hover:bg-[var(--surface-2)]")}
             style={selected === GENERAL ? { background: "rgba(35,52,92,0.08)", border: "1px solid rgba(35,52,92,0.25)" } : { border: "1px solid transparent" }}
           >
-            <p className="text-sm font-medium" style={{ color: "#17181C" }}>General coaching</p>
-            <p className="text-xs" style={{ color: "#9B988E" }}>Fluency, pronunciation, confidence, eye contact</p>
+            <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>General coaching</p>
+            <p className="text-xs" style={{ color: "var(--faint)" }}>Fluency, pronunciation, confidence, eye contact</p>
           </button>
 
-          <p className="text-[10px] font-semibold uppercase tracking-wide px-3 pt-3 pb-1" style={{ color: "#9B988E" }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wide px-3 pt-3 pb-1" style={{ color: "var(--faint)" }}>
             Presentation attempts
           </p>
-          {error && <p className="text-xs px-3" style={{ color: "#8C3B32" }}>{error}</p>}
-          {attempts === null && !error && <Loader2 className="w-4 h-4 animate-spin mx-3" style={{ color: "#9B988E" }} />}
+          {error && <p className="text-xs px-3" style={{ color: "var(--bad)" }}>{error}</p>}
+          {attempts === null && !error && <Loader2 className="w-4 h-4 animate-spin mx-3" style={{ color: "var(--faint)" }} />}
           {attempts?.length === 0 && (
-            <Link href="/presentations" className="flex items-center gap-2 text-xs px-3 py-2" style={{ color: "#8A5A22" }}>
+            <Link href="/presentations" className="flex items-center gap-2 text-xs px-3 py-2" style={{ color: "var(--warn)" }}>
               <Presentation className="w-4 h-4" /> Practise a deck to chat about it <ChevronRight className="w-3 h-3" />
             </Link>
           )}
@@ -89,11 +89,11 @@ export default function CoachPage() {
             <button
               key={a.run.practice_id}
               onClick={() => setSelected(a.run.practice_id)}
-              className={cn("w-full text-left px-3 py-2 rounded-xl transition-colors", a.run.practice_id !== selected && "hover:bg-[#F5F2EB]")}
+              className={cn("w-full text-left px-3 py-2 rounded-xl transition-colors", a.run.practice_id !== selected && "hover:bg-[var(--surface-2)]")}
               style={a.run.practice_id === selected ? { background: "rgba(35,52,92,0.08)", border: "1px solid rgba(35,52,92,0.25)" } : { border: "1px solid transparent" }}
             >
-              <p className="text-sm font-medium truncate" style={{ color: "#17181C" }}>{a.deck.original_filename}</p>
-              <p className="text-xs" style={{ color: "#9B988E" }}>
+              <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>{a.deck.original_filename}</p>
+              <p className="text-xs" style={{ color: "var(--faint)" }}>
                 Attempt #{a.number} · {a.run.recording_granularity === "per_slide" ? `slide ${a.run.slide_index}` : "whole deck"} · {formatWhen(a.run.created_at)}
               </p>
             </button>
@@ -102,22 +102,22 @@ export default function CoachPage() {
 
         {selected === GENERAL ? (
           <div className="glass-card rounded-2xl p-4 flex flex-col" style={{ height: "min(640px, calc(100dvh - 220px))" }}>
-            <p className="text-sm font-semibold mb-3" style={{ color: "#17181C" }}>General coaching</p>
+            <p className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>General coaching</p>
             <GeneralCoachChat />
           </div>
         ) : current && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             <div className="glass-card rounded-2xl p-4 flex flex-col" style={{ height: "min(640px, calc(100dvh - 220px))" }}>
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold" style={{ color: "#17181C" }}>Chat</p>
-                <Link href={`/presentations/${current.deck.session_id}`} className="text-xs underline" style={{ color: "#23345C" }}>
+                <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Chat</p>
+                <Link href={`/presentations/${current.deck.session_id}`} className="text-xs underline" style={{ color: "var(--accent-ink)" }}>
                   Open presentation
                 </Link>
               </div>
               <CoachChat key={current.run.practice_id} sessionId={current.deck.session_id} practiceId={current.run.practice_id} />
             </div>
             <div className="glass-card rounded-2xl p-4">
-              <p className="text-sm font-semibold mb-3" style={{ color: "#17181C" }}>Feedback for this attempt</p>
+              <p className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Feedback for this attempt</p>
               <FeedbackPanel run={current.run} />
             </div>
           </div>

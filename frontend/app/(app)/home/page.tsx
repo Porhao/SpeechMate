@@ -8,6 +8,8 @@ import {
   ChevronRight, Activity, Flame, Zap, Clock,
 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
+import { useMyStats } from "@/hooks/useMyStats";
+import { tint, inkOf } from "@/lib/utils";
 
 // ── Mode definitions ──────────────────────────────────────────────────────────
 const MODES = [
@@ -20,7 +22,6 @@ const MODES = [
     color: "#23345C",
     dark: "#17233E",
     glow: "rgba(35,52,92,0.5)",
-    sessions: 20,
   },
   {
     id: "Interview",
@@ -31,7 +32,6 @@ const MODES = [
     color: "#5A5470",
     dark: "#48435C",
     glow: "rgba(90,84,112,0.5)",
-    sessions: 12,
   },
   {
     id: "Presentation",
@@ -42,7 +42,6 @@ const MODES = [
     color: "#8A5A22",
     dark: "#6B4419",
     glow: "rgba(138,90,34,0.5)",
-    sessions: 10,
   },
   {
     id: "Pronunciation",
@@ -53,7 +52,6 @@ const MODES = [
     color: "#3F6B4C",
     dark: "#2E4F38",
     glow: "rgba(63,107,76,0.5)",
-    sessions: 6,
   },
 ];
 
@@ -66,7 +64,9 @@ function ModeCard({
   isDimmed,
   onSelect,
   index = 0,
+  sessions,
 }: {
+  sessions: number | null;
   mode: typeof MODES[0];
   isSelecting: boolean;
   isDimmed: boolean;
@@ -131,7 +131,7 @@ function ModeCard({
         <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.14)" }}>
           <span className="text-white/45 text-xs flex items-center gap-1.5">
             <Activity className="w-3 h-3" />
-            {mode.sessions} sessions
+            {sessions == null ? "" : `${sessions} session${sessions === 1 ? "" : "s"}`}
           </span>
           <span className="flex items-center gap-1 text-sm font-medium text-white">
             Start <ChevronRight className="w-3.5 h-3.5" />
@@ -156,13 +156,13 @@ function StatChip({
     >
       <div
         className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: `${color}16` }}
+        style={{ background: `${tint(color, "16")}` }}
       >
-        <Icon className="w-4.5 h-4.5" style={{ color }} />
+        <Icon className="w-4.5 h-4.5" style={{ color: inkOf(color) }} />
       </div>
       <div>
-        <p className="text-base font-bold leading-none" style={{ color: "#17181C" }}>{value}</p>
-        <p className="text-[11px] mt-0.5" style={{ color: "#9B988E" }}>{label}</p>
+        <p className="text-base font-bold leading-none" style={{ color: "var(--ink)" }}>{value}</p>
+        <p className="text-[11px] mt-0.5" style={{ color: "var(--faint)" }}>{label}</p>
       </div>
     </div>
   );
@@ -171,6 +171,7 @@ function StatChip({
 // ── Home / Launcher Page ──────────────────────────────────────────────────────
 export default function HomePage() {
   const { user }    = useUserStore();
+  const { stats, signedIn } = useMyStats();
   const router      = useRouter();
   const [selecting, setSelecting] = useState<string | null>(null);
   const [pageOut,   setPageOut]   = useState(false);
@@ -198,15 +199,15 @@ export default function HomePage() {
     >
       {/* ── Hero text ────────────────────────────────────────────────────── */}
       <div className="text-center mb-12">
-        <p className="text-xs font-medium mb-3 uppercase tracking-wide" style={{ color: "#9B988E" }}>
+        <p className="text-xs font-medium mb-3 uppercase tracking-wide" style={{ color: "var(--faint)" }}>
           AI Communication Coach
         </p>
-        <h1 className="font-display text-4xl sm:text-5xl leading-tight mb-4" style={{ color: "#17181C" }}>
-          Hello, <span style={{ color: "#23345C" }}>{firstName}</span>
+        <h1 className="font-display text-4xl sm:text-5xl leading-tight mb-4" style={{ color: "var(--ink)" }}>
+          Hello, <span style={{ color: "var(--accent-ink)" }}>{firstName}</span>
           {" "}
-          <span style={{ color: "#34343A" }}>— what are we practising today?</span>
+          <span style={{ color: "var(--ink-3)" }}>— what are we practising today?</span>
         </h1>
-        <p className="text-base max-w-xl mx-auto" style={{ color: "#9B988E" }}>
+        <p className="text-base max-w-xl mx-auto" style={{ color: "var(--faint)" }}>
           Choose a mode below. Your AI coach responds in real time to everything you say.
         </p>
       </div>
@@ -221,16 +222,25 @@ export default function HomePage() {
             isSelecting={selecting === mode.id}
             isDimmed={!!selecting && selecting !== mode.id}
             onSelect={handleSelect}
+            sessions={stats ? (stats.byMode[mode.id]?.sessions ?? 0) : null}
           />
         ))}
       </div>
 
       {/* ── Quick stats strip ────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatChip index={0} icon={Flame}    value="12 days"  label="Current streak"  color="#8A5A22" />
-        <StatChip index={1} icon={Zap}      value="Level 2"  label="Developing communicator" color="#23345C" />
-        <StatChip index={2} icon={Clock}    value="24.5 h"   label="Total practice"  color="#5A5470" />
-        <StatChip index={3} icon={Activity} value="Score 78" label="Overall rating"  color="#3F6B4C" />
+        {/* Real numbers from your analysed sessions; "—" until there are some */}
+        <StatChip index={0} icon={Flame}    value={stats ? `${stats.streakDays} day${stats.streakDays === 1 ? "" : "s"}` : "—"} label="Practice streak" color="#8A5A22" />
+        <StatChip index={1} icon={Zap}      value={stats ? String(stats.sessions) : "—"} label="Live sessions" color="#23345C" />
+        <StatChip index={2} icon={Clock}    value={stats ? (stats.practiceMinutes >= 60 ? `${(stats.practiceMinutes / 60).toFixed(1)} h` : `${stats.practiceMinutes} min`) : "—"} label="Practice time" color="#5A5470" />
+        <StatChip index={3} icon={Activity} value={stats?.latestScore != null ? String(stats.latestScore) : "—"} label="Latest overall score" color="#3F6B4C" />
+      </div>
+      {!signedIn && (
+        <p className="text-center text-xs mt-3" style={{ color: "var(--muted)" }}>
+          Sign in to track your streak, practice time and scores.
+        </p>
+      )}
+      <div>
       </div>
     </div>
   );

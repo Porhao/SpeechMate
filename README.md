@@ -23,6 +23,12 @@ You practise speaking (a live camera + mic session with an AI partner, or rehear
 | **Multimodal analysis** | `/assessment` | After a session: transcript, fluency, fillers (EN + BM), stuttering, pronunciation, English/Malay ratio and code-switching, eye contact, posture, emotion, confidence, an overall score and recommended exercises |
 | **Presentation Coach** | `/presentations` | `.pptx` → AI script per slide → narration by a local Malaysian TTS voice → example video. Then record the whole deck or one slide and get coached, with a chat for follow-up questions. |
 | **AI Coach** | `/coach` | A general coaching chat that knows your goal and recent results, plus a follow-up chat on any presentation attempt |
+| **Deck insights** | `/presentations/[id]` | Upload **.pptx or .pdf**: before narration, SpeechMate summarises the deck: main message, structure, each slide's key point, text-heavy slides, talk length, fixes and likely audience questions |
+| **Two camera views + lighting check** | `/session` | A large clean mirror of you, a small tracking inset with the MediaPipe overlay, and live lighting/contrast advice (face brightness, backlight, contrast, how well you stand out) |
+| **Evidence-based recommendations** | `/assessment` | Up to 3 per session, each with what was measured (numbers and moments), why it matters, a drill and a target relative to your current value |
+| **Reference matrix** | `/methodology` | How every metric is measured, the ranges used for feedback, and how each component is evaluated |
+| **Notifications** | bell, top left | Session analysis, example video and practice feedback, ready or failed |
+| **Dark mode** | top bar / Settings | Light, Dark or System; text keeps at least 4.5:1 contrast in both themes |
 | **Accounts & profile** | `/register`, `/login`, `/profile` | JWT sign-in, and a coaching profile (goal, skill level, challenges) |
 | **Progress & reports** | API: `/api/progress`, `/api/reports` | Every analysed session's metrics over time, and saved summary reports |
 

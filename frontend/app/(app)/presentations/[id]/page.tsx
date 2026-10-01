@@ -9,6 +9,7 @@ import {
 import { presentationService, DECK_IN_PROGRESS, PRACTICE_IN_PROGRESS } from "@/services/presentation";
 import { useRecorder } from "@/hooks/useRecorder";
 import GenerationProgress from "@/components/presentation/GenerationProgress";
+import DeckInsightsPanel from "@/components/presentation/DeckInsightsPanel";
 import FeedbackPanel from "@/components/presentation/FeedbackPanel";
 import CoachChat from "@/components/presentation/CoachChat";
 import type { DeckStatusResponse, PracticeRun, RecordingGranularity, SlideScript } from "@/types";
@@ -107,40 +108,44 @@ export default function PresentationWorkspace() {
   if (loadError && !deck) {
     return (
       <div className="px-4 py-10 max-w-[560px] mx-auto text-center space-y-3">
-        <p className="text-sm" style={{ color: "#8C3B32" }}>{loadError}</p>
-        <Link href="/presentations" className="text-sm underline" style={{ color: "#23345C" }}>Back to presentations</Link>
+        <p className="text-sm" style={{ color: "var(--bad)" }}>{loadError}</p>
+        <Link href="/presentations" className="text-sm underline" style={{ color: "var(--accent-ink)" }}>Back to presentations</Link>
       </div>
     );
   }
   if (!deck) {
-    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: "#9B988E" }} /></div>;
+    return <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--faint)" }} /></div>;
   }
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-[1320px] mx-auto space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
-        <Link href="/presentations" className="p-2 rounded-xl" style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }} aria-label="Back">
-          <ArrowLeft className="w-4 h-4" style={{ color: "#4B4C52" }} />
+        <Link href="/presentations" className="p-2 rounded-xl" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }} aria-label="Back">
+          <ArrowLeft className="w-4 h-4" style={{ color: "var(--ink-2)" }} />
         </Link>
         <div className="flex-1 min-w-0">
-          <h1 className="font-display text-xl truncate" style={{ color: "#17181C" }}>{deck.original_filename}</h1>
-          <p className="text-xs" style={{ color: "#9B988E" }}>
+          <h1 className="font-display text-xl truncate" style={{ color: "var(--ink)" }}>{deck.original_filename}</h1>
+          <p className="text-xs" style={{ color: "var(--faint)" }}>
             {deck.slide_count ? `${deck.slide_count} slides` : "Presentation"}
             {complete && deck.voice_cloning_used != null && ` · narrated in ${deck.voice_cloning_used ? "your cloned voice" : deck.narrator_voice ? `the “${deck.narrator_voice}” voice` : "a standard voice"}`}
           </p>
         </div>
         {complete && (
           <button onClick={retry} disabled={retrying} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl disabled:opacity-50"
-            style={{ color: "#6E6C63", border: "1px solid #E6E2D8", background: "#F5F2EB" }}>
+            style={{ color: "var(--muted)", border: "1px solid var(--line)", background: "var(--surface-2)" }}>
             {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Regenerate
           </button>
         )}
       </div>
 
-      {loadError && <p className="text-sm" style={{ color: "#8C3B32" }}>{loadError}</p>}
+      {loadError && <p className="text-sm" style={{ color: "var(--bad)" }}>{loadError}</p>}
 
       {!complete ? (
-        <GenerationProgress deck={deck} onRetry={retry} retrying={retrying} />
+        <>
+          <GenerationProgress deck={deck} onRetry={retry} retrying={retrying} />
+          {/* Insights are ready right after the slides are parsed — read them while the video builds */}
+          {deck.insights && <div className="max-w-[880px] mx-auto"><DeckInsightsPanel insights={deck.insights} /></div>}
+        </>
       ) : (
         <>
           {deck.warnings.length > 0 && (
@@ -150,6 +155,7 @@ export default function PresentationWorkspace() {
               ))}
             </div>
           )}
+          {deck.insights && <DeckInsightsPanel insights={deck.insights} defaultOpen={false} />}
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-5 items-start">
             <IdealPanel sessionId={id} scripts={scripts} />
             <div className="space-y-5">
@@ -192,7 +198,7 @@ function IdealPanel({ sessionId, scripts }: { sessionId: string; scripts: SlideS
 
   return (
     <div className="glass-card rounded-2xl p-4 space-y-4">
-      <p className="text-sm font-semibold" style={{ color: "#17181C" }}>Example presentation</p>
+      <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Example presentation</p>
       <video
         ref={video}
         src={presentationService.videoUrl(sessionId)}
@@ -211,18 +217,18 @@ function IdealPanel({ sessionId, scripts }: { sessionId: string; scripts: SlideS
               onClick={() => seek(s)}
               className="w-full text-left rounded-xl p-3 transition-colors"
               style={{
-                background: active ? "rgba(35,52,92,0.08)" : "#FBFAF7",
-                border: `1px solid ${active ? "rgba(35,52,92,0.35)" : "#E6E2D8"}`,
+                background: active ? "rgba(35,52,92,0.08)" : "var(--bg)",
+                border: `1px solid ${active ? "rgba(35,52,92,0.35)" : "var(--line)"}`,
               }}
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-bold" style={{ color: active ? "#23345C" : "#6E6C63" }}>Slide {s.slide_index}</span>
-                {s.start_sec != null && <span className="text-[11px] tabular-nums" style={{ color: "#9B988E" }}>{formatDuration(Math.floor(s.start_sec))}</span>}
+                <span className="text-[11px] font-bold" style={{ color: active ? "#23345C" : "var(--muted)" }}>Slide {s.slide_index}</span>
+                {s.start_sec != null && <span className="text-[11px] tabular-nums" style={{ color: "var(--faint)" }}>{formatDuration(Math.floor(s.start_sec))}</span>}
                 {s.script_source === "fallback" && (
-                  <span className="text-[10px] px-1.5 rounded" style={{ background: "#8A5A2214", color: "#8A5A22" }}>template script</span>
+                  <span className="text-[10px] px-1.5 rounded" style={{ background: "#8A5A2214", color: "var(--warn)" }}>template script</span>
                 )}
               </div>
-              <p className="text-sm leading-relaxed" style={{ color: "#24252B" }}>{s.script_text ?? "—"}</p>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--ink-3)" }}>{s.script_text ?? "—"}</p>
             </button>
           );
         })}
@@ -266,14 +272,14 @@ function PracticeRecorder({ sessionId, scripts, onSubmitted }: {
 
   return (
     <div className="glass-card rounded-2xl p-4 space-y-4">
-      <p className="text-sm font-semibold" style={{ color: "#17181C" }}>Your practice</p>
+      <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Your practice</p>
 
       <div className="flex gap-2">
         {(["whole_deck", "per_slide"] as const).map((g) => (
           <button key={g} onClick={() => setGranularity(g)} className="text-xs font-medium px-3 py-1.5 rounded-lg"
             style={granularity === g
-              ? { background: "#23345C", color: "white" }
-              : { background: "#F5F2EB", color: "#4B4C52", border: "1px solid #E6E2D8" }}>
+              ? { background: "var(--accent)", color: "white" }
+              : { background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>
             {g === "whole_deck" ? "Whole deck" : "One slide"}
           </button>
         ))}
@@ -283,15 +289,15 @@ function PracticeRecorder({ sessionId, scripts, onSubmitted }: {
         <div className="space-y-3">
           <select value={slide} onChange={(e) => setSlide(Number(e.target.value))}
             className="text-sm px-3 py-2 rounded-lg outline-none"
-            style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}>
+            style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}>
             {scripts.map((s) => <option key={s.slide_index} value={s.slide_index}>Slide {s.slide_index}</option>)}
           </select>
           {/* eslint-disable-next-line @next/next/no-img-element -- served by the backend, not a static asset */}
           <img src={presentationService.slideImageUrl(sessionId, slide)} alt={`Slide ${slide}`}
-            className="w-full rounded-lg" style={{ border: "1px solid #E6E2D8" }} />
+            className="w-full rounded-lg" style={{ border: "1px solid var(--line)" }} />
           {slideInfo?.audio_source && slideInfo.audio_source !== "silence" && (
             <div>
-              <p className="text-[11px] mb-1" style={{ color: "#9B988E" }}>
+              <p className="text-[11px] mb-1" style={{ color: "var(--faint)" }}>
                 Ideal narration ({AUDIO_SOURCE_LABEL[slideInfo.audio_source] ?? slideInfo.audio_source})
               </p>
               <audio key={slide} src={presentationService.slideAudioUrl(sessionId, slide)} controls className="w-full h-9" />
@@ -315,28 +321,28 @@ function PracticeRecorder({ sessionId, scripts, onSubmitted }: {
           onChange={(e) => { const f = e.target.files?.[0]; if (f) { rec.reset(); setFile(f); } e.target.value = ""; }} />
         <button onClick={() => fileInput.current?.click()} disabled={rec.recording || submitting}
           className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-50"
-          style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}>
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}>
           <Upload className="w-4 h-4" /> Upload file
         </button>
       </div>
-      {rec.error && <p className="text-xs" style={{ color: "#8C3B32" }}>{rec.error}</p>}
+      {rec.error && <p className="text-xs" style={{ color: "var(--bad)" }}>{rec.error}</p>}
 
       {recording && !rec.recording && (
-        <div className="rounded-xl p-3 space-y-2" style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}>
+        <div className="rounded-xl p-3 space-y-2" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
           {file ? (
-            <p className="flex items-center gap-2 text-sm" style={{ color: "#17181C" }}>
+            <p className="flex items-center gap-2 text-sm" style={{ color: "var(--ink)" }}>
               {file.name}
               <button onClick={() => setFile(null)} aria-label="Remove file"><X className="w-3.5 h-3.5" /></button>
             </p>
           ) : rec.url && <audio src={rec.url} controls className="w-full h-9" />}
           <button onClick={submit} disabled={submitting}
-            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50" style={{ background: "#23345C" }}>
+            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-50" style={{ background: "var(--accent)" }}>
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             Get feedback{granularity === "per_slide" ? ` on slide ${slide}` : ""}
           </button>
         </div>
       )}
-      {error && <p className="text-sm" style={{ color: "#8C3B32" }}>{error}</p>}
+      {error && <p className="text-sm" style={{ color: "var(--bad)" }}>{error}</p>}
     </div>
   );
 }
@@ -348,7 +354,7 @@ function AttemptsPanel({ sessionId, runs, selectedId, onSelect }: {
   if (runs.length === 0) {
     return (
       <div className="glass-card rounded-2xl p-4">
-        <p className="text-sm" style={{ color: "#9B988E" }}>
+        <p className="text-sm" style={{ color: "var(--faint)" }}>
           Watch the example, then record yourself presenting. Your coach feedback will appear here.
         </p>
       </div>
@@ -360,7 +366,7 @@ function AttemptsPanel({ sessionId, runs, selectedId, onSelect }: {
   return (
     <div className="glass-card rounded-2xl p-4 space-y-4">
       <div>
-        <p className="text-sm font-semibold mb-2" style={{ color: "#17181C" }}>Attempts</p>
+        <p className="text-sm font-semibold mb-2" style={{ color: "var(--ink)" }}>Attempts</p>
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
           {newestFirst.map((r) => {
             const n = runs.indexOf(r) + 1;
@@ -369,8 +375,8 @@ function AttemptsPanel({ sessionId, runs, selectedId, onSelect }: {
               <button key={r.practice_id} onClick={() => onSelect(r.practice_id)}
                 className="flex-shrink-0 text-left text-xs px-3 py-2 rounded-xl"
                 style={active
-                  ? { background: "#23345C", color: "white" }
-                  : { background: "#F5F2EB", color: "#4B4C52", border: "1px solid #E6E2D8" }}>
+                  ? { background: "var(--accent)", color: "white" }
+                  : { background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}>
                 <span className="flex items-center gap-1 font-semibold">
                   #{n} {r.recording_granularity === "per_slide" ? `· slide ${r.slide_index}` : "· whole deck"}
                   {r.status === "complete" && <CheckCircle2 className="w-3 h-3" />}
@@ -385,13 +391,13 @@ function AttemptsPanel({ sessionId, runs, selectedId, onSelect }: {
       </div>
 
       {PRACTICE_IN_PROGRESS.has(selected.status) && (
-        <div className="flex items-center gap-2 text-sm py-4" style={{ color: "#23345C" }}>
+        <div className="flex items-center gap-2 text-sm py-4" style={{ color: "var(--accent-ink)" }}>
           <Loader2 className="w-4 h-4 animate-spin" /> {PRACTICE_STAGE[selected.status]}
         </div>
       )}
 
       {selected.status === "failed" && (
-        <p className="text-sm px-3 py-2 rounded-lg" style={{ background: "rgba(140,59,50,0.06)", color: "#8C3B32", border: "1px solid rgba(140,59,50,0.2)" }}>
+        <p className="text-sm px-3 py-2 rounded-lg" style={{ background: "rgba(140,59,50,0.06)", color: "var(--bad)", border: "1px solid rgba(140,59,50,0.2)" }}>
           {selected.error_detail ?? "Analysis failed."} Record or upload again to retry.
         </p>
       )}
@@ -399,8 +405,8 @@ function AttemptsPanel({ sessionId, runs, selectedId, onSelect }: {
       {selected.status === "complete" && (
         <>
           <FeedbackPanel run={selected} />
-          <div className="pt-4" style={{ borderTop: "1px solid #F0EDE5" }}>
-            <p className="text-sm font-semibold mb-3" style={{ color: "#17181C" }}>Ask your coach</p>
+          <div className="pt-4" style={{ borderTop: "1px solid var(--line-2)" }}>
+            <p className="text-sm font-semibold mb-3" style={{ color: "var(--ink)" }}>Ask your coach</p>
             <CoachChat key={selected.practice_id} sessionId={sessionId} practiceId={selected.practice_id} compact />
           </div>
         </>

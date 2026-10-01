@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { liveService, conversationService } from "@/services/live";
 import { presentationService } from "@/services/presentation";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
+import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
 import type { SessionType, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -610,6 +611,10 @@ function SessionContent() {
   const [mood,           setMood]           = useState<{ label: MoodLabel; score: number } | null>(null);
   // true while the mic is open for the user's turn (not tied to the recogniser's internal restarts)
   const [speechActive,   setSpeechActive]   = useState(false);
+  // Camera's real aspect ratio, so the tracking inset shows the full frame and the
+  // landmark overlay (drawn in normalised frame coordinates) lines up exactly
+  const [camAspect,      setCamAspect]      = useState("16 / 9");
+  const [lighting,       setLighting]       = useState<LightingReport | null>(null);
   // AI reply text is ready and its voice is loading: shown as "thinking" until audio really plays
   const [voicePending,   setVoicePending]   = useState(false);
   const [interimText,    setInterimText]    = useState("");
@@ -632,8 +637,11 @@ function SessionContent() {
   const slideInputRef = useRef<HTMLInputElement>(null);
 
   // ── DOM refs ─────────────────────────────────────────────────────────────
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  // Two views of the same camera stream: a large clean "mirror" (videoRef, which
+  // MediaPipe reads from) and a small tracking inset with the landmark overlay
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const trackVideoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
   const streamRef  = useRef<MediaStream | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -669,6 +677,8 @@ function SessionContent() {
   const postureRef          = useRef(50);
   const moodRef             = useRef<{ label: MoodLabel; score: number } | null>(null);
   const moodBoxRef          = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  // Face box in normalised frame coordinates, for the lighting check
+  const faceNormRef         = useRef<FaceBox | null>(null);
   const pronounceRef        = useRef(72);
   const wordListRef         = useRef<string[]>([]);
   const fillerCntRef        = useRef(0);
@@ -996,6 +1006,7 @@ function SessionContent() {
             const bx = clamp((minX - pad) * w, 0, w), by = clamp((minY - pad * 1.4) * h, 0, h);
             const bw = clamp((maxX - minX + pad * 2) * w, 0, w - bx), bh = clamp((maxY - minY + pad * 2.4) * h, 0, h - by);
             moodBoxRef.current = { x: bx, y: by, w: bw, h: bh };
+            faceNormRef.current = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 
             // Draw bracket-corner box + mood tag, matching a HUD-style ID overlay.
             if (moodRef.current) {
@@ -1023,7 +1034,7 @@ function SessionContent() {
               ctx.fillStyle = "#FFFFFF";
               ctx.fillText(label, tagX + 8, tagY + 14);
             }
-          } else { setFaceDetected(false); moodBoxRef.current = null; }
+          } else { setFaceDetected(false); moodBoxRef.current = null; faceNormRef.current = null; }
         } catch { /* transient */ }
         try {
           const pr = mp.poseLandmarker.detectForVideo(video, now);
@@ -1101,7 +1112,7 @@ function SessionContent() {
           // The user is (still) talking: don't answer yet
           lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
           if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
-          setInterimText("🎙 …");
+          setInterimText("Hearing you…");
         },
         onTranscribing: () => setInterimText("Transcribing…"),
         // The listener already waited ~1 s of silence, so reply sooner than the browser path
@@ -1214,6 +1225,9 @@ function SessionContent() {
       });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
+      if (trackVideoRef.current) trackVideoRef.current.srcObject = stream;
+      const { width, height } = stream.getVideoTracks()[0]?.getSettings() ?? {};
+      if (width && height) setCamAspect(`${width} / ${height}`);
       setCameraOn(true);
       startAudioMeter(stream);
 
@@ -1249,6 +1263,7 @@ function SessionContent() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    if (trackVideoRef.current) trackVideoRef.current.srcObject = null;
     setCameraOn(false);
     stopAudioMeter();
   }, [setCameraOn, stopAudioMeter]);
@@ -1352,7 +1367,8 @@ function SessionContent() {
         });
         setAIFeedback({
           id: "", session_id: sessionId,
-          summary:
+          // The coaching plan's summary (written from the measured results), else a score line
+          summary: result.recommendations.summary ||
             (result.communication_score.overall_score != null
               ? `Overall score: ${result.communication_score.overall_score}% (${result.communication_score.grade}). `
               : "Not enough signals were measured for an overall score. ") +
@@ -1387,6 +1403,16 @@ function SessionContent() {
     stopSpeech, stopRecording, stopCamera, setRecording, router, duration,
     setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setAnalysisError, setGazeTunneling, updateLiveFeedback,
   ]);
+
+  // ── Lighting & contrast check: once a second while the camera runs (independent of
+  //    MediaPipe loading; uses its face box when available) ───────────────────────
+  useEffect(() => {
+    if (!sessionStarted || !isCameraOn) return;
+    const timer = setInterval(() => {
+      if (videoRef.current) setLighting(analyzeLighting(videoRef.current, faceNormRef.current));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sessionStarted, isCameraOn]);
 
   // ── Silence detection ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1443,7 +1469,11 @@ function SessionContent() {
   }, [sessionStarted, speakText]);
 
   // ── Scroll + cleanup ──────────────────────────────────────────────────────
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, aiTyping]);
+  // Scroll only the chat box to its latest message (scrollIntoView would also scroll the page)
+  useEffect(() => {
+    const box = chatEndRef.current?.closest(".overflow-y-auto");
+    if (box) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+  }, [messages, aiTyping]);
   useEffect(() => {
     return () => {
       activeRef.current = false;
@@ -1489,8 +1519,115 @@ function SessionContent() {
     && mode !== "Pronunciation";
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  // ── Camera stage: large clean mirror + small MediaPipe tracking inset ──────
+  const stateColor =
+    orbState === "listening" ? "#4ade80" : orbState === "speaking" ? "#93c5fd" :
+    orbState === "thinking" ? "#fbbf24" : "rgba(255,255,255,0.55)";
+  const chip = { background: "rgba(0,0,0,0.6)" } as const;
+  const LIGHT_STATUS = {
+    good: { label: "Good", color: "#4ade80" },
+    fair: { label: "Could be better", color: "#fbbf24" },
+    poor: { label: "Needs fixing", color: "#f87171" },
+  } as const;
+  const lightingPanel = (
+    <div className="glass-card px-4 py-3 flex-shrink-0">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">Lighting &amp; contrast</p>
+        {lighting && (
+          <span className="text-[11px] font-semibold" style={{ color: LIGHT_STATUS[lighting.status].color }}>
+            {lighting.faceDetected ? LIGHT_STATUS[lighting.status].label : "Looking for your face"}
+          </span>
+        )}
+      </div>
+      {!lighting ? (
+        <p className="text-xs text-white/40">Checks your lighting once your camera is on.</p>
+      ) : (
+        <>
+          <dl className="grid grid-cols-4 gap-2 mb-2.5">
+            {([
+              ["Face", `${Math.round(lighting.faceLum)}`, lighting.faceLum >= 90 && lighting.faceLum <= 205],
+              ["Contrast", `${Math.round(lighting.contrast)}`, !lighting.faceDetected || lighting.contrast >= 18],
+              ["Backlight", lighting.backgroundLum > lighting.faceLum + 15 ? "Yes" : "No", lighting.backgroundLum <= lighting.faceLum + 15],
+              ["Stand-out", `${lighting.separation.toFixed(1)}:1`, lighting.separation >= 1.3],
+            ] as const).map(([k, v, ok]) => (
+              <div key={k}>
+                <dt className="text-[9px] uppercase tracking-wide text-white/35">{k}</dt>
+                <dd className="text-xs font-semibold" style={{ color: ok ? "rgba(255,255,255,0.85)" : "#fbbf24" }}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <ul className="space-y-1">
+            {lighting.tips.slice(0, 2).map((t) => (
+              <li key={t} className="text-xs leading-relaxed text-white/65">{t}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+
+  const cameraStage = (
+    <div className="relative w-full flex-shrink-0 overflow-hidden bg-black"
+      style={{ aspectRatio: "16 / 9", border: "1px solid rgba(255,255,255,0.08)" }}>
+      {/* Main view — how you look to your audience, no overlay (mirrored like a mirror) */}
+      <video ref={videoRef} autoPlay muted playsInline
+        className={cn("absolute inset-0 w-full h-full object-cover", !isCameraOn && "hidden")}
+        style={{ transform: "scaleX(-1)" }} />
+      {!isCameraOn && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/35">
+          <VideoOff className="w-8 h-8" />
+          <span className="text-xs">{sessionStarted ? "Camera is off" : "Your camera appears here when the session starts"}</span>
+        </div>
+      )}
+
+      {sessionStarted && (
+        <span className="absolute top-3 left-3 flex items-center gap-1.5 text-[11px] font-semibold text-white px-2 py-1" style={chip}>
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> REC {fmt(duration)}
+        </span>
+      )}
+      <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-1" style={{ ...chip, color: stateColor }}>
+        {stateLabel}
+      </span>
+
+      {/* Mic + camera controls */}
+      <div className="absolute bottom-3 left-3 flex items-center gap-2">
+        <button onClick={toggleMic} disabled={!sessionStarted} aria-label={isRecording ? "Mute microphone" : "Unmute microphone"}
+          className={cn("relative h-9 pl-3 pr-3.5 flex items-center gap-2 text-xs font-semibold text-white transition-colors",
+            !sessionStarted && "opacity-40 cursor-not-allowed")}
+          style={{ background: isRecording ? "rgba(156,74,64,0.92)" : "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}>
+          {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-white/60" />}
+          {/* Real input level */}
+          <span className="w-10 h-1 bg-white/20 overflow-hidden">
+            <span className="block h-full bg-white transition-[width] duration-100" style={{ width: `${Math.min(100, audioLevel * 260)}%` }} />
+          </span>
+        </button>
+        <button onClick={toggleCamera} disabled={!sessionStarted} aria-label={isCameraOn ? "Turn camera off" : "Turn camera on"}
+          className={cn("h-9 w-9 flex items-center justify-center text-white transition-colors", !sessionStarted && "opacity-40 cursor-not-allowed")}
+          style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}>
+          {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-white/60" />}
+        </button>
+      </div>
+
+      {/* Tracking inset — the same camera with MediaPipe's face + pose landmarks */}
+      <div className="absolute bottom-3 right-3 bg-black overflow-hidden"
+        style={{ width: "27%", minWidth: 150, aspectRatio: camAspect, border: "1px solid rgba(255,255,255,0.3)" }}>
+        <video ref={trackVideoRef} autoPlay muted playsInline
+          className={cn("absolute inset-0 w-full h-full object-fill", !isCameraOn && "hidden")} />
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+        <div className="absolute bottom-0 inset-x-0 flex items-center justify-between px-1.5 py-0.5 text-[9px] font-semibold" style={chip}>
+          <span className="text-white/75">Tracking</span>
+          <span className="flex gap-2">
+            <span style={{ color: faceDetected ? "#5eead4" : "rgba(255,255,255,0.3)" }}>Face</span>
+            <span style={{ color: poseDetected ? "#93c5fd" : "rgba(255,255,255,0.3)" }}>Pose</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="session-dark flex flex-col px-3 sm:px-6 py-4 h-auto lg:h-[calc(100dvh-60px)] overflow-y-auto lg:overflow-hidden">
+    <div className="session-dark flex flex-col px-3 sm:px-6 py-4 min-h-[calc(100dvh-56px)]">
 
       {/* ── Analyzing overlay ──────────────────────────────────────────── */}
       {isEnding && (
@@ -1585,95 +1722,10 @@ function SessionContent() {
         <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
 
           {/* LEFT: Interviewer panel */}
-          <div className="flex flex-col gap-3 w-full lg:w-[56%] lg:flex-shrink-0">
+          <div className="flex flex-col gap-3 w-full lg:w-[60%] lg:flex-shrink-0">
 
-            {/* Interviewer card */}
-            <div className="flex-1 glass-card rounded-2xl relative overflow-hidden" style={{ minHeight: 0 }}>
-
-              {/* Top bar: company context + timer */}
-              <div className="absolute top-0 left-0 right-0 px-5 py-3 flex items-center justify-between z-10"
-                style={{ background: "linear-gradient(180deg, rgba(8,10,28,0.96) 0%, transparent 100%)" }}>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background: "rgba(35,52,92,0.3)", border: "1px solid rgba(35,52,92,0.4)" }}>
-                    <Briefcase className="w-3.5 h-3.5 text-blue-300" />
-                  </div>
-                  <div>
-                    <p className="text-white text-xs font-bold">SpeechMate Corp · Technical Interview</p>
-                    <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>Software Engineer Position</p>
-                  </div>
-                </div>
-                {sessionStarted && (
-                  <span className="flex items-center gap-1.5 font-mono text-xs font-semibold text-white/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"
-                      style={{ boxShadow: "0 0 6px rgba(156,74,64,0.7)" }} />
-                    {fmt(duration)}
-                  </span>
-                )}
-              </div>
-
-              {/* Interviewer avatar — centred */}
-              <div className="w-full h-full flex items-center justify-center" style={{ paddingTop: 56, paddingBottom: 16 }}>
-                <InterviewerAvatar state={orbState} />
-              </div>
-
-              {/* User camera PiP */}
-              <div className="absolute bottom-3 left-3 rounded-xl overflow-hidden"
-                style={{ width: 132, height: 94, border: "2px solid rgba(35,52,92,0.3)", boxShadow: "0 4px 14px rgba(0,0,0,0.6)" }}>
-                <div className="relative w-full h-full bg-black/70">
-                  <video ref={videoRef} autoPlay muted playsInline
-                    className={cn("w-full h-full object-cover", !isCameraOn && "hidden")} />
-                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-                  {!isCameraOn && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <VideoOff className="w-4 h-4 text-white/20" />
-                    </div>
-                  )}
-                  <div className="absolute top-1.5 left-1.5">
-                    <span className="text-[8px] font-bold bg-black/70 text-white/60 px-1.5 py-0.5 rounded-md">YOU</span>
-                  </div>
-                  {sessionStarted && (
-                    <div className="absolute top-1.5 right-1.5 flex flex-col gap-0.5 items-end">
-                      {faceDetected && <span className="text-[8px] font-bold bg-black/60 text-cyan-400 px-1 py-0.5 rounded-md">FACE ●</span>}
-                    </div>
-                  )}
-                  {sessionStarted && (
-                    <div className="absolute top-1.5 left-1.5">
-                      <span className="text-[8px] font-bold bg-black/60 text-red-400 px-1 py-0.5 rounded-md flex items-center gap-0.5">
-                        <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" /> LIVE
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Mic + cam controls */}
-              <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                <button onClick={toggleMic} disabled={!sessionStarted}
-                  className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all press-effect",
-                    !sessionStarted ? "opacity-30 cursor-not-allowed" : "")}
-                  style={isRecording
-                    ? { background: "rgba(156,74,64,0.85)", boxShadow: "0 0 14px rgba(156,74,64,0.5)" }
-                    : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  {isRecording ? <Mic className="w-4 h-4 text-white" /> : <MicOff className="w-4 h-4 text-white/40" />}
-                </button>
-                <button onClick={toggleCamera} disabled={!sessionStarted}
-                  className={cn("w-9 h-9 rounded-full flex items-center justify-center transition-all press-effect",
-                    !sessionStarted ? "opacity-30 cursor-not-allowed" : "text-white/40")}
-                  style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* AI speaking overlay badge */}
-              {aiSpeaking && (
-                <div className="absolute top-[56px] right-4 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
-                  style={{ background: "rgba(35,52,92,0.25)", border: "1px solid rgba(35,52,92,0.4)" }}>
-                  <Volume2 className="w-3 h-3 text-blue-300 animate-pulse" />
-                  <span className="text-[10px] font-semibold text-blue-300">Alex is speaking</span>
-                </div>
-              )}
-            </div>
+            {cameraStage}
+            {lightingPanel}
 
             {/* Current question card */}
             {currentQuestion && (
@@ -1692,6 +1744,25 @@ function SessionContent() {
 
           {/* RIGHT: Metrics + responses */}
           <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+
+            {/* Interviewer tile */}
+            <div className="glass-card relative overflow-hidden flex-shrink-0" style={{ height: 210 }}>
+              <div className="absolute top-0 inset-x-0 px-4 py-2.5 flex items-center justify-between z-10"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-3.5 h-3.5 text-white/50" />
+                  <p className="text-white text-xs font-semibold">Alex · Interviewer</p>
+                </div>
+                {aiSpeaking && (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-300">
+                    <Volume2 className="w-3 h-3" /> Speaking
+                  </span>
+                )}
+              </div>
+              <div className="w-full h-full flex items-center justify-center pt-8">
+                <div style={{ transform: "scale(0.72)" }}><InterviewerAvatar state={orbState} /></div>
+              </div>
+            </div>
 
             {/* Live performance */}
             <div className="glass-card rounded-2xl p-4 flex-shrink-0">
@@ -1782,7 +1853,7 @@ function SessionContent() {
                     <div className="flex items-center gap-3 py-1">
                       <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
                       <span className="text-[10px] text-white/30 font-medium whitespace-nowrap">
-                        {speechActive ? "🎙 Speak your answer" : "Your turn"}
+                        {speechActive ? "Speak your answer" : "Your turn"}
                       </span>
                       <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
                     </div>
@@ -1837,97 +1908,23 @@ function SessionContent() {
         /* ── Default 2-column layout (Conversation / Presentation / Pronunciation) ── */
         <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
 
-          {/* LEFT: Orb + camera PiP */}
-          <div className="w-full lg:w-[300px] lg:flex-shrink-0 flex flex-col gap-3">
+          {/* LEFT: camera stage + AI status */}
+          <div className="w-full lg:w-[58%] lg:flex-shrink-0 flex flex-col gap-3">
 
-          {/* Orb card */}
-          <div className="flex-1 glass-card rounded-2xl flex flex-col items-center justify-center gap-6 relative overflow-hidden"
-            style={{ minHeight: 320 }}>
-            {/* Orb */}
-            <div style={{ paddingBottom: 40 }}>
-              <AIOrb state={orbState} level={audioLevel} />
+          {cameraStage}
+
+          {/* AI partner status */}
+          <div className="glass-card px-4 py-3 flex items-center gap-4 flex-shrink-0">
+            <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
+              <div style={{ transform: "scale(0.3)" }}><AIOrb state={orbState} level={audioLevel} /></div>
             </div>
-
-            {/* State label */}
-            <div className="absolute bottom-16 flex flex-col items-center gap-1">
-              <p className="text-sm font-semibold"
-                style={{
-                  color: orbState === "listening" ? "#4ade80"
-                       : orbState === "speaking"  ? "#93c5fd"
-                       : orbState === "thinking"  ? "#fbbf24"
-                       : "rgba(255,255,255,0.5)",
-                }}>
-                {stateLabel}
-              </p>
-            </div>
-
-            {/* Mic + camera controls */}
-            <div className="absolute bottom-4 flex items-center gap-3">
-              <div className="relative">
-                {/* Ripple ring — real amplitude, not a canned pulse loop */}
-                {isRecording && (
-                  <div className="absolute rounded-full pointer-events-none"
-                    style={{
-                      inset: -6 - audioLevel * 14,
-                      border: "1.5px solid rgba(156,74,64,0.4)",
-                      opacity: Math.min(1, audioLevel * 2.5),
-                      transition: "inset 0.1s ease-out, opacity 0.1s ease-out",
-                    }} />
-                )}
-                <button onClick={toggleMic} disabled={!sessionStarted}
-                  className={cn(
-                    "relative w-10 h-10 rounded-full flex items-center justify-center transition-all press-effect",
-                    !sessionStarted ? "opacity-30 cursor-not-allowed" : "",
-                    isRecording
-                      ? "text-white"
-                      : "text-white/40 hover:text-white/70",
-                  )}
-                  style={isRecording ? {
-                    background: "rgba(156,74,64,0.85)",
-                    boxShadow: `0 0 ${16 + audioLevel * 20}px rgba(156,74,64,${0.5 + audioLevel * 0.3})`,
-                    transform: `scale(${1 + audioLevel * 0.08})`,
-                    transition: "box-shadow 0.1s ease-out, transform 0.1s ease-out",
-                  } : { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                </button>
-              </div>
-              <button onClick={toggleCamera} disabled={!sessionStarted}
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all press-effect",
-                  !sessionStarted ? "opacity-30 cursor-not-allowed" : "text-white/40 hover:text-white/70",
-                )}
-                style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-              </button>
+            <div className="min-w-0">
+              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider">AI partner</p>
+              <p className="text-sm font-semibold" style={{ color: stateColor }}>{stateLabel}</p>
             </div>
           </div>
 
-          {/* Camera PiP */}
-          <div className="glass-card rounded-2xl overflow-hidden flex-shrink-0" style={{ height: 140 }}>
-            <div className="relative w-full h-full bg-black/60">
-              <video ref={videoRef} autoPlay muted playsInline
-                className={cn("w-full h-full object-cover", !isCameraOn && "hidden")} />
-              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-              {!isCameraOn && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <VideoOff className="w-6 h-6 text-white/20" />
-                </div>
-              )}
-              {sessionStarted && (
-                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-                  {faceDetected && <span className="text-[9px] font-bold bg-black/60 text-cyan-400 px-1.5 py-0.5 rounded-md">FACE ●</span>}
-                  {poseDetected && <span className="text-[9px] font-bold bg-black/60 text-blue-400 px-1.5 py-0.5 rounded-md">POSE ●</span>}
-                </div>
-              )}
-              {sessionStarted && (
-                <div className="absolute top-2 left-2">
-                  <span className="text-[9px] font-bold bg-black/60 text-red-400 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" /> LIVE
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+          {lightingPanel}
 
           {/* Mood — read from the same face tracking already running above */}
           {sessionStarted && (
@@ -2186,7 +2183,7 @@ function SessionContent() {
                       <div className="flex items-center gap-3 py-1">
                         <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
                         <span className="text-[10px] text-white/30 font-medium whitespace-nowrap">
-                          {speechActive ? "🎙 Speak your answer" : "Your turn — speak or type"}
+                          {speechActive ? "Speak your answer" : "Your turn — speak or type"}
                         </span>
                         <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
                       </div>

@@ -17,8 +17,10 @@ from sqlalchemy import func, select
 
 from app.database import async_session_factory
 from app.models.live_session import LiveSession, ProgressRecord
-from app.services.live import asr, language, pronunciation, scoring, speech, vision
+from app.models.user import User
+from app.services.live import asr, coaching, language, pronunciation, scoring, speech, vision
 from app.services.live._ml import available
+from app.services.notifications import notify
 from app.services.live.audio import to_16k_wav
 from app.services.media import MediaError, detect_silences, wav_duration
 from app.services.storage import storage_service
@@ -31,7 +33,15 @@ PROGRESS_METRICS = (
 )
 
 
-async def analyze_recording(recording, work_dir, session_history_count: int) -> tuple[dict, list[str]]:
+async def analyze_recording(
+    recording,
+    work_dir,
+    session_history_count: int,
+    *,
+    session_type: str = "Conversation",
+    user_goal: str | None = None,
+    previous: dict | None = None,
+) -> tuple[dict, list[str]]:
     """Run every analysis stage on one recording. Returns (analysis, warnings)."""
     warnings: list[str] = []
 
@@ -118,15 +128,27 @@ async def analyze_recording(recording, work_dir, session_history_count: int) -> 
         "Eye Contact": eye.eye_contact_score if eye else None,
         "Posture": posture.posture_score if posture else None,
     })
-    recs = scoring.generate_recommendations(
-        fluency=fluency.fluency_score if fluency else None,
-        pronunciation=pron_score,
-        eye_contact=eye.eye_contact_score if eye else None,
-        confidence=confidence.confidence_score if confidence else None,
-        posture=posture.posture_score if posture else None,
-        stuttering=stutter.stuttering_score,
-        filler_count=fillers.total_fillers if fillers else None,
+    # Recommendations from what was actually measured (see coaching.py)
+    candidates = coaching.build_candidates(
+        fluency=speech.to_dict(fluency) if fluency else None,
+        fillers=speech.to_dict(fillers) if fillers else None,
+        stutter=speech.to_dict(stutter),
+        pronunciation={**pron.to_dict(), "score": pron_score} if pron else None,
+        eye=vision.as_dict(eye),
+        posture=vision.as_dict(posture),
+        emotion=vision.as_dict(emotion),
+        duration_sec=duration,
+        session_type=session_type,
+        previous=previous,
+    )
+    recs = await coaching.build_plan(
+        candidates=candidates,
+        strengths=comm.strengths,
+        session_type=session_type,
+        user_goal=user_goal,
         session_history_count=session_history_count,
+        transcript_excerpt=transcript,
+        warnings=warnings,
     )
 
     analysis = {
@@ -186,8 +208,21 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
             history = (await db.execute(
                 select(func.count()).select_from(LiveSession).where(LiveSession.user_id == live.user_id)
             )).scalar_one()
+            # The user's last analysed session, so recommendations can show progress
+            previous = (await db.execute(
+                select(LiveSession.analysis)
+                .where(LiveSession.user_id == live.user_id, LiveSession.status == "complete",
+                       LiveSession.id != live.id, LiveSession.created_at < live.created_at)
+                .order_by(LiveSession.created_at.desc()).limit(1)
+            )).scalar_one_or_none()
+            user = await db.get(User, live.user_id)
             recording = storage_service.get_absolute_path(live.recording_storage_path)
-            analysis, warnings = await analyze_recording(recording, recording.parent, history)
+            analysis, warnings = await analyze_recording(
+                recording, recording.parent, history,
+                session_type=live.session_type,
+                user_goal=user.communication_goal if user else None,
+                previous=previous,
+            )
 
             live.analysis = {"session_id": str(live.id), **analysis}
             live.warnings = warnings or None
@@ -206,16 +241,23 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
                         user_id=live.user_id, live_session_id=live.id,
                         metric_name=name, metric_value=float(values[name]),
                     ))
+            overall = analysis["communication_score"]["overall_score"]
+            notify(db, live.user_id, "live_analysis", f"Your {live.session_type.lower()} session results are ready",
+                   (f"Overall score {overall:.0f}. " if overall is not None else "")
+                   + (f"Focus next: {analysis['recommendations']['weekly_focus']}." if analysis["recommendations"]["exercises"] else ""),
+                   f"/assessment?live={live.id}")
             await db.commit()
             logger.info("Live analysis ready for %s", live_id)
         except MediaError as e:
             await db.rollback()
             await db.refresh(live)
             live.status, live.error_detail = "failed", str(e)
+            notify(db, live.user_id, "live_failed", "Session analysis failed", str(e), "/practice")
             await db.commit()
         except Exception as e:  # noqa: BLE001
             logger.exception("Live analysis crashed for %s", live_id)
             await db.rollback()
             await db.refresh(live)
             live.status, live.error_detail = "failed", f"Internal error: {e}"
+            notify(db, live.user_id, "live_failed", "Session analysis failed", "Internal error — please try the session again.", "/practice")
             await db.commit()

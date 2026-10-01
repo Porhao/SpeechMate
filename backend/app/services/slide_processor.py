@@ -1,12 +1,14 @@
-"""Slide processing service (Ideal Agent Stage 1): .pptx → per-slide PNGs + text.
+"""Slide processing service (Ideal Agent Stage 1): deck → per-slide PNGs + text.
 
-Rendering goes .pptx → PDF (LibreOffice headless) → PNG per page (pdftoppm).
-LibreOffice's direct PNG export only renders the first slide, so the PDF hop
-is the reliable path for multi-slide decks.
+Accepts .pptx and .pdf. A .pptx is rendered .pptx → PDF (LibreOffice headless) →
+PNG per page (pdftoppm) — LibreOffice's direct PNG export only renders the first
+slide, so the PDF hop is the reliable path. A .pdf skips straight to pdftoppm.
+Text comes from python-pptx (.pptx) or pdftotext (.pdf).
 """
 
 import logging
 import shutil
+import subprocess
 from pathlib import Path
 
 from pptx import Presentation
@@ -48,6 +50,16 @@ class SlideProcessor:
         shutil.rmtree(work_dir, ignore_errors=True)
         work_dir.mkdir(parents=True)
 
+        if pptx_abs.suffix.lower() == ".pdf":
+            shutil.copy(pptx_abs, work_dir / "deck.pdf")
+        else:
+            await self._pptx_to_pdf(pptx_abs, work_dir)
+        pdfs = sorted(work_dir.glob("*.pdf"))
+        if not pdfs:
+            raise SlideProcessorError("LibreOffice did not produce a PDF — is the .pptx valid?")
+        return await self._pdf_to_pngs(pdfs[0], work_dir, slides_dir, dirs["root"])
+
+    async def _pptx_to_pdf(self, pptx_abs: Path, work_dir: Path) -> None:
         # Separate LibreOffice profile per job so concurrent conversions don't collide
         profile = (work_dir / "lo_profile").resolve().as_uri()
         try:
@@ -65,16 +77,13 @@ class SlideProcessor:
         except MediaError as e:
             raise SlideProcessorError(f"PPTX → PDF conversion failed: {e}") from e
 
-        pdfs = sorted(work_dir.glob("*.pdf"))
-        if not pdfs:
-            raise SlideProcessorError("LibreOffice did not produce a PDF — is the .pptx valid?")
-
+    async def _pdf_to_pngs(self, pdf: Path, work_dir: Path, slides_dir: Path, root: Path) -> list[Path]:
         try:
             await run_command(
                 [
                     "pdftoppm", "-png",
                     "-scale-to-x", "1920", "-scale-to-y", "-1",
-                    str(pdfs[0]),
+                    str(pdf),
                     str(work_dir / "page"),
                 ],
                 timeout=180,
@@ -93,7 +102,7 @@ class SlideProcessor:
             page.rename(target)
             normalized.append(target)
 
-        shutil.move(str(pdfs[0]), dirs["root"] / "slides.pdf")
+        shutil.move(str(pdf), root / "slides.pdf")
         shutil.rmtree(work_dir, ignore_errors=True)
         return normalized
 
@@ -105,6 +114,8 @@ class SlideProcessor:
         slides are skipped because LibreOffice leaves them out of the PDF export.
         """
         pptx_abs = storage_service.get_absolute_path(pptx_relative_path)
+        if pptx_abs.suffix.lower() == ".pdf":
+            return self._pdf_texts(pptx_abs)
         try:
             prs = Presentation(str(pptx_abs))
         except Exception as e:  # noqa: BLE001 — text is best-effort
@@ -136,6 +147,22 @@ class SlideProcessor:
                             lines.append(" | ".join(cells))
             texts.append("\n".join(lines))
         return texts
+
+    @staticmethod
+    def _pdf_texts(pdf: Path) -> list[str]:
+        """Text per page via pdftotext (pages are separated by form feeds)."""
+        try:
+            out = subprocess.run(
+                ["pdftotext", "-layout", str(pdf), "-"], capture_output=True, text=True, timeout=120, check=True
+            ).stdout
+        except (OSError, subprocess.SubprocessError) as e:
+            logger.warning("Could not read text from %s: %s", pdf, e)
+            return []
+        pages = out.split("\f")
+        if pages and not pages[-1].strip():
+            pages = pages[:-1]
+        # Collapse the column padding -layout adds, keep one line per text line
+        return ["\n".join(" ".join(line.split()) for line in page.splitlines() if line.strip()) for page in pages]
 
 
 # Module-level singleton

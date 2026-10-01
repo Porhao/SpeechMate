@@ -83,6 +83,6 @@ export const presentationService = {
 };
 
 export const DECK_IN_PROGRESS: ReadonlySet<string> = new Set([
-  "queued", "processing_slides", "generating_scripts", "synthesizing_audio", "assembling_video",
+  "queued", "processing_slides", "analyzing_content", "generating_scripts", "synthesizing_audio", "assembling_video",
 ]);
 export const PRACTICE_IN_PROGRESS: ReadonlySet<string> = new Set(["queued", "transcribing", "analyzing"]);

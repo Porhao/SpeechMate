@@ -102,5 +102,10 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
   - Adjust parameters and fix issues based on the evaluation results (e.g., pronunciation scoring inconsistencies).
   - [x] Documentation: README, backend README and PROJECT.md match the code; TESTING.md has demo accounts, a test guide and a glossary.
   - [x] Local-first AI: Ollama for LLM + vision, local Malaysian TTS for narration, demo accounts seeded for testing.
+  - [x] UI: single plain top bar, near-square corners, no glassmorphism or emoji; dark mode with WCAG AA contrast; notifications; reference matrix; real stats on Home/Practice (no invented numbers).
+  - [x] Live sessions: large clean camera view and a separate MediaPipe tracking inset; lighting & contrast advice.
+  - [x] Recommendations grounded in measured evidence with drills and relative targets (LLM picks/words them, can't invent issues).
+  - [x] Presentation decks: .pptx or .pdf, and deck insights (summary, structure, key points, suggestions) before narration.
+  - [ ] Connect the Dashboard, Progress and Reports charts to `/api/progress` and `/api/reports` (they're labelled as sample data until then).
   - [ ] Deploy the prototype: set a real `SECRET_KEY`, add API keys, and pick a host with enough RAM/CPU for the local models.
   - Compile the final project report summarizing the quantitative results and user acceptance findings.

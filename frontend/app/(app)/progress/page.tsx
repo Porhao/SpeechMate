@@ -12,6 +12,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Trophy, Flame, TrendingUp, Clock, Zap, Award, Target, Star } from "lucide-react";
+import { tint, inkOf } from "@/lib/utils";
+import SampleDataNotice from "@/components/ui/SampleDataNotice";
 
 const TREND_DATA = [
   { week: "Jan W3", overall: 68, fluency: 72, pronunciation: 64, confidence: 67, eyeContact: 71, posture: 62 },
@@ -31,7 +33,7 @@ const HEAT_SESSIONS = [
 ];
 
 function heatColor(n: number) {
-  if (n === 0) return "#F0EDE5";
+  if (n === 0) return "var(--line-2)";
   if (n === 1) return "rgba(35,52,92,0.30)";
   if (n === 2) return "rgba(35,52,92,0.60)";
   return "#23345C";
@@ -73,31 +75,32 @@ export default function ProgressPage() {
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1320px] mx-auto space-y-6">
+      <SampleDataNotice what="progress charts" />
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>Progress Analytics</h1>
-          <p className="text-sm mt-1" style={{ color: "#9B988E" }}>
+          <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Progress Analytics</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--faint)" }}>
             Track your communication improvement over time
           </p>
         </div>
         <div
           className="flex gap-1 rounded-xl p-1"
-          style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
         >
           {(["7D", "30D", "3M", "All"] as const).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
               className="relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-              style={{ color: period === p ? "#17233E" : "#6E6C63" }}
+              style={{ color: period === p ? "#17233E" : "var(--muted)" }}
             >
               {period === p && (
                 <motion.div
                   layoutId="progress-period-pill"
                   className="absolute inset-0 rounded-lg"
-                  style={{ background: "#FFFFFF", boxShadow: "0 0 0 1px rgba(35,52,92,0.25), 0 2px 8px rgba(35,52,92,0.10)" }}
+                  style={{ background: "var(--surface)", boxShadow: "0 0 0 1px rgba(35,52,92,0.25), 0 2px 8px rgba(35,52,92,0.10)" }}
                   transition={{ type: "spring", stiffness: 480, damping: 34 }}
                 />
               )}
@@ -117,13 +120,13 @@ export default function ProgressPage() {
         ].map(({ label, value, sub, icon: Icon, color }, i) => (
           <div key={label} className="glass-card rounded-2xl p-5 slide-up" style={{ animationDelay: `${i * 0.06}s` }}>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium" style={{ color: "#9B988E" }}>{label}</span>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${color}18` }}>
-                <Icon className="w-4 h-4" style={{ color }} />
+              <span className="text-xs font-medium" style={{ color: "var(--faint)" }}>{label}</span>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${tint(color, "18")}` }}>
+                <Icon className="w-4 h-4" style={{ color: inkOf(color) }} />
               </div>
             </div>
-            <p className="text-2xl font-bold" style={{ color: "#17181C" }}>{value}</p>
-            <p className="text-xs mt-1 font-medium" style={{ color: "#3F6B4C" }}>{sub}</p>
+            <p className="text-2xl font-bold" style={{ color: "var(--ink)" }}>{value}</p>
+            <p className="text-xs mt-1 font-medium" style={{ color: "var(--ok)" }}>{sub}</p>
           </div>
         ))}
       </div>
@@ -131,7 +134,7 @@ export default function ProgressPage() {
       {/* Trend Chart */}
       <div className="glass-card rounded-2xl p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4">
-          <h2 className="text-sm font-semibold" style={{ color: "#17181C" }}>Score Trends</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Score Trends</h2>
           <div className="flex flex-wrap gap-1.5">
             {LINES.map(({ key, label, color }) => (
               <button
@@ -139,8 +142,8 @@ export default function ProgressPage() {
                 onClick={() => toggleLine(key)}
                 className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-all"
                 style={visible[key]
-                  ? { backgroundColor: `${color}18`, borderColor: color, color }
-                  : { borderColor: "#E6E2D8", color: "#9B988E", background: "transparent" }
+                  ? { backgroundColor: `${tint(color, "18")}`, borderColor: color, color }
+                  : { borderColor: "var(--line)", color: "var(--faint)", background: "transparent" }
                 }
               >
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
@@ -153,18 +156,18 @@ export default function ProgressPage() {
         {mounted ? (
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={TREND_DATA} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1EEE6" />
-              <XAxis dataKey="week" tick={{ fill: "#9B988E", fontSize: 11 }} />
-              <YAxis domain={[50, 100]} tick={{ fill: "#9B988E", fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-3)" />
+              <XAxis dataKey="week" tick={{ fill: "var(--faint)", fontSize: 11 }} />
+              <YAxis domain={[50, 100]} tick={{ fill: "var(--faint)", fontSize: 11 }} />
               <Tooltip
                 contentStyle={{
                   borderRadius: 12,
-                  border: "1px solid #E6E2D8",
-                  background: "#FFFFFF",
+                  border: "1px solid var(--line)",
+                  background: "var(--surface)",
                   boxShadow: "0 8px 24px rgba(23,24,28,0.1)",
                 }}
-                labelStyle={{ fontSize: 12, fontWeight: 600, color: "#17181C" }}
-                itemStyle={{ fontSize: 11, color: "#4B4C52" }}
+                labelStyle={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}
+                itemStyle={{ fontSize: 11, color: "var(--ink-2)" }}
               />
               {LINES.map(({ key, label, color, width }) => (
                 <Line key={key} type="monotone" dataKey={key} name={label} stroke={color} strokeWidth={width} dot={false} hide={!visible[key]} />
@@ -181,20 +184,20 @@ export default function ProgressPage() {
       {/* Heatmap */}
       <div className="glass-card rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold" style={{ color: "#17181C" }}>Practice Consistency</h2>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Practice Consistency</h2>
           <div className="flex items-center gap-2">
-            <span className="text-[10px]" style={{ color: "#9B988E" }}>Less</span>
+            <span className="text-[10px]" style={{ color: "var(--faint)" }}>Less</span>
             {[0, 1, 2, 3].map((n) => (
               <div key={n} className="w-3 h-3 rounded-sm" style={{ backgroundColor: heatColor(n) }} />
             ))}
-            <span className="text-[10px]" style={{ color: "#9B988E" }}>More</span>
+            <span className="text-[10px]" style={{ color: "var(--faint)" }}>More</span>
           </div>
         </div>
 
         <div className="flex gap-2">
           <div className="flex flex-col gap-1 pt-1 justify-between" style={{ height: 7 * (12 + 4) - 4 }}>
             {DAY_LABELS.map((d) => (
-              <span key={d} className="text-[9px] w-7 text-right leading-3" style={{ color: "#9B988E" }}>{d}</span>
+              <span key={d} className="text-[9px] w-7 text-right leading-3" style={{ color: "var(--faint)" }}>{d}</span>
             ))}
           </div>
           <div className="flex gap-1">
@@ -216,27 +219,27 @@ export default function ProgressPage() {
 
       {/* Milestones */}
       <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-sm font-semibold mb-4" style={{ color: "#17181C" }}>Milestones</h2>
+        <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ink)" }}>Milestones</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {MILESTONES.map(({ title, done, icon: Icon, color, date }) => (
             <div
               key={title}
               className="flex items-center gap-3 p-4 rounded-xl border transition-all"
               style={{
-                background: done ? `${color}0c` : "#F6F3EC",
-                borderColor: done ? `${color}30` : "#F0EDE5",
+                background: done ? `${tint(color, "0c")}` : "#F6F3EC",
+                borderColor: done ? `${tint(color, "30")}` : "var(--line-2)",
                 opacity: done ? 1 : 0.6,
               }}
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: done ? `${color}18` : "#F1EEE6" }}
+                style={{ backgroundColor: done ? `${tint(color, "18")}` : "var(--surface-3)" }}
               >
-                <Icon className="w-4 h-4" style={{ color: done ? color : "#9B988E" }} />
+                <Icon className="w-4 h-4" style={{ color: done ? color : "var(--faint)" }} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold truncate" style={{ color: "#17181C" }}>{title}</p>
-                <p className="text-[10px] mt-0.5 truncate" style={{ color: "#9B988E" }}>
+                <p className="text-xs font-semibold truncate" style={{ color: "var(--ink)" }}>{title}</p>
+                <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--faint)" }}>
                   {done ? `Achieved ${date}` : date}
                 </p>
               </div>

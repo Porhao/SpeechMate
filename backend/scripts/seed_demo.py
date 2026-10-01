@@ -26,7 +26,7 @@ from app.auth import hash_password  # noqa: E402
 from app.database import async_session_factory  # noqa: E402
 from app.models.live_session import LiveSession, ProgressRecord  # noqa: E402
 from app.models.user import User  # noqa: E402
-from app.services.live import scoring  # noqa: E402
+from app.services.live import coaching, scoring  # noqa: E402
 
 PASSWORD = "Demo1234!"
 DEMO_NOTE = "Demo data created by scripts/seed_demo.py — not a real recording."
@@ -76,11 +76,21 @@ def _analysis(h: dict, history_count: int) -> dict:
         "Fluency": h["fluency"], "Pronunciation": h["pron"], "Confidence": h["conf"],
         "Eye Contact": h["eye"], "Posture": h["posture"],
     })
-    recs = scoring.generate_recommendations(
-        fluency=h["fluency"], pronunciation=h["pron"], eye_contact=h["eye"], confidence=h["conf"],
-        posture=h["posture"], stuttering=h["stutter"], filler_count=h["fillers"],
-        session_history_count=history_count,
+    minutes_ = h["duration"] / 60
+    candidates = coaching.build_candidates(
+        fluency={"speaking_rate": h["wpm"]},
+        fillers={"total_fillers": h["fillers"], "fillers_per_minute": round(h["fillers"] / minutes_, 1),
+                 "filler_breakdown": {"um": h["fillers"]}, "top_filler": "um"},
+        stutter={"detected_events": []},
+        pronunciation=None,
+        eye={"eye_contact_score": h["eye"], "look_away_percentage": 100 - h["eye"], "dominant_gaze": "down"},
+        posture={"posture_score": h["posture"], "head_alignment": h["posture"], "shoulder_alignment": 80,
+                 "body_stability": 80, "tilt_angle": 6},
+        emotion=None,
+        duration_sec=float(h["duration"]),
+        session_type=h["type"],
     )
+    recs = coaching.rule_based_plan(candidates, comm.strengths, h["type"], history_count)
     minutes = h["duration"] / 60
     manglish = "lah" in h["transcript"]
     return {

@@ -10,9 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.auth import get_optional_user
 from app.database import get_db
 from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
 from app.models.slide import Slide
+from app.models.user import User
 from app.schemas.session import (
     SessionCreateResponse,
     SessionListItem,
@@ -69,10 +71,11 @@ async def get_slides(db: AsyncSession, session_id: uuid.UUID) -> list[Slide]:
 
 @router.post("", response_model=SessionCreateResponse, status_code=201)
 async def create_session(
-    pptx: UploadFile = File(..., description="PowerPoint .pptx file"),
+    pptx: UploadFile = File(..., description="The deck: PowerPoint .pptx or .pdf"),
     voice_sample: UploadFile | None = File(None, description="Voice sample for cloning (optional)"),
     requirement_prompt: str | None = Form(None, description="Audience/purpose context (optional)"),
     narrator_voice: str | None = Form(None, description="Malaysian TTS voice id (see GET /api/narrator-voices)"),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -80,8 +83,9 @@ async def create_session(
 
     Returns immediately with `queued`; poll `GET /api/sessions/{id}` for progress.
     """
-    if not pptx.filename or not pptx.filename.lower().endswith(".pptx"):
-        raise HTTPException(status_code=400, detail="File must be a .pptx PowerPoint file")
+    deck_ext = Path(pptx.filename or "").suffix.lower()
+    if deck_ext not in (".pptx", ".pdf"):
+        raise HTTPException(status_code=400, detail="The deck must be a PowerPoint (.pptx) or PDF (.pdf) file")
 
     if narrator_voice and narrator_voice not in malaysian_tts.VOICES:
         raise HTTPException(
@@ -93,7 +97,7 @@ async def create_session(
         voice_ext = audio_extension(voice_sample.filename)
 
     session_id = uuid.uuid4()
-    pptx_path = await storage_service.save_upload(str(session_id), "original.pptx", await pptx.read())
+    pptx_path = await storage_service.save_upload(str(session_id), f"original{deck_ext}", await pptx.read())
 
     voice_path = None
     if voice_ext:
@@ -109,6 +113,7 @@ async def create_session(
         voice_sample_storage_path=voice_path,
         requirement_prompt=(requirement_prompt or "").strip() or None,
         narrator_voice=narrator_voice or None,
+        user_id=user.id if user else None,
         status="queued",
     )
     db.add(session)
@@ -120,9 +125,10 @@ async def create_session(
 
 
 @router.get("", response_model=list[SessionListItem])
-async def list_sessions(db: AsyncSession = Depends(get_db)):
-    """List all sessions, most recent first."""
-    result = await db.execute(select(Session).order_by(Session.created_at.desc()))
+async def list_sessions(user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    """Your decks, most recent first (signed out: decks uploaded without an account)."""
+    owner = Session.user_id == user.id if user else Session.user_id.is_(None)
+    result = await db.execute(select(Session).where(owner).order_by(Session.created_at.desc()))
     return [
         SessionListItem(
             session_id=s.id,
@@ -162,6 +168,7 @@ async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db))
         voice_cloning_used=session.voice_cloning_used,
         original_filename=session.original_filename,
         narrator_voice=session.narrator_voice,
+        insights=session.insights,
         created_at=session.created_at,
         updated_at=session.updated_at,
     )

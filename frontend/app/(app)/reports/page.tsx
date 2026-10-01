@@ -14,6 +14,8 @@ import {
   Loader2,
   ChevronRight,
 } from "lucide-react";
+import { tint, inkOf } from "@/lib/utils";
+import SampleDataNotice from "@/components/ui/SampleDataNotice";
 
 const REPORTS = [
   { id: "r-001", name: "Weekly Progress Report — Mar 10",  type: "PDF", scope: "All Sessions",  generated: "Mar 10, 2026 · 9:15 AM",  size: "1.2 MB", sessions: 8,  score: 78 },
@@ -41,8 +43,8 @@ function TypeBadge({ type }: { type: string }) {
     <span
       className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
       style={isPdf
-        ? { backgroundColor: "rgba(140,59,50,0.10)", color: "#8C3B32" }
-        : { backgroundColor: "rgba(63,107,76,0.10)", color: "#3F6B4C" }
+        ? { backgroundColor: "rgba(140,59,50,0.10)", color: "var(--bad)" }
+        : { backgroundColor: "rgba(63,107,76,0.10)", color: "var(--ok)" }
       }
     >
       {isPdf ? <FileText className="w-3 h-3" /> : <FileSpreadsheet className="w-3 h-3" />}
@@ -73,19 +75,20 @@ export default function ReportsPage() {
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1320px] mx-auto space-y-6">
+      <SampleDataNotice what="reports" />
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl" style={{ color: "#17181C" }}>Reports</h1>
-          <p className="text-sm mt-1" style={{ color: "#9B988E" }}>
+          <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Reports</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--faint)" }}>
             Download your progress data and session summaries
           </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all press-effect"
-          style={{ background: "#23345C" }}
+          style={{ background: "var(--accent)" }}
         >
           <Plus className="w-4 h-4" /> Generate Report
         </button>
@@ -99,12 +102,12 @@ export default function ReportsPage() {
           { label: "Data Exported",     value: "4.1 MB", icon: Download,  color: "#3F6B4C" },
         ].map(({ label, value, icon: Icon, color }, i) => (
           <div key={label} className="glass-card rounded-2xl p-5 flex items-center gap-4 slide-up" style={{ animationDelay: `${i * 0.06}s` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}18` }}>
-              <Icon className="w-5 h-5" style={{ color }} />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${tint(color, "18")}` }}>
+              <Icon className="w-5 h-5" style={{ color: inkOf(color) }} />
             </div>
             <div>
-              <p className="text-xl font-bold" style={{ color: "#17181C" }}>{value}</p>
-              <p className="text-xs" style={{ color: "#9B988E" }}>{label}</p>
+              <p className="text-xl font-bold" style={{ color: "var(--ink)" }}>{value}</p>
+              <p className="text-xs" style={{ color: "var(--faint)" }}>{label}</p>
             </div>
           </div>
         ))}
@@ -112,26 +115,26 @@ export default function ReportsPage() {
 
       {/* Filters */}
       <div className="glass-card rounded-2xl p-4 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2 text-xs" style={{ color: "#6E6C63" }}>
+        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--muted)" }}>
           <Filter className="w-3.5 h-3.5" /> Filter:
         </div>
 
         <div
           className="flex gap-1 rounded-xl p-1"
-          style={{ background: "#F5F2EB", border: "1px solid #E6E2D8" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
         >
           {REPORT_TYPES.map((t) => (
             <button
               key={t}
               onClick={() => setFilter(t)}
               className="relative px-3 py-1 rounded-lg text-xs font-semibold transition-colors"
-              style={{ color: filter === t ? "#17233E" : "#6E6C63" }}
+              style={{ color: filter === t ? "#17233E" : "var(--muted)" }}
             >
               {filter === t && (
                 <motion.div
                   layoutId="reports-filter-pill"
                   className="absolute inset-0 rounded-lg"
-                  style={{ background: "#FFFFFF", boxShadow: "0 0 0 1px rgba(35,52,92,0.25)" }}
+                  style={{ background: "var(--surface)", boxShadow: "0 0 0 1px rgba(35,52,92,0.25)" }}
                   transition={{ type: "spring", stiffness: 480, damping: 34 }}
                 />
               )}
@@ -140,13 +143,13 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        <div className="w-px h-5" style={{ background: "#E6E2D8" }} />
+        <div className="w-px h-5" style={{ background: "var(--line)" }} />
 
         <select
           value={scope}
           onChange={(e) => setScope(e.target.value)}
           className="text-xs rounded-xl px-3 py-1.5 outline-none transition-colors"
-          style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#34343A" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink-3)" }}
         >
           {SCOPES.map((s) => <option key={s}>{s}</option>)}
         </select>
@@ -156,8 +159,8 @@ export default function ReportsPage() {
       <div className="glass-card rounded-2xl overflow-hidden">
         {filtered.length === 0 ? (
           <div className="p-12 text-center">
-            <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: "#CDC9BE" }} />
-            <p className="text-sm" style={{ color: "#9B988E" }}>No reports match your filter</p>
+            <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--disabled)" }} />
+            <p className="text-sm" style={{ color: "var(--faint)" }}>No reports match your filter</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -165,7 +168,7 @@ export default function ReportsPage() {
               {/* Header row */}
               <div
                 className="grid grid-cols-[1fr_120px_100px_80px_80px_100px] gap-4 px-6 py-3 text-[10px] font-semibold uppercase tracking-wide"
-                style={{ color: "#9B988E", borderBottom: "1px solid #F0EDE5" }}
+                style={{ color: "var(--faint)", borderBottom: "1px solid var(--line-2)" }}
               >
                 <span>Report</span>
                 <span>Scope</span>
@@ -179,44 +182,44 @@ export default function ReportsPage() {
                 <div
                   key={r.id}
                   className="grid grid-cols-[1fr_120px_100px_80px_80px_100px] gap-4 px-6 py-4 items-center transition-colors"
-                  style={i < filtered.length - 1 ? { borderBottom: "1px solid #F1EEE6" } : {}}
+                  style={i < filtered.length - 1 ? { borderBottom: "1px solid var(--surface-3)" } : {}}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "#F6F3EC"; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: "#F1EEE6" }}
+                      style={{ background: "var(--surface-3)" }}
                     >
                       {r.type === "PDF"
-                        ? <FileText className="w-4 h-4" style={{ color: "#8C3B32" }} />
-                        : <FileSpreadsheet className="w-4 h-4" style={{ color: "#3F6B4C" }} />
+                        ? <FileText className="w-4 h-4" style={{ color: "var(--bad)" }} />
+                        : <FileSpreadsheet className="w-4 h-4" style={{ color: "var(--ok)" }} />
                       }
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "#17181C" }}>{r.name}</p>
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>{r.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <TypeBadge type={r.type} />
-                        <span className="text-[10px]" style={{ color: "#9B988E" }}>{r.sessions} sessions</span>
+                        <span className="text-[10px]" style={{ color: "var(--faint)" }}>{r.sessions} sessions</span>
                       </div>
                     </div>
                   </div>
 
-                  <span className="text-xs" style={{ color: "#4B4C52" }}>{r.scope}</span>
+                  <span className="text-xs" style={{ color: "var(--ink-2)" }}>{r.scope}</span>
 
-                  <div className="flex items-center gap-1 text-xs" style={{ color: "#6E6C63" }}>
+                  <div className="flex items-center gap-1 text-xs" style={{ color: "var(--muted)" }}>
                     <Clock className="w-3 h-3 flex-shrink-0" />
                     <span className="truncate">{r.generated.split(" · ")[0]}</span>
                   </div>
 
-                  <span className="text-xs" style={{ color: "#6E6C63" }}>{r.size}</span>
+                  <span className="text-xs" style={{ color: "var(--muted)" }}>{r.size}</span>
 
-                  <span className="text-sm font-bold" style={{ color: gradeColor(r.score) }}>{r.score}</span>
+                  <span className="text-sm font-bold" style={{ color: inkOf(gradeColor(r.score)) }}>{r.score}</span>
 
                   <div className="flex items-center justify-end">
                     <button
                       className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors"
-                      style={{ color: "#23345C" }}
+                      style={{ color: "var(--accent-ink)" }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(35,52,92,0.08)"; e.currentTarget.style.color = "#17233E"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#23345C"; }}
                     >
@@ -233,7 +236,7 @@ export default function ReportsPage() {
       {/* FYP Research note */}
       <div
         className="rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4"
-        style={{ background: "#F1EEE6", border: "1px solid #E6E2D8" }}
+        style={{ background: "var(--surface-3)", border: "1px solid var(--line)" }}
       >
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -242,8 +245,8 @@ export default function ReportsPage() {
           <BarChart2 className="w-5 h-5" style={{ color: "#17233E" }} />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold" style={{ color: "#17181C" }}>FYP Research Export</p>
-          <p className="text-xs mt-0.5" style={{ color: "#6E6C63" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>FYP Research Export</p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--muted)" }}>
             Export anonymized pre/post data for your FYP research evaluation (paired T-test, ASR metrics, user satisfaction scores).
           </p>
         </div>
@@ -251,13 +254,13 @@ export default function ReportsPage() {
           <button
             onClick={() => router.push("/methodology")}
             className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap transition-colors"
-            style={{ color: "#23345C" }}
+            style={{ color: "var(--accent-ink)" }}
           >
             View Methodology <ChevronRight className="w-4 h-4" />
           </button>
           <button
             className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap transition-colors"
-            style={{ color: "#9B988E" }}
+            style={{ color: "var(--faint)" }}
           >
             Research Export <ChevronRight className="w-3.5 h-3.5" />
           </button>
@@ -282,10 +285,8 @@ export default function ReportsPage() {
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-[440px] p-6 rounded-2xl overflow-hidden"
             style={{
-              background: "rgba(255,255,255,0.78)",
-              backdropFilter: "blur(20px) saturate(1.6)",
-              WebkitBackdropFilter: "blur(20px) saturate(1.6)",
-              border: "1px solid rgba(255,255,255,0.6)",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
               boxShadow: "var(--shadow-modal)",
             }}
             initial={{ opacity: 0, scale: 0.94, y: 12 }}
@@ -293,16 +294,11 @@ export default function ReportsPage() {
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ type: "spring", stiffness: 420, damping: 32 }}
           >
-            {/* Glass highlight — a soft sheen along the top edge */}
-            <div
-              className="absolute inset-x-0 top-0 h-24 pointer-events-none"
-              style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.5), transparent)" }}
-            />
-            <h2 className="relative text-base font-bold mb-5" style={{ color: "#17181C" }}>Generate New Report</h2>
+            <h2 className="relative text-base font-bold mb-5" style={{ color: "var(--ink)" }}>Generate New Report</h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium mb-2" style={{ color: "#6E6C63" }}>Format</label>
+                <label className="block text-xs font-medium mb-2" style={{ color: "var(--muted)" }}>Format</label>
                 <div className="flex gap-2">
                   {(["PDF", "CSV"] as const).map((t) => (
                     <button
@@ -311,7 +307,7 @@ export default function ReportsPage() {
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all"
                       style={genType === t
                         ? { borderColor: "#23345C", background: "rgba(35,52,92,0.08)", color: "#17233E" }
-                        : { borderColor: "#E6E2D8", color: "#9B988E", background: "#F6F3EC" }
+                        : { borderColor: "var(--line)", color: "var(--faint)", background: "#F6F3EC" }
                       }
                     >
                       {t === "PDF" ? <FileText className="w-4 h-4" /> : <FileSpreadsheet className="w-4 h-4" />}
@@ -322,12 +318,12 @@ export default function ReportsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium mb-2" style={{ color: "#6E6C63" }}>Session Scope</label>
+                <label className="block text-xs font-medium mb-2" style={{ color: "var(--muted)" }}>Session Scope</label>
                 <select
                   value={genScope}
                   onChange={(e) => setGenScope(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-all"
-                  style={{ background: "#F5F2EB", border: "1px solid #E6E2D8", color: "#17181C" }}
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
                 >
                   {SCOPES.map((s) => <option key={s}>{s}</option>)}
                 </select>
@@ -338,7 +334,7 @@ export default function ReportsPage() {
               <button
                 onClick={() => setShowModal(false)}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                style={{ border: "1px solid #E6E2D8", color: "#4B4C52", background: "#F5F2EB" }}
+                style={{ border: "1px solid var(--line)", color: "var(--ink-2)", background: "var(--surface-2)" }}
               >
                 Cancel
               </button>
@@ -346,7 +342,7 @@ export default function ReportsPage() {
                 onClick={handleGenerate}
                 disabled={generating}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition-all disabled:opacity-70"
-                style={{ background: "#23345C" }}
+                style={{ background: "var(--accent)" }}
               >
                 {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</> : "Generate"}
               </button>

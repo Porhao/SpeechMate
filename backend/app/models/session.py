@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, Uuid
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,6 +16,7 @@ JSONType = JSON().with_variant(JSONB(), "postgresql")
 SESSION_IN_PROGRESS_STATUSES = (
     "queued",
     "processing_slides",
+    "analyzing_content",
     "generating_scripts",
     "synthesizing_audio",
     "assembling_video",
@@ -28,7 +29,10 @@ class Session(Base):
     __tablename__ = "sessions"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    # Not tied to a user account yet: decks are shared by everyone using this instance
+    # Who uploaded it (None for decks uploaded while signed out, or before accounts existed)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     original_filename: Mapped[str] = mapped_column(Text, nullable=False)
     pptx_storage_path: Mapped[str] = mapped_column(Text, nullable=False)
     voice_sample_storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -43,6 +47,8 @@ class Session(Base):
     warnings: Mapped[list | None] = mapped_column(JSONType, nullable=True)
     voice_cloning_used: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     slide_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Deck insights computed before narration (services/deck_insights.py)
+    insights: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     # Output artifact
     video_storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)

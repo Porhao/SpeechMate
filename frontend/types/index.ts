@@ -162,6 +162,8 @@ export interface FullAnalysisResult {
     scored_on: string[];
   };
   recommendations: {
+    summary?: string;
+    source?: "llm" | "rules";
     weekly_focus: string;
     daily_target_minutes: number;
     next_session_type: string;
@@ -174,6 +176,10 @@ export interface FullAnalysisResult {
       daily_minutes: number;
       priority: string;
       metric_target: string;
+      // Measured basis for the recommendation (numbers / moments), why it matters
+      area?: string;
+      evidence?: string;
+      why?: string;
     }[];
   };
   // Full per-model output (fluency, fillers, stuttering events, pronunciation
@@ -209,6 +215,7 @@ export interface GazeTunnelingResult {
 export type DeckStatus =
   | "queued"
   | "processing_slides"
+  | "analyzing_content"
   | "generating_scripts"
   | "synthesizing_audio"
   | "assembling_video"
@@ -233,9 +240,30 @@ export interface DeckStatusResponse {
   video_ready: boolean;
   voice_cloning_used: boolean | null;
   narrator_voice: string | null;
+  insights: DeckInsights | null;
   original_filename: string;
   created_at: string;
   updated_at: string;
+}
+
+// Understanding of the deck, computed before narration (backend deck_insights.py)
+export interface DeckInsights {
+  summary: string;
+  main_message: string;
+  audience: string;
+  structure: { section: string; slides: number[] }[];
+  slides: { slide_index: number; key_point: string }[];
+  strengths: string[];
+  suggestions: { slide_index: number | null; issue: string; suggestion: string }[];
+  likely_questions: string[];
+  source: "llm" | "rules";
+  stats: {
+    slide_count: number;
+    total_words: number;
+    estimated_minutes: [number, number];
+    text_heavy_slides: number[];
+    no_text_slides: number[];
+  };
 }
 
 export interface SlideScript {

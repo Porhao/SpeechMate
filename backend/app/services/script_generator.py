@@ -71,6 +71,7 @@ class ScriptGenerator:
         slide_text: str,
         requirement_prompt: str | None,
         previous_script: str | None,
+        deck_context: str | None = None,
     ) -> ScriptResult:
         client = get_llm_client()
         if client is not None:
@@ -83,6 +84,7 @@ class ScriptGenerator:
                     slide_text=slide_text,
                     requirement_prompt=requirement_prompt,
                     previous_script=previous_script,
+                    deck_context=deck_context,
                 )
             except Exception as e:  # noqa: BLE001 — fall back rather than fail the deck
                 logger.error("VLM script generation failed for slide %d: %s", slide_index, e)
@@ -100,6 +102,7 @@ class ScriptGenerator:
         slide_text: str,
         requirement_prompt: str | None,
         previous_script: str | None,
+        deck_context: str | None = None,
     ) -> ScriptResult:
         min_w, max_w = settings.script_min_words, settings.script_max_words
         image_b64 = base64.b64encode(image_path.read_bytes()).decode()
@@ -107,6 +110,8 @@ class ScriptGenerator:
         context = [f"This is slide {slide_index} of {slide_count}."]
         if requirement_prompt:
             context.append(f"Presenter's requirements: {requirement_prompt}")
+        if deck_context:
+            context.append(deck_context)
         if slide_text.strip():
             context.append(f"Text extracted from the slide (may be incomplete):\n{slide_text}")
         if previous_script:

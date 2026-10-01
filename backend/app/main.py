@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, conversation, health, live, practice, sessions
+from app.routers import auth, conversation, health, live, notifications, practice, sessions
 from app.services import tasks
 
 # Configure logging
@@ -57,3 +57,4 @@ app.include_router(practice.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(live.router, prefix="/api")
 app.include_router(conversation.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
