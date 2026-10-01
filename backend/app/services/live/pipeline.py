@@ -3,7 +3,9 @@
     recording → 16 kHz WAV → ASR (+ code-switch routing) → language detection
       → fluency / fillers / stuttering / pronunciation
       → eye contact / posture / emotion (video frames)
-      → confidence → communication score → recommendations
+      → vocal variety / loudness / vocabulary / hedging / gestures / head stability
+      → confidence → communication score → four pillars → recommendations
+      → content feedback on what was said (interview answers / Q&A / language)
       → progress records
 
     status: analyzing → complete | failed
@@ -18,7 +20,8 @@ from sqlalchemy import func, select
 from app.database import async_session_factory
 from app.models.live_session import LiveSession, ProgressRecord
 from app.models.user import User
-from app.services.live import asr, coaching, language, pronunciation, scoring, speech, vision
+from app.services import practice_plans
+from app.services.live import asr, coaching, extra_metrics, language, pronunciation, scoring, speech, vision
 from app.services.live._ml import available
 from app.services.notifications import notify
 from app.services.live.audio import to_16k_wav
@@ -30,7 +33,9 @@ logger = logging.getLogger(__name__)
 PROGRESS_METRICS = (
     "fluency_score", "pronunciation_score", "eye_contact_score",
     "confidence_score", "posture_score", "overall_score",
+    "voice_score", "language_score", "body_score", "presence_score",
 )
+PILLAR_METRICS = {"voice": "voice_score", "language": "language_score", "body": "body_score", "confidence": "presence_score"}
 
 
 async def analyze_recording(
@@ -41,6 +46,9 @@ async def analyze_recording(
     session_type: str = "Conversation",
     user_goal: str | None = None,
     previous: dict | None = None,
+    context: dict | None = None,
+    turns: list[dict] | None = None,
+    client_metrics: dict | None = None,
 ) -> tuple[dict, list[str]]:
     """Run every analysis stage on one recording. Returns (analysis, warnings)."""
     warnings: list[str] = []
@@ -75,8 +83,19 @@ async def analyze_recording(
             warnings.append("Pronunciation scoring needs the local Wav2Vec2 model (requirements-ml.txt); skipped.")
     pron_score = language.adjust_pronunciation_for_accent(pron.score, lang) if pron and lang else None
 
+    prosody = None
+    if available("librosa", "numpy"):
+        try:
+            prosody = await asyncio.to_thread(extra_metrics.analyze_prosody, wav)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Prosody analysis failed")
+            warnings.append(f"Vocal variety / volume analysis failed ({e}).")
+    else:
+        warnings.append("Vocal variety and volume need librosa (requirements-ml.txt); skipped.")
+    lang_use = extra_metrics.analyze_language_use(transcript) if transcript else None
+
     # ── Vision ────────────────────────────────────────────────────────────
-    eye = posture = emotion = None
+    eye = posture = emotion = gestures = None
     if available("cv2", "mediapipe"):
         frames = await asyncio.to_thread(vision.sample_frames, str(recording), 60)
         if not frames:
@@ -95,6 +114,11 @@ async def analyze_recording(
                     eye = result
                 else:
                     posture = result
+            try:
+                gestures = await asyncio.to_thread(extra_metrics.analyze_gestures, frames)
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Gesture analysis failed")
+                warnings.append(f"Gesture analysis failed ({e}).")
             if available("transformers", "torch", "PIL"):
                 try:
                     emotion = await asyncio.to_thread(vision.analyze_emotion, frames)
@@ -140,6 +164,9 @@ async def analyze_recording(
         duration_sec=duration,
         session_type=session_type,
         previous=previous,
+        prosody=extra_metrics.as_dict(prosody),
+        language_use=extra_metrics.as_dict(lang_use),
+        response_latency_sec=extra_metrics.median_latency(client_metrics),
     )
     recs = await coaching.build_plan(
         candidates=candidates,
@@ -182,6 +209,8 @@ async def analyze_recording(
             "scored_on": comm.scored_on,
         },
         "recommendations": recs.to_dict(),
+        # What was said, judged against the plan (interview answers, Q&A) or as language
+        "content_feedback": await practice_plans.content_feedback(session_type, context, turns),
         # Full per-model output, for anyone who wants more than the summary above
         "details": {
             "asr_engine": asr_result.engine if asr_result else None,
@@ -193,8 +222,14 @@ async def analyze_recording(
             "posture": vision.as_dict(posture),
             "emotion": vision.as_dict(emotion),
             "confidence": vision.as_dict(confidence),
+            "prosody": extra_metrics.as_dict(prosody),
+            "language_use": extra_metrics.as_dict(lang_use),
+            "gestures": extra_metrics.as_dict(gestures),
+            "client": client_metrics,
         },
     }
+    # The simple view: four pillars, each with its measured metrics
+    analysis["pillars"] = extra_metrics.build_pillars(analysis, prosody, lang_use, gestures, client_metrics)
     return analysis, warnings
 
 
@@ -222,6 +257,9 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
                 session_type=live.session_type,
                 user_goal=user.communication_goal if user else None,
                 previous=previous,
+                context=live.context,
+                turns=live.turns,
+                client_metrics=live.client_metrics,
             )
 
             live.analysis = {"session_id": str(live.id), **analysis}
@@ -234,6 +272,7 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
                 "confidence_score": analysis["vision"]["confidence_score"],
                 "posture_score": analysis["vision"]["posture_score"],
                 "overall_score": analysis["communication_score"]["overall_score"],
+                **{name: analysis["pillars"][key]["score"] for key, name in PILLAR_METRICS.items()},
             }
             for name in PROGRESS_METRICS:
                 if values[name] is not None:
@@ -245,19 +284,19 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
             notify(db, live.user_id, "live_analysis", f"Your {live.session_type.lower()} session results are ready",
                    (f"Overall score {overall:.0f}. " if overall is not None else "")
                    + (f"Focus next: {analysis['recommendations']['weekly_focus']}." if analysis["recommendations"]["exercises"] else ""),
-                   f"/assessment?live={live.id}")
+                   f"/results/{live.id}")
             await db.commit()
             logger.info("Live analysis ready for %s", live_id)
         except MediaError as e:
             await db.rollback()
             await db.refresh(live)
             live.status, live.error_detail = "failed", str(e)
-            notify(db, live.user_id, "live_failed", "Session analysis failed", str(e), "/practice")
+            notify(db, live.user_id, "live_failed", "Session analysis failed", str(e), f"/results/{live.id}")
             await db.commit()
         except Exception as e:  # noqa: BLE001
             logger.exception("Live analysis crashed for %s", live_id)
             await db.rollback()
             await db.refresh(live)
             live.status, live.error_detail = "failed", f"Internal error: {e}"
-            notify(db, live.user_id, "live_failed", "Session analysis failed", "Internal error — please try the session again.", "/practice")
+            notify(db, live.user_id, "live_failed", "Session analysis failed", "Internal error — please try the session again.", f"/results/{live.id}")
             await db.commit()

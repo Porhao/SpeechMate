@@ -25,6 +25,8 @@ from sqlalchemy import select  # noqa: E402
 from app.auth import hash_password  # noqa: E402
 from app.database import async_session_factory  # noqa: E402
 from app.models.live_session import LiveSession, ProgressRecord  # noqa: E402
+from app.services.live import extra_metrics  # noqa: E402
+from app.services.live.pipeline import PILLAR_METRICS  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.services.live import coaching, scoring  # noqa: E402
 
@@ -122,14 +124,58 @@ def _analysis(h: dict, history_count: int) -> dict:
             "improvement_areas": comm.improvement_areas, "scored_on": comm.scored_on,
         },
         "recommendations": recs.to_dict(),
-        "details": {"asr_engine": "demo-seed"},
+        "details": {"asr_engine": "demo-seed", "stuttering": None,
+                    "emotion": {"facial_tension": round(100 - h["conf"], 1) / 2, "dominant_emotion": h["emotion"]}},
     }
+
+
+def _with_pillars(analysis: dict, h: dict) -> dict:
+    """Add the four pillars (and an example of interview content feedback) to a demo analysis."""
+    prosody = extra_metrics.ProsodyResult(
+        pitch_mean_hz=210.0, pitch_variation_st=round(1.6 + h["conf"] / 40, 2),
+        loudness_dbfs=-24.0, loudness_variation_db=round(10 - h["conf"] / 20, 1), voiced_ratio=0.6)
+    lang_use = extra_metrics.analyze_language_use(h["transcript"])
+    gestures = extra_metrics.GestureResult(hands_visible_ratio=0.5, gesture_ratio=round(h["posture"] / 400, 2),
+                                           head_stability=h["posture"], frame_count=60)
+    client = {"response_latency_sec": [round(4.5 - h["conf"] / 30, 1)] * 3}
+    analysis["details"].update(prosody=extra_metrics.as_dict(prosody), language_use=extra_metrics.as_dict(lang_use),
+                               gestures=extra_metrics.as_dict(gestures), client=client)
+    analysis["pillars"] = extra_metrics.build_pillars(analysis, prosody, lang_use, gestures, client)
+    if h["type"] == "Interview":
+        analysis["content_feedback"] = {
+            "kind": "answers", "source": "demo",
+            "summary": "You gave a relevant example with a clear result. Add numbers to make your impact concrete.",
+            "answers": [{
+                "question": "What is your greatest strength?", "relevance": 5, "structure": 4, "specificity": 3,
+                "went_well": "You backed up your strength with a real internship example.",
+                "improve": "Say what the result was: were all three deadlines met, and what did it mean for the team?",
+                "stronger_answer": "My greatest strength is staying organised under pressure. During my internship I "
+                                   "had three deadlines in one week, so I planned each day the night before and "
+                                   "delivered all three on time.",
+            }],
+        }
+    return analysis
+
+
+async def _backfill_pillars(db, user: User) -> None:
+    """Demo sessions seeded before the pillars existed get them added (nothing else changes)."""
+    sessions = (await db.execute(select(LiveSession).where(LiveSession.user_id == user.id))).scalars().all()
+    for live in sessions:
+        a = live.analysis or {}
+        if DEMO_NOTE not in (live.warnings or []) or "pillars" in a:
+            continue
+        h = next((x for x in HISTORY if x["type"] == live.session_type), None)
+        if h:
+            live.analysis = {**_with_pillars(_analysis(h, 1), h), "session_id": str(live.id),
+                             "recommendations": a.get("recommendations")}
 
 
 async def seed() -> None:
     async with async_session_factory() as db:
         for acc in ACCOUNTS:
-            if (await db.execute(select(User).where(User.email == acc["email"]))).scalar_one_or_none():
+            existing = (await db.execute(select(User).where(User.email == acc["email"]))).scalar_one_or_none()
+            if existing:
+                await _backfill_pillars(db, existing)
                 print(f"  {acc['email']} already exists — skipped")
                 continue
             user = User(
@@ -145,7 +191,7 @@ async def seed() -> None:
                 now = datetime.now(timezone.utc)
                 for i, h in enumerate(HISTORY):
                     when = now - timedelta(days=h["days_ago"])
-                    analysis = _analysis(h, i + 1)
+                    analysis = _with_pillars(_analysis(h, i + 1), h)
                     live = LiveSession(
                         user_id=user.id, session_type=h["type"], duration_sec=h["duration"],
                         status="complete", warnings=[DEMO_NOTE], created_at=when,
@@ -158,6 +204,7 @@ async def seed() -> None:
                         "eye_contact_score": h["eye"], "confidence_score": h["conf"],
                         "posture_score": h["posture"],
                         "overall_score": analysis["communication_score"]["overall_score"],
+                        **{name: analysis["pillars"][key]["score"] for key, name in PILLAR_METRICS.items()},
                     }.items():
                         db.add(ProgressRecord(
                             user_id=user.id, live_session_id=live.id, metric_name=name,

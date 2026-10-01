@@ -34,14 +34,23 @@ SpeechMate/
 - **MediaPipe Tasks Vision** (`FaceLandmarker` + `PoseLandmarker`) running client-side in the browser for real-time face-mesh and pose tracking during a session — this is also where the **Gaze Tunneling** metric is computed
 - **Web Audio API** for live mic-level analysis and **Web Speech API** for live transcription during a session
 
-Pages (`app/(app)/`): `home`, `practice`, `session` (the live coaching session), `assessment`, `presentations` (presentation coach), `coach` (AI chat), `dashboard`, `progress`, `reports`, `methodology`, `profile`, `settings`. Auth flow (`app/(auth)/`): `login`, `register`, `onboarding`. API clients live in `services/` (`api.ts`, `auth.ts`, `live.ts`, `presentation.ts`).
+Pages (`app/(app)/`), organised around the three functions:
+- `home`;
+- `conversation` (topic picker);
+- `interview` (setup, resume, question preview);
+- `presentations` and `presentations/[id]` (deck insights, example, rehearsal, Q&A launcher);
+- `session` (the live session for all three);
+- `results/[id]` (the four-pillar report);
+- `progress`, `methodology` ("How it's measured"), `profile`, `settings`.
+
+(`assessment` only redirects old links.) Auth flow (`app/(auth)/`): `login`, `register`, `onboarding`. API clients live in `services/` (`api.ts`, `auth.ts`, `live.ts`, `presentation.ts`).
 
 ### Backend (`backend/`)
 
 - **FastAPI** on Python 3.12, **SQLAlchemy** (async) on **PostgreSQL** with **Alembic** migrations
 - JWT auth (`pyjwt`, `bcrypt`) with access + refresh tokens
-- **Local-first AI.** An LLM served by **Ollama** (`qwen2.5` for text: live AI partner, general coach, OIS coaching feedback; `qwen2.5vl` for vision: presentation scripts) through the OpenAI-compatible API (`LLM_BASE_URL`), and **Mesolitica `Malaysian-TTS-0.6B-v1`** for narration (Malay / English / code-switching, 7 voices). OpenAI (LLM, TTS, Whisper) and ElevenLabs (cloning your own voice) are optional cloud extras.
-- Routers (`app/routers/`): `auth` (accounts + profile), `live` (live sessions, progress, reports), `conversation` (AI partner, general coach, TTS), `sessions` + `practice` (presentation coaching), `health`
+- **Local-first AI.** An LLM served by **Ollama** (`qwen2.5` for text: AI partner, interview and Q&A question plans, deck insights, answer feedback, coaching plans, OIS feedback; `qwen2.5vl` for vision: presentation scripts) through the OpenAI-compatible API (`LLM_BASE_URL`), and **Mesolitica `Malaysian-TTS-0.6B-v1`** for narration (Malay / English / code-switching, 7 voices). OpenAI (LLM, TTS, Whisper) and ElevenLabs (cloning your own voice) are optional cloud extras.
+- Routers (`app/routers/`): `auth` (accounts + profile), `live` (live sessions, progress, reports), `conversation` (AI partner, which follows interview/Q&A plans; STT; TTS), `sessions` + `practice` (presentation coaching), `health`
 - Long-running work (video generation, coaching analysis, live-session analysis) runs as in-process background jobs the frontend polls
 
 ---
@@ -60,16 +69,32 @@ Heavy models are optional (`requirements-ml.txt`): each stage uses its local mod
 
 **Speech**
 - `asr.py` — routes each recording between two ASR engines instead of one general-purpose model:
-  - **faster-whisper** ("small", CPU int8, word-level timestamps) always runs first and doubles as the language-confidence signal.
+  - **faster-whisper** with Mesolitica's **Malaysian Whisper large-v3-turbo** (CPU int8, word-level timestamps, auto language detection) always runs first and doubles as the language-confidence signal.
   - If Whisper isn't confidently English, the same audio is re-run through **Mesolitica's `wav2vec2-xls-r-300m-mixed`** — a model trained specifically on Malay/Singlish/Mandarin-mixed speech (WER 0.132 / CER 0.048 per its model card), loaded directly via `transformers`/PyTorch (the same checkpoint `malaya-speech` wraps, without needing that package or TensorFlow).
   - Without local models, the OpenAI transcription API (with word timestamps) is used instead.
 - `language.py` — a documented ~190-word Bahasa Malaysia/Manglish lexicon to estimate the English/Malay ratio, flag code-switching and Manglish particles, and apply the accent-fair pronunciation allowance. An honest word-list heuristic, not a trained language-ID model.
-- `speech.py` — fluency (WPM, articulation rate, pauses from word timestamps or ffmpeg silence detection), English + Bahasa Melayu filler words, and stuttering: a signal-processing heuristic for repetitions, mid-utterance blocks and energy-based prolongations. (The trained CNN + BiLSTM classifier in `TECHNICAL.md` is future work — it needs SEP-28k/UCLASS training.)
+- `speech.py` — fluency (WPM, articulation rate, pauses from word timestamps or ffmpeg silence detection), English + Bahasa Melayu filler words counted in context (hesitations always; discourse markers like "like" / "macam" only as markers), and stuttering: a signal-processing heuristic for repetitions, mid-utterance blocks and energy-based prolongations. (The trained CNN + BiLSTM classifier in `TECHNICAL.md` is future work — it needs SEP-28k/UCLASS training.)
 - `pronunciation.py` — Wav2Vec2 (`facebook/wav2vec2-base-960h`) CTC-confidence pronunciation scoring over proportional word spans (not full GOP forced alignment).
 
 **Vision** (`vision.py`) — eye contact (MediaPipe Face Mesh iris landmarks → camera/left/right/down gaze), posture (MediaPipe Pose: head tilt, shoulder level, stability), and facial emotion (MediaPipe face crop + the `trpakov/vit-face-expression` classifier).
 
-**Scoring & recommendations** (`scoring.py`) — cross-modal confidence (speech/face/body), the weighted communication score (re-weighted over whichever components were measured), and prioritised exercises, a weekly focus and daily practice targets.
+**Extra metrics & pillars** (`extra_metrics.py`):
+- vocal variety (pitch, semitones) and volume/steadiness (librosa);
+- vocabulary richness (MATTR) and hedging;
+- gestures and head steadiness (MediaPipe Pose);
+- response time and Gaze Tunneling (sent from the browser);
+- the four pillars that group all metrics for the results page.
+
+**Scoring & recommendations** (`scoring.py`, `coaching.py`):
+- cross-modal confidence (speech / face / body);
+- the weighted overall score (re-weighted over whichever components were measured);
+- an evidence-based coaching plan: the LLM may only pick and phrase issues that were actually measured.
+
+**Interview & Q&A** (`app/services/practice_plans.py`):
+- resume text extraction;
+- LLM question plans (interview from the setup and resume; Q&A from the deck insights);
+- the server-enforced plan the AI partner follows;
+- per-answer feedback with a fact check on the "stronger answer".
 
 **Presentation coaching** (`app/services/pipeline.py`, `app/services/coach/`) — the PresentCoach-style Ideal Presentation Agent and Coach Agent; see the backend README.
 
@@ -77,7 +102,7 @@ Heavy models are optional (`requirements-ml.txt`): each stage uses its local mod
 
 ## Data model
 
-PostgreSQL tables (`app/models/`): `users` (with the coaching profile), `live_sessions` (one live practice session, its recording and full analysis result), `progress_records` (one row per metric per analysed session, for trend charts), `reports`; and for presentation coaching `sessions`, `slides`, `practice_sessions`, `chat_messages`.
+PostgreSQL tables (`app/models/`): `users` (with the coaching profile), `live_sessions` (one practice session: its setup and question plan in `context`, transcript `turns`, browser `client_metrics`, recording and full analysis result), `notifications`, `progress_records` (one row per metric per analysed session, for trend charts), `reports`; and for presentation coaching `sessions`, `slides`, `practice_sessions`, `chat_messages`.
 
 ---
 

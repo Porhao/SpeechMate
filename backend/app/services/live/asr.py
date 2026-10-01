@@ -55,7 +55,11 @@ def whisper_language(default_for_standard: str | None = "en") -> str | None:
         return None
     if settings.stt_language:
         return settings.stt_language
-    return "ms" if is_malaysian_model() else default_for_standard
+    # Malaysian Whisper auto-detects reliably and then transcribes in the language spoken.
+    # Forcing "ms" makes it *translate* English speech into Malay when there's no English
+    # prompt (seen on US/UK-accented answers); auto-detect was also better on real Malay
+    # (6.4% vs 7.4% WER, docs/benchmarks/stt-benchmark-2026-10-01.md).
+    return None if is_malaysian_model() else default_for_standard
 
 
 @load_once
@@ -95,7 +99,7 @@ def _transcribe_local(wav_16k: Path, warnings: list[str]) -> ASRResult:
     malaysian = is_malaysian_model()
     segments, info = _whisper_model().transcribe(
         str(wav_16k), task="transcribe", vad_filter=True, word_timestamps=True,
-        # Standard Whisper auto-detects (the routing signal below); Malaysian Whisper uses "ms"
+        # Auto-detect for both: the detected language is the routing signal below
         language=whisper_language(default_for_standard=None),
     )
     segments = list(segments)  # single-use generator

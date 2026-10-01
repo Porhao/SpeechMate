@@ -19,6 +19,7 @@ import {
   Brain,
 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
+import { authService } from "@/services/auth";
 import { tint, inkOf } from "@/lib/utils";
 
 // ── Step data ─────────────────────────────────────────────────────────────────
@@ -65,15 +66,14 @@ const CHALLENGES = [
 ] as const;
 
 const PRACTICE_TYPES = [
-  { value: "Conversation",  label: "AI Conversation",        icon: MessageCircle, color: "#23345C", desc: "Everyday dialogue & fluency drills" },
-  { value: "Interview",     label: "Mock Interview",          icon: Briefcase,     color: "#5A5470", desc: "Structured Q&A with AI feedback" },
-  { value: "Presentation",  label: "Presentation Practice",   icon: Presentation,  color: "#9C6A28", desc: "Speeches, slides & audience simulation" },
-  { value: "Pronunciation", label: "Pronunciation Training",  icon: Volume2,       color: "#4D7A59", desc: "Phoneme drills & BM-English patterns" },
+  { value: "Conversation",  label: "Daily Conversation",     icon: MessageCircle, color: "#23345C", desc: "Everyday speaking with an AI partner" },
+  { value: "Interview",     label: "Mock Interview",          icon: Briefcase,     color: "#5A5470", desc: "Questions curated for your role and resume" },
+  { value: "Presentation",  label: "Presentation Practice",   icon: Presentation,  color: "#9C6A28", desc: "Deck insights, rehearsal and Q&A" },
 ] as const;
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 
-function StepDot({ step, current, total }: { step: number; current: number; total: number }) {
+function StepDot({ step, current }: { step: number; current: number; total: number }) {
   const done = step < current;
   const active = step === current;
   return (
@@ -115,6 +115,10 @@ export default function OnboardingPage() {
     (step === 4 && practiceType !== "");
 
   const handleFinish = () => {
+    // Saved on the server when signed in (the coaching plan uses the goal), and locally either way
+    if (authService.isSignedIn()) {
+      authService.updateProfile({ communication_goal: goal, skill_level: skill, challenges }).catch(() => null);
+    }
     setProfile({
       id: "local",
       user_id: "local",
@@ -123,7 +127,7 @@ export default function OnboardingPage() {
       skill_level: skill as "Beginner" | "Intermediate" | "Advanced",
       challenges,
     });
-    router.push("/dashboard");
+    router.push(practiceType === "Interview" ? "/interview" : practiceType === "Presentation" ? "/presentations" : "/home");
   };
 
   return (
@@ -150,8 +154,8 @@ export default function OnboardingPage() {
           <>
             <div className="mb-6">
               <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 1 of 4</p>
-              <h1 className="font-display text-2xl text-[var(--ink)]">What's your main goal?</h1>
-              <p className="text-sm text-[var(--muted)] mt-1">We'll personalise your practice sessions based on your answer.</p>
+              <h1 className="font-display text-2xl text-[var(--ink)]">What&apos;s your main goal?</h1>
+              <p className="text-sm text-[var(--muted)] mt-1">We&apos;ll personalise your practice sessions based on your answer.</p>
             </div>
             <div className="space-y-2">
               {GOALS.map(({ value, label, icon: Icon, desc }) => {
@@ -185,7 +189,7 @@ export default function OnboardingPage() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 2 of 4</p>
               <h1 className="font-display text-2xl text-[var(--ink)]">How would you rate your speaking?</h1>
-              <p className="text-sm text-[var(--muted)] mt-1">Be honest — we'll calibrate feedback difficulty to your level.</p>
+              <p className="text-sm text-[var(--muted)] mt-1">Be honest — we&apos;ll calibrate feedback difficulty to your level.</p>
             </div>
             <div className="space-y-3">
               {SKILL_LEVELS.map(({ value, label, desc, color, bg }) => {
@@ -223,7 +227,7 @@ export default function OnboardingPage() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 3 of 4</p>
               <h1 className="font-display text-2xl text-[var(--ink)]">What are your main challenges?</h1>
-              <p className="text-sm text-[var(--muted)] mt-1">Select all that apply. We'll focus extra coaching here.</p>
+              <p className="text-sm text-[var(--muted)] mt-1">Select all that apply. We&apos;ll focus extra coaching here.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {CHALLENGES.map(({ value, icon: Icon, color }) => {
@@ -260,7 +264,7 @@ export default function OnboardingPage() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 4 of 4</p>
               <h1 className="font-display text-2xl text-[var(--ink)]">Preferred practice style?</h1>
-              <p className="text-sm text-[var(--muted)] mt-1">Don't worry — you can use all modes anytime.</p>
+              <p className="text-sm text-[var(--muted)] mt-1">Don&apos;t worry — you can use all three anytime.</p>
             </div>
             <div className="space-y-2">
               {PRACTICE_TYPES.map(({ value, label, icon: Icon, color, desc }) => {
@@ -328,7 +332,7 @@ export default function OnboardingPage() {
       {/* ── Skip link ──────────────────────────────────────────────────── */}
       <p className="text-center mt-4 text-xs text-[var(--faint)]">
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push("/home")}
           className="hover:text-[var(--muted)] underline underline-offset-2 transition-colors"
         >
           Skip for now

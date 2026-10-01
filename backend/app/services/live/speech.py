@@ -96,16 +96,34 @@ def analyze_fluency(
 
 # ── Filler words (English + Bahasa Melayu) ──────────────────────────────────
 
-EN_FILLERS = {
-    "um", "uh", "like", "actually", "basically", "you know",
-    "i mean", "kind of", "sort of", "literally", "right",
-    "okay so", "so yeah", "well",
+# Always fillers: hesitation sounds
+HESITATIONS = {"um", "umm", "uh", "uhh", "er", "err", "erm", "em", "aa", "ah", "hmm"}
+# Fillers only when used as discourse markers: at the start of a clause or set off by a
+# comma ("Like, I think…", "and, you know, it…"). "I like data", "what kind of tool",
+# "tapi" (but) and Manglish particles (lah, kan: shown in the language card) are not fillers.
+MARKERS = {
+    "like", "you know", "i mean", "actually", "basically", "literally", "well", "right",
+    "okay so", "so yeah", "macam", "sebenarnya",
 }
-BM_FILLERS = {
-    "err", "aa", "em", "kan", "lah", "mah", "weh",
-    "erm", "macam", "tapi", "sebenarnya",
-}
-ALL_FILLERS = EN_FILLERS | BM_FILLERS
+ALL_FILLERS = HESITATIONS | MARKERS
+
+
+def count_fillers(transcript: str) -> dict[str, int]:
+    """Filler counts, most frequent first (see HESITATIONS / MARKERS)."""
+    text = " " + re.sub(r"\s+", " ", transcript.lower().replace("’", "'")) + " "
+    counts: dict[str, int] = {}
+    for h in HESITATIONS:
+        n = len(re.findall(rf"(?<![\w']){re.escape(h)}(?![\w'])", text))
+        if n:
+            counts[h] = n
+    for m in sorted(MARKERS, key=len, reverse=True):
+        # clause start (text start or after . , ! ? ;) or directly followed by a comma
+        pattern = rf"(?:(?:^|[.,!?;]) ?{re.escape(m)}(?![\w']))|(?:(?<![\w']){re.escape(m)},)"
+        n = len(re.findall(pattern, text.strip()))
+        if n:
+            counts[m] = n
+            text = re.sub(rf"(?<![\w']){re.escape(m)}(?![\w'])", "#", text)  # don't recount inside longer phrases
+    return dict(sorted(counts.items(), key=lambda kv: -kv[1]))
 
 
 @dataclass
@@ -118,20 +136,14 @@ class FillerResult:
 
 
 def detect_fillers(transcript: str, duration_sec: float) -> FillerResult:
-    text = transcript.lower()
-    breakdown = {}
-    for filler in ALL_FILLERS:
-        found = len(re.findall(rf"\b{re.escape(filler)}\b", text))
-        if found:
-            breakdown[filler] = found
-
+    breakdown = count_fillers(transcript)
     total = sum(breakdown.values())
     per_min = round(total / max(duration_sec / 60, 0.01), 1)
     return FillerResult(
         total_fillers=total,
         fillers_per_minute=per_min,
         top_filler=max(breakdown, key=breakdown.get) if breakdown else "none",
-        filler_breakdown=dict(sorted(breakdown.items(), key=lambda kv: -kv[1])),
+        filler_breakdown=breakdown,
         impact_level="Low" if per_min < 3 else "Medium" if per_min < 7 else "High",
     )
 

@@ -1,8 +1,8 @@
-"""Conversational endpoints used by live sessions and the general coach:
-the AI practice partner, the general AI coach, and text-to-speech."""
+"""Conversational endpoints used by live sessions: the AI practice partner (free
+conversation, or following an interview / Q&A question plan), speech-to-text and text-to-speech."""
 
 import asyncio
-import json
+import copy
 import logging
 import tempfile
 from pathlib import Path
@@ -18,8 +18,8 @@ from app.config import settings
 from app.database import get_db
 from app.models.live_session import LiveSession
 from app.models.user import User
-from app.schemas.live import CoachQuestion, ConversationRequest, TTSRequest
-from app.services import malaysian_tts
+from app.schemas.live import ConversationMessage, ConversationRequest, TTSRequest
+from app.services import malaysian_tts, practice_plans
 from app.services.ai import get_llm_client, get_openai_client, get_tts_client
 
 logger = logging.getLogger(__name__)
@@ -63,32 +63,13 @@ Rules:
 - Be professional but encouraging.
 - Progress through different question types as the conversation continues.""",
     "Presentation": """\
-You are a public speaking coach helping a student practise a presentation.
+You are the moderator of the Q&A after a student's presentation, asking questions on behalf of the audience.
 
 Rules:
-- Keep replies SHORT — 2 sentences of coaching, then 1 instruction for what to do next.
-- Comment specifically on structure, clarity, signpost language, pace, or audience engagement.
-- Guide them through: opening hook → context → main arguments → transitions → conclusion.
-- Be constructive and specific.""",
-    "Pronunciation": """\
-You are a pronunciation coach for a Malaysian English learner.
-
-Rules:
-- 1 to 2 sentences only.
-- Comment specifically on what was correct and what sound needs work.
-- Give ONE concrete tip (tongue position, stress pattern, etc.)
-- Be encouraging.""",
+- Keep replies to 2 sentences: a short reaction to their answer, then ONE audience-style question
+  (clarify a point, ask for evidence or an example, challenge a claim, or ask about next steps).
+- Be curious and respectful, like a real audience member.""",
 }
-
-COACH_PROMPT = """You are SpeechMate AI Coach, an expert communication trainer specializing in:
-- Speech fluency and stuttering improvement
-- Pronunciation coaching (English and Bahasa Melayu), with Malaysian English treated as a valid accent
-- Public speaking and presentation skills
-- Communication confidence building
-- Eye contact and non-verbal communication
-
-Provide concise, actionable, encouraging feedback. Never shame the user.
-Always frame improvements positively and specifically."""
 
 TTS_VOICES = [
     {"id": "nova", "label": "Nova", "desc": "Warm, professional — default coaching voice"},
@@ -110,10 +91,32 @@ def _llm():
 
 
 @router.post("/chat/message")
-async def partner_reply(body: ConversationRequest):
-    """The AI partner's next spoken turn in a live session. 503 without an API key
-    (the frontend then falls back to scripted prompts)."""
+async def partner_reply(
+    body: ConversationRequest,
+    user: User | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The AI partner's next spoken turn in a live session.
+
+    With `live_id` of an Interview / Presentation session, it follows that session's
+    curated question plan (and works without an LLM). Otherwise it's a free conversation:
+    503 without an LLM (the frontend then falls back to scripted prompts)."""
+    if body.live_id and user:
+        s = (await db.execute(
+            select(LiveSession).where(LiveSession.id == body.live_id, LiveSession.user_id == user.id)
+        )).scalar_one_or_none()
+        if s and s.context and s.context.get("plan"):
+            context = copy.deepcopy(s.context)
+            reply = await practice_plans.planned_reply(s.session_type, context, [m.model_dump() for m in body.messages])
+            s.context = context
+            await db.commit()
+            return {"reply": reply, "progress": context.get("progress"),
+                    "total_questions": len(context["plan"]["questions"])}
+        if s and s.context and s.context.get("topic") and not body.topic:
+            body.topic = s.context["topic"]
     client = _llm()
+    if not body.messages:
+        body.messages = [ConversationMessage(role="user", content="(The learner has just joined. Greet them warmly and open the conversation.)")]
     system = PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"]) + SPOKEN_STYLE
     if body.topic:
         system += f"\n\nThe current conversation topic is: {body.topic}"
@@ -127,56 +130,6 @@ async def partner_reply(body: ConversationRequest):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=str(e))
     return {"reply": (resp.choices[0].message.content or "Could you say that again?").strip()}
-
-
-async def _user_context(db: AsyncSession, user: User) -> str:
-    """The signed-in user's goal and their last few analysed live sessions."""
-    recent = (await db.execute(
-        select(LiveSession)
-        .where(LiveSession.user_id == user.id, LiveSession.status == "complete")
-        .order_by(LiveSession.created_at.desc())
-        .limit(3)
-    )).scalars()
-    summaries = [
-        {
-            "type": s.session_type,
-            "date": s.created_at.date().isoformat(),
-            "speech": (s.analysis or {}).get("speech"),
-            "vision": (s.analysis or {}).get("vision"),
-            "overall": (s.analysis or {}).get("communication_score"),
-        }
-        for s in recent
-    ]
-    parts = [
-        f"Learner: {user.full_name}. Goal: {user.communication_goal or 'not set'}. "
-        f"Skill level: {user.skill_level}. Challenges: {', '.join(user.challenges or []) or 'not set'}."
-    ]
-    if summaries:
-        parts.append("Their most recent analysed practice sessions (newest first):\n" + json.dumps(summaries))
-    return "\n\n".join(parts)
-
-
-@router.post("/coach/chat")
-async def coach_chat(
-    body: CoachQuestion,
-    user: User | None = Depends(get_optional_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """General AI coach. When signed in, it sees your profile and recent session results."""
-    client = _llm()
-    system = COACH_PROMPT
-    if user:
-        system += "\n\n=== LEARNER CONTEXT ===\n" + await _user_context(db, user)
-    messages = [{"role": "system", "content": system}]
-    messages += [m.model_dump() for m in body.history[-10:]]
-    messages.append({"role": "user", "content": body.question})
-    try:
-        resp = await client.chat.completions.create(
-            model=settings.llm_model, messages=messages, max_tokens=500, temperature=0.7
-        )
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=str(e))
-    return {"answer": (resp.choices[0].message.content or "").strip()}
 
 
 def _local_live_tts() -> bool:

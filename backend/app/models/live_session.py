@@ -14,7 +14,7 @@ LIVE_IN_PROGRESS_STATUSES = ("analyzing",)
 
 
 class LiveSession(Base):
-    """One live practice session (Conversation / Interview / Presentation / Pronunciation)."""
+    """One live practice session: Conversation, Interview (mock), or Presentation (deck Q&A)."""
 
     __tablename__ = "live_sessions"
 
@@ -32,6 +32,12 @@ class LiveSession(Base):
     warnings: Mapped[list | None] = mapped_column(JSONType, nullable=True)
     # Full multimodal analysis result (speech, vision, language, score, recommendations)
     analysis: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # Practice setup: interview details + question plan, or the deck + its Q&A plan
+    context: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # What was said, turn by turn: [{role: user|assistant, text, t_sec}]
+    turns: Mapped[list | None] = mapped_column(JSONType, nullable=True)
+    # Measured in the browser during the session (gaze tunneling, response latency, …)
+    client_metrics: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

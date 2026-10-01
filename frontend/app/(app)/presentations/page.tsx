@@ -127,11 +127,13 @@ export default function PresentationsPage() {
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1100px] mx-auto space-y-6">
       <div>
-        <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Presentation Coach</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
-          Upload your slides. SpeechMate writes a script for each one and narrates the deck as an example
-          presentation (in your own voice if you add a sample). Then you practise and get coached against it.
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--muted)" }}>Presentation practice</p>
+        <h1 className="font-display text-3xl" style={{ color: "var(--ink)" }}>Practise your talk and your Q&amp;A</h1>
+        <ol className="text-sm mt-3 space-y-1 max-w-2xl" style={{ color: "var(--ink-2)" }}>
+          <li><b>1.</b> Upload your slides (.pptx or .pdf). The AI reads them first: summary, structure, each slide&apos;s key point.</li>
+          <li><b>2.</b> Watch a narrated example, then rehearse the whole deck or one slide and get coached on what to improve.</li>
+          <li><b>3.</b> Rehearse the Q&amp;A: answer audience questions drawn from your own deck, with feedback on every answer.</li>
+        </ol>
       </div>
 
       {noAI && (

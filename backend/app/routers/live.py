@@ -12,16 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user
 from app.database import get_db
 from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession, ProgressRecord, Report
+from app.models.session import Session as Deck
 from app.models.user import User
 from app.routers.sessions import audio_extension
 from app.schemas.live import (
+    InterviewSetup,
     LiveEndRequest,
     LiveSessionResponse,
     LiveStartRequest,
+    PracticePlan,
     ProgressRecordOut,
     ReportOut,
 )
-from app.services import tasks
+from app.services import practice_plans, tasks
 from app.services.live.pipeline import run_live_analysis
 from app.services.storage import storage_service
 
@@ -40,6 +43,8 @@ def _to_response(s: LiveSession) -> LiveSessionResponse:
         error_detail=s.error_detail,
         warnings=s.warnings or [],
         analysis=s.analysis,
+        context=s.context,
+        turns=s.turns,
         created_at=s.created_at,
     )
 
@@ -53,11 +58,72 @@ async def _own_session(db: AsyncSession, user: User, live_id: uuid.UUID) -> Live
     return s
 
 
+MAX_RESUME_BYTES = 5 * 1024 * 1024
+
+
+def _first_name(user: User) -> str | None:
+    return (user.full_name or "").split(" ")[0] or None
+
+
+@router.post("/interview/resume")
+async def read_resume(
+    file: UploadFile = File(..., description="Resume as PDF, DOCX or TXT"),
+    user: User = Depends(get_current_user),
+):
+    """Extract the resume's text so the user can check it before it's used for the interview.
+    Nothing is stored here; the text is saved only with the interview session it's used in."""
+    data = await file.read()
+    if len(data) > MAX_RESUME_BYTES:
+        raise HTTPException(status_code=413, detail="Resume must be under 5 MB")
+    try:
+        text = practice_plans.extract_resume_text(data, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return {"text": text, "chars": len(text)}
+
+
+@router.post("/interview/plan", response_model=PracticePlan)
+async def interview_plan(body: InterviewSetup, user: User = Depends(get_current_user)):
+    """Curate the mock-interview questions from the candidate's setup (and resume) for preview."""
+    return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user))
+
+
+async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID) -> dict:
+    deck = await db.get(Deck, deck_id)
+    if not deck or (deck.user_id is not None and deck.user_id != user.id):
+        raise HTTPException(status_code=404, detail="Deck not found")
+    if not deck.insights:
+        raise HTTPException(status_code=409, detail="This deck hasn't been analysed yet: wait for its insights first")
+    title = deck.original_filename.rsplit(".", 1)[0]
+    plan = await practice_plans.build_qa_plan(title, deck.insights, deck.requirement_prompt)
+    return {"deck_id": str(deck.id), "deck_title": title, "deck_summary": deck.insights.get("summary", ""),
+            "audience": deck.requirement_prompt, "plan": plan}
+
+
 @router.post("/live", response_model=LiveSessionResponse, status_code=201)
 async def start_live_session(
     body: LiveStartRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
-    s = LiveSession(user_id=user.id, session_type=body.session_type, status="active")
+    """Start a session. Interview needs `interview` (the setup); Presentation needs `deck_id`.
+    Both get a curated question plan that the AI partner follows."""
+    context: dict | None = None
+    if body.session_type == "Interview":
+        if not body.interview:
+            raise HTTPException(status_code=422, detail="Tell us about the interview first (position, background…)")
+        setup = body.interview.model_dump(exclude_none=True)
+        resume_text = setup.pop("resume_text", None)
+        plan = body.plan.model_dump() if body.plan else await practice_plans.build_interview_plan(
+            {**setup, **({"resume_text": resume_text} if resume_text else {})}, _first_name(user))
+        context = {"setup": setup, "resume_text": resume_text, "plan": plan}
+    elif body.session_type == "Presentation":
+        if not body.deck_id:
+            raise HTTPException(status_code=422, detail="Choose the deck to rehearse the Q&A for")
+        context = await _deck_context(db, user, body.deck_id)
+    elif body.topic:
+        context = {"topic": body.topic}
+    if context and context.get("plan"):
+        context["progress"] = {"asked": 0, "followups": 0}
+    s = LiveSession(user_id=user.id, session_type=body.session_type, status="active", context=context)
     db.add(s)
     await db.commit()
     return _to_response(s)
@@ -89,6 +155,10 @@ async def end_live_session(
 ):
     s = await _own_session(db, user, live_id)
     s.duration_sec = body.duration_sec
+    if body.turns:
+        s.turns = [t.model_dump() for t in body.turns]
+    if body.client_metrics:
+        s.client_metrics = body.client_metrics
     await db.commit()
     return _to_response(s)
 

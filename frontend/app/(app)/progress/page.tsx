@@ -1,260 +1,178 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { Trophy, Flame, TrendingUp, Clock, Zap, Award, Target, Star } from "lucide-react";
-import { tint, inkOf } from "@/lib/utils";
-import SampleDataNotice from "@/components/ui/SampleDataNotice";
+// Your progress from real sessions only: totals, how the overall score and the four
+// pillars have moved, and every session (open one for its full results).
 
-const TREND_DATA = [
-  { week: "Jan W3", overall: 68, fluency: 72, pronunciation: 64, confidence: 67, eyeContact: 71, posture: 62 },
-  { week: "Jan W4", overall: 70, fluency: 74, pronunciation: 66, confidence: 68, eyeContact: 72, posture: 64 },
-  { week: "Feb W1", overall: 71, fluency: 75, pronunciation: 68, confidence: 70, eyeContact: 74, posture: 63 },
-  { week: "Feb W2", overall: 73, fluency: 77, pronunciation: 70, confidence: 71, eyeContact: 75, posture: 65 },
-  { week: "Feb W3", overall: 74, fluency: 78, pronunciation: 72, confidence: 71, eyeContact: 77, posture: 66 },
-  { week: "Feb W4", overall: 75, fluency: 79, pronunciation: 73, confidence: 72, eyeContact: 78, posture: 66 },
-  { week: "Mar W1", overall: 76, fluency: 80, pronunciation: 74, confidence: 72, eyeContact: 78, posture: 67 },
-  { week: "Mar W2", overall: 78, fluency: 82, pronunciation: 76, confidence: 73, eyeContact: 80, posture: 68 },
-];
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ChevronRight, Loader2, Trash2 } from "lucide-react";
+import { liveService } from "@/services/live";
+import { authService } from "@/services/auth";
+import { Card, LinkButton, Notice, PageHeader, statusColor } from "@/components/ui/kit";
+import type { LiveSession, MetricStatus } from "@/types";
+import { formatDuration } from "@/utils/format";
 
-const HEAT_SESSIONS = [
-  [0,1,2,1,3,2,0],[1,0,1,2,1,0,0],[2,1,3,2,1,2,0],[0,1,0,1,2,3,1],
-  [1,2,1,0,1,2,0],[3,2,2,1,2,1,0],[1,0,2,3,1,0,0],[2,1,1,2,3,2,1],
-  [0,2,0,1,2,1,0],[1,1,3,2,0,1,0],[2,3,1,2,1,0,1],[1,2,2,3,2,1,0],
-];
-
-function heatColor(n: number) {
-  if (n === 0) return "var(--line-2)";
-  if (n === 1) return "rgba(35,52,92,0.30)";
-  if (n === 2) return "rgba(35,52,92,0.60)";
-  return "#23345C";
-}
-
-const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const MILESTONES = [
-  { title: "First Session",         done: true,  icon: Zap,    color: "#3F6B4C", date: "Jan 15" },
-  { title: "7-Day Streak",          done: true,  icon: Flame,  color: "#8A5A22", date: "Jan 22" },
-  { title: "10 Sessions Completed", done: true,  icon: Star,   color: "#5A5470", date: "Feb 3"  },
-  { title: "Score 75+ Overall",     done: true,  icon: Target, color: "#23345C", date: "Feb 20" },
-  { title: "30-Day Streak",         done: false, icon: Trophy, color: "#8C3B32", date: "In 3 days" },
-  { title: "Score 85+ Overall",     done: false, icon: Award,  color: "#8A5A22", date: "Est. Apr" },
-];
-
-const LINES = [
-  { key: "overall",       label: "Overall",       color: "#17233E", width: 2.5 },
-  { key: "fluency",       label: "Fluency",       color: "#23345C", width: 1.5 },
-  { key: "pronunciation", label: "Pronunciation", color: "#5A5470", width: 1.5 },
-  { key: "confidence",    label: "Confidence",    color: "#8A5A22", width: 1.5 },
-  { key: "eyeContact",    label: "Eye Contact",   color: "#3F6B4C", width: 1.5 },
-  { key: "posture",       label: "Posture",       color: "#8C3B32", width: 1.5 },
+const TYPES = [
+  { id: "all", label: "All" },
+  { id: "Conversation", label: "Conversation" },
+  { id: "Interview", label: "Interview" },
+  { id: "Presentation", label: "Presentation Q&A" },
+] as const;
+const TYPE_LABEL: Record<string, string> = { Conversation: "Conversation", Interview: "Mock interview", Presentation: "Presentation Q&A", Pronunciation: "Pronunciation" };
+const PILLARS = [
+  { key: "voice", label: "Voice & delivery" },
+  { key: "language", label: "Language & clarity" },
+  { key: "body", label: "Body language" },
+  { key: "confidence", label: "Confidence & presence" },
 ] as const;
 
-type LineKey = (typeof LINES)[number]["key"];
+const statusOf = (v: number | null): MetricStatus => (v == null ? null : v >= 75 ? "good" : v >= 55 ? "ok" : "work");
+
+function overall(s: LiveSession): number | null {
+  const a = s.analysis;
+  if (!a) return null;
+  if (a.communication_score.overall_score != null) return Math.round(a.communication_score.overall_score);
+  const vals = PILLARS.map((p) => a.pillars?.[p.key]?.score).filter((v): v is number => v != null);
+  return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null;
+}
+
+function subtitle(s: LiveSession) {
+  if (s.session_type === "Interview") return s.context?.setup?.position;
+  if (s.session_type === "Presentation") return s.context?.deck_title;
+  return s.context?.topic;
+}
+
+// A small line chart (oldest → newest), 0–100
+function Trend({ values, height = 120 }: { values: number[]; height?: number }) {
+  if (values.length < 2) {
+    return <p className="text-sm py-6" style={{ color: "var(--muted)" }}>Complete two analysed sessions to see a trend.</p>;
+  }
+  const w = 600, pad = 8;
+  const x = (i: number) => pad + (i * (w - pad * 2)) / (values.length - 1);
+  const y = (v: number) => pad + (1 - v / 100) * (height - pad * 2);
+  const d = values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} className="w-full" style={{ height }} role="img"
+      aria-label={`Scores over ${values.length} sessions, from ${values[0]} to ${values[values.length - 1]}`}>
+      {[25, 50, 75].map((g) => <line key={g} x1={0} x2={w} y1={y(g)} y2={y(g)} stroke="var(--line-2)" strokeWidth={1} />)}
+      <path d={d} fill="none" stroke="var(--accent-ink)" strokeWidth={2} />
+      {values.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={3} fill="var(--accent-ink)" />)}
+    </svg>
+  );
+}
 
 export default function ProgressPage() {
-  const [mounted, setMounted] = useState(false);
-  const [period, setPeriod] = useState<"7D" | "30D" | "3M" | "All">("30D");
-  const [visible, setVisible] = useState<Record<LineKey, boolean>>({
-    overall: true, fluency: false, pronunciation: false,
-    confidence: false, eyeContact: false, posture: false,
-  });
+  const [list, setList] = useState<LiveSession[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [type, setType] = useState<(typeof TYPES)[number]["id"]>("all");
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (!authService.isSignedIn()) {
+      const t = setTimeout(() => setError("Sign in to see your progress."), 0);
+      return () => clearTimeout(t);
+    }
+    liveService.history().then(setList).catch((e) => setError(e instanceof Error ? e.message : "Couldn't load your sessions"));
+  }, []);
 
-  const toggleLine = (key: LineKey) => setVisible((v) => ({ ...v, [key]: !v[key] }));
+  const shown = useMemo(() => (list ?? []).filter((s) => type === "all" || s.session_type === type), [list, type]);
+  const analysed = useMemo(() => shown.filter((s) => s.status === "complete").slice().reverse(), [shown]);  // oldest first
+  const overallSeries = analysed.map(overall).filter((v): v is number => v != null);
+  const minutes = Math.round(shown.reduce((t, s) => t + s.duration_sec, 0) / 60);
+
+  const remove = async (id: string) => {
+    if (!confirm("Delete this session and its results? This can't be undone.")) return;
+    await liveService.remove(id).catch(() => null);
+    setList((l) => l?.filter((s) => s.id !== id) ?? null);
+  };
 
   return (
-    <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1320px] mx-auto space-y-6">
-      <SampleDataNotice what="progress charts" />
+    <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto space-y-6">
+      <PageHeader eyebrow="Progress" title="How you're improving">
+        Every number here comes from your own analysed sessions.
+      </PageHeader>
 
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl" style={{ color: "var(--ink)" }}>Progress Analytics</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--faint)" }}>
-            Track your communication improvement over time
-          </p>
-        </div>
-        <div
-          className="flex gap-1 rounded-xl p-1"
-          style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
-        >
-          {(["7D", "30D", "3M", "All"] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className="relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-              style={{ color: period === p ? "#17233E" : "var(--muted)" }}
-            >
-              {period === p && (
-                <motion.div
-                  layoutId="progress-period-pill"
-                  className="absolute inset-0 rounded-lg"
-                  style={{ background: "var(--surface)", boxShadow: "0 0 0 1px rgba(35,52,92,0.25), 0 2px 8px rgba(35,52,92,0.10)" }}
-                  transition={{ type: "spring", stiffness: 480, damping: 34 }}
-                />
-              )}
-              <span className="relative">{p}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {error && <Notice tone="warn">{error} {error.startsWith("Sign in") && <Link href="/login" className="underline">Sign in</Link>}</Notice>}
+      {!list && !error && <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--muted)" }} /></div>}
 
-      {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        {[
-          { label: "Total Sessions",      value: "42",      sub: "+8 this month",   icon: Zap,        color: "#23345C" },
-          { label: "Practice Hours",      value: "18h",     sub: "+3.5h this week", icon: Clock,      color: "#5A5470" },
-          { label: "Current Streak",      value: "12 days", sub: "Best: 14 days",   icon: Flame,      color: "#8A5A22" },
-          { label: "Overall Improvement", value: "+10 pts", sub: "vs 8 weeks ago",  icon: TrendingUp, color: "#3F6B4C" },
-        ].map(({ label, value, sub, icon: Icon, color }, i) => (
-          <div key={label} className="glass-card rounded-2xl p-5 slide-up" style={{ animationDelay: `${i * 0.06}s` }}>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium" style={{ color: "var(--faint)" }}>{label}</span>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${tint(color, "18")}` }}>
-                <Icon className="w-4 h-4" style={{ color: inkOf(color) }} />
-              </div>
-            </div>
-            <p className="text-2xl font-bold" style={{ color: "var(--ink)" }}>{value}</p>
-            <p className="text-xs mt-1 font-medium" style={{ color: "var(--ok)" }}>{sub}</p>
-          </div>
-        ))}
-      </div>
+      {list && list.length === 0 && (
+        <Card>
+          <p className="text-sm mb-4" style={{ color: "var(--ink-2)" }}>No sessions yet. Start with a short conversation to get your first results.</p>
+          <LinkButton href="/conversation">Start a conversation</LinkButton>
+        </Card>
+      )}
 
-      {/* Trend Chart */}
-      <div className="glass-card rounded-2xl p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4">
-          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Score Trends</h2>
-          <div className="flex flex-wrap gap-1.5">
-            {LINES.map(({ key, label, color }) => (
-              <button
-                key={key}
-                onClick={() => toggleLine(key)}
-                className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-all"
-                style={visible[key]
-                  ? { backgroundColor: `${tint(color, "18")}`, borderColor: color, color }
-                  : { borderColor: "var(--line)", color: "var(--faint)", background: "transparent" }
-                }
-              >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                {label}
+      {list && list.length > 0 && (
+        <>
+          <div className="flex flex-wrap gap-2" role="tablist">
+            {TYPES.map((t) => (
+              <button key={t.id} role="tab" aria-selected={type === t.id} onClick={() => setType(t.id)}
+                className="px-3 h-8 text-sm"
+                style={{ background: type === t.id ? "var(--accent)" : "var(--surface)", color: type === t.id ? "#fff" : "var(--ink-2)", border: "1px solid var(--line-strong)" }}>
+                {t.label}
               </button>
             ))}
           </div>
-        </div>
 
-        {mounted ? (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={TREND_DATA} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-3)" />
-              <XAxis dataKey="week" tick={{ fill: "var(--faint)", fontSize: 11 }} />
-              <YAxis domain={[50, 100]} tick={{ fill: "var(--faint)", fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  borderRadius: 12,
-                  border: "1px solid var(--line)",
-                  background: "var(--surface)",
-                  boxShadow: "0 8px 24px rgba(23,24,28,0.1)",
-                }}
-                labelStyle={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}
-                itemStyle={{ fontSize: 11, color: "var(--ink-2)" }}
-              />
-              {LINES.map(({ key, label, color, width }) => (
-                <Line key={key} type="monotone" dataKey={key} name={label} stroke={color} strokeWidth={width} dot={false} hide={!visible[key]} />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="h-[280px] flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-[#23345C] border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-      </div>
-
-      {/* Heatmap */}
-      <div className="glass-card rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>Practice Consistency</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px]" style={{ color: "var(--faint)" }}>Less</span>
-            {[0, 1, 2, 3].map((n) => (
-              <div key={n} className="w-3 h-3 rounded-sm" style={{ backgroundColor: heatColor(n) }} />
-            ))}
-            <span className="text-[10px]" style={{ color: "var(--faint)" }}>More</span>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="flex flex-col gap-1 pt-1 justify-between" style={{ height: 7 * (12 + 4) - 4 }}>
-            {DAY_LABELS.map((d) => (
-              <span key={d} className="text-[9px] w-7 text-right leading-3" style={{ color: "var(--faint)" }}>{d}</span>
-            ))}
-          </div>
-          <div className="flex gap-1">
-            {HEAT_SESSIONS.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-1">
-                {week.map((sessions, di) => (
-                  <div
-                    key={di}
-                    title={`${sessions} session${sessions !== 1 ? "s" : ""}`}
-                    className="w-[14px] h-[14px] rounded-[3px] cursor-default transition-opacity hover:opacity-75"
-                    style={{ backgroundColor: heatColor(sessions) }}
-                  />
-                ))}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              ["Sessions", String(shown.length)],
+              ["Practice time", minutes >= 60 ? `${(minutes / 60).toFixed(1)} h` : `${minutes} min`],
+              ["Latest overall", overallSeries.length ? String(overallSeries[overallSeries.length - 1]) : "—"],
+              ["Change since first", overallSeries.length >= 2 ? `${overallSeries[overallSeries.length - 1] - overallSeries[0] >= 0 ? "+" : ""}${overallSeries[overallSeries.length - 1] - overallSeries[0]}` : "—"],
+            ].map(([k, v]) => (
+              <div key={k} className="p-4" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                <p className="text-xs" style={{ color: "var(--muted)" }}>{k}</p>
+                <p className="font-display text-2xl mt-1 tabular-nums" style={{ color: "var(--ink)" }}>{v}</p>
               </div>
             ))}
           </div>
-        </div>
-      </div>
 
-      {/* Milestones */}
-      <div className="glass-card rounded-2xl p-6">
-        <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--ink)" }}>Milestones</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {MILESTONES.map(({ title, done, icon: Icon, color, date }) => (
-            <div
-              key={title}
-              className="flex items-center gap-3 p-4 rounded-xl border transition-all"
-              style={{
-                background: done ? `${tint(color, "0c")}` : "#F6F3EC",
-                borderColor: done ? `${tint(color, "30")}` : "var(--line-2)",
-                opacity: done ? 1 : 0.6,
-              }}
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: done ? `${tint(color, "18")}` : "var(--surface-3)" }}
-              >
-                <Icon className="w-4 h-4" style={{ color: done ? color : "var(--faint)" }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold truncate" style={{ color: "var(--ink)" }}>{title}</p>
-                <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--faint)" }}>
-                  {done ? `Achieved ${date}` : date}
-                </p>
-              </div>
-              {done && (
-                <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+          <Card title="Overall score per session"><Trend values={overallSeries} /></Card>
 
+          <div className="grid sm:grid-cols-2 gap-3">
+            {PILLARS.map((p) => {
+              const series = analysed.map((s) => s.analysis?.pillars?.[p.key]?.score).filter((v): v is number => v != null).map(Math.round);
+              const last = series.length ? series[series.length - 1] : null;
+              return (
+                <Card key={p.key} title={p.label}
+                  action={<span className="text-sm font-semibold tabular-nums" style={{ color: statusColor(statusOf(last)) }}>{last ?? "—"}</span>}>
+                  <Trend values={series} height={70} />
+                </Card>
+              );
+            })}
+          </div>
+
+          <Card title="All sessions">
+            <ul className="divide-y" style={{ borderColor: "var(--line-2)" }}>
+              {shown.map((s) => {
+                const score = overall(s);
+                return (
+                  <li key={s.id} className="flex items-center gap-3 py-3">
+                    <Link href={`/results/${s.id}`} className="flex-1 min-w-0 flex items-center gap-4 group">
+                      <span className="w-12 text-center font-display text-xl tabular-nums" style={{ color: score != null ? statusColor(statusOf(score)) : "var(--faint)" }}>
+                        {score ?? "—"}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium truncate" style={{ color: "var(--ink)" }}>
+                          {TYPE_LABEL[s.session_type] ?? s.session_type}{subtitle(s) ? ` · ${subtitle(s)}` : ""}
+                        </span>
+                        <span className="block text-xs" style={{ color: "var(--muted)" }}>
+                          {new Date(s.created_at).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" })} · {formatDuration(s.duration_sec)}
+                          {s.status !== "complete" && ` · ${s.status === "analyzing" ? "analysing…" : s.status === "failed" ? "analysis failed" : "not analysed"}`}
+                        </span>
+                      </span>
+                      <ChevronRight className="w-4 h-4 opacity-40 group-hover:opacity-100" style={{ color: "var(--ink)" }} />
+                    </Link>
+                    <button onClick={() => remove(s.id)} aria-label="Delete session" className="p-2 opacity-50 hover:opacity-100" style={{ color: "var(--muted)" }}>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

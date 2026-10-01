@@ -11,15 +11,14 @@ import { useUserStore } from "@/store/useUserStore";
 import { ThemeToggleButton } from "@/components/theme/ThemeToggle";
 import NotificationBell from "@/components/layout/NotificationBell";
 
-const LINKS = [
+// The three practice functions, then progress and the reference matrix
+const LINKS: { href: string; label: string; also?: string[] }[] = [
   { href: "/home", label: "Home" },
-  { href: "/practice", label: "Practice" },
-  { href: "/presentations", label: "Presentations" },
-  { href: "/coach", label: "Coach" },
-  { href: "/progress", label: "Progress" },
-  { href: "/dashboard", label: "Analytics" },
-  { href: "/reports", label: "Reports" },
-  { href: "/methodology", label: "Reference" },
+  { href: "/conversation", label: "Conversation" },
+  { href: "/interview", label: "Interview" },
+  { href: "/presentations", label: "Presentation" },
+  { href: "/progress", label: "Progress", also: ["/results"] },
+  { href: "/methodology", label: "How it's measured" },
 ];
 
 function initials(name: string | undefined) {
@@ -35,7 +34,10 @@ export default function TopNav() {
   // Close the mobile menu after navigating (derived during render, no effect needed)
   if (open && openedAt !== pathname) setOpen(false);
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = (href: string) => {
+    const paths = [href, ...(LINKS.find((l) => l.href === href)?.also ?? [])];
+    return paths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-[var(--surface)]" style={{ borderBottom: "1px solid var(--line)" }}>

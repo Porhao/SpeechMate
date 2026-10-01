@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, Loader2, Mic, Square, Upload, Send, AlertTriangle, RotateCcw, X, CheckCircle2, XCircle,
+  ArrowLeft, Loader2, Mic, Square, Upload, Send, AlertTriangle, RotateCcw, X, CheckCircle2, XCircle, MessagesSquare,
 } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS, PRACTICE_IN_PROGRESS } from "@/services/presentation";
+import { liveService } from "@/services/live";
 import { useRecorder } from "@/hooks/useRecorder";
 import GenerationProgress from "@/components/presentation/GenerationProgress";
 import DeckInsightsPanel from "@/components/presentation/DeckInsightsPanel";
@@ -34,6 +35,53 @@ const AUDIO_SOURCE_LABEL: Record<string, string> = {
 
 function formatAttemptTime(iso: string) {
   return new Date(iso).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// The three steps of presentation practice, and the Q&A rehearsal launcher
+function PracticeSteps({ deck }: { deck: DeckStatusResponse }) {
+  const router = useRouter();
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const startQA = async () => {
+    setStarting(true); setError(null);
+    try {
+      const s = await liveService.start({ session_type: "Presentation", deck_id: deck.session_id });
+      router.push(`/session?mode=Presentation&live=${s.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't prepare the Q&A");
+      setStarting(false);
+    }
+  };
+  const steps = [
+    { title: "Understand the deck", body: "Summary, structure, each slide's key point and likely questions.", done: !!deck.insights },
+    { title: "Rehearse the talk", body: "Watch the example, record the whole deck or one slide, get coached.", done: false },
+    { title: "Rehearse the Q&A", body: "A moderator asks audience questions drawn from your deck; feedback on every answer.", done: false },
+  ];
+  return (
+    <div className="grid md:grid-cols-3" style={{ border: "1px solid var(--line)", background: "var(--surface)" }}>
+      {steps.map((st, i) => (
+        <div key={st.title} className="p-4" style={{ borderLeft: i ? "1px solid var(--line)" : undefined }}>
+          <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: st.done ? "var(--ok)" : "var(--muted)" }}>
+            {st.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : <span className="w-3.5 text-center">{i + 1}</span>} Step {i + 1}
+          </p>
+          <p className="text-sm font-semibold mt-1" style={{ color: "var(--ink)" }}>{st.title}</p>
+          <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "var(--muted)" }}>{st.body}</p>
+          {i === 2 && (
+            <>
+              <button onClick={startQA} disabled={!deck.insights || starting}
+                className="mt-3 inline-flex items-center gap-2 h-9 px-3 text-sm font-semibold text-white disabled:opacity-40"
+                style={{ background: "var(--accent)" }}>
+                {starting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessagesSquare className="w-4 h-4" />}
+                {starting ? "Preparing questions…" : "Start Q&A rehearsal"}
+              </button>
+              {!deck.insights && <p className="text-xs mt-1.5" style={{ color: "var(--muted)" }}>Available once the deck has been analysed.</p>}
+              {error && <p className="text-xs mt-1.5" style={{ color: "var(--bad)" }}>{error}</p>}
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function PresentationWorkspace() {
@@ -139,6 +187,8 @@ export default function PresentationWorkspace() {
       </div>
 
       {loadError && <p className="text-sm" style={{ color: "var(--bad)" }}>{loadError}</p>}
+
+      <PracticeSteps deck={deck} />
 
       {!complete ? (
         <>

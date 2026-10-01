@@ -1,11 +1,11 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any -- the Web Speech API and MediaPipe handles have no bundled types */
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Mic, MicOff, PhoneOff, Send, Volume2, VolumeX, Shuffle,
-  Activity, ChevronUp, ChevronDown, Minus,
-  Loader2, Video, VideoOff, Star, Upload, FileText, Briefcase, EarOff,
+  Activity, Loader2, Video, VideoOff, Briefcase, EarOff, Presentation, ListChecks,
 } from "lucide-react";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
@@ -14,7 +14,7 @@ import { liveService, conversationService } from "@/services/live";
 import { presentationService } from "@/services/presentation";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
 import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
-import type { SessionType, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
+import type { SessionType, LiveSession, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Message  = { role: "ai" | "user"; text: string; ts: number };
@@ -37,18 +37,6 @@ const RANDOM_TOPICS = [
   "How do you communicate a complex idea to someone unfamiliar with it?",
 ];
 
-// ── Pronunciation curriculum ──────────────────────────────────────────────────
-const PRONUNCIATION_PHRASES = [
-  { phrase: "The thorough theory through the theatre",              focus: "TH sounds",         hint: "Tongue between teeth for every 'th'" },
-  { phrase: "I would like to present my research findings today",   focus: "Formal delivery",   hint: "Stress 'present' and 'findings'" },
-  { phrase: "The preliminary presentation requires preparation",    focus: "P consonants",      hint: "Pop each P — don't swallow them" },
-  { phrase: "Statistical significance supports the hypothesis",     focus: "S and H clarity",   hint: "Slow down and articulate every syllable" },
-  { phrase: "Malaysian English has unique intonation patterns",     focus: "Natural intonation",hint: "Rising intonation on key words" },
-  { phrase: "Could you please clarify that point for the audience", focus: "Question tone",     hint: "Natural rising tone at the end" },
-  { phrase: "I am confident in my ability to lead this initiative", focus: "Confidence & pace", hint: "Slow, deliberate, authoritative delivery" },
-  { phrase: "Technology drives innovation in modern communication", focus: "T and N clarity",   hint: "Crisp T at start, strong final N" },
-];
-
 // ── Mode content ──────────────────────────────────────────────────────────────
 const MODE_PROMPTS: Record<string, string[]> = {
   Conversation: [
@@ -63,15 +51,19 @@ const MODE_PROMPTS: Record<string, string[]> = {
     "Describe a challenge you faced and exactly how you overcame it.",
     "Where do you see yourself in five years, and why does this role fit that path?",
   ],
+  // Only used when the deck's Q&A plan couldn't be loaded
   Presentation: [
-    "Welcome to your presentation session. Begin with your opening — hook the audience immediately.",
-    "Strong start. Now develop your first main argument with supporting evidence.",
-    "Good. Use a clear signpost transition to move to your next point.",
-    "Now close — summarise your key points and end with a memorable call to action.",
+    "Thank you for your presentation. Let's open the floor. What is the one thing you want the audience to remember?",
+    "Could you give a concrete example that supports your main point?",
+    "What are the limitations of your approach?",
+    "What would you do next if you had more time?",
   ],
-  Pronunciation: [
-    "Welcome to pronunciation training. I'll say each phrase first, then you repeat after me.",
-  ],
+};
+
+const MODE_TITLES: Record<string, string> = {
+  Conversation: "Daily conversation",
+  Interview: "Mock interview",
+  Presentation: "Presentation Q&A",
 };
 
 const MODE_ACKS: Record<string, string[]> = {
@@ -88,11 +80,10 @@ const MODE_ACKS: Record<string, string[]> = {
     "Really insightful. Here's what I want to explore next: ",
   ],
   Presentation: [
-    "Good progress — keep that energy. Now, ",
-    "Well delivered. Moving to the next coaching point: ",
-    "That transition was clean. Continue with: ",
+    "Thanks, that's clear. ",
+    "Good answer. Another question from the audience: ",
+    "Interesting. Next question: ",
   ],
-  Pronunciation: [],
 };
 
 const CHECKIN_MESSAGES = [
@@ -103,10 +94,9 @@ const CHECKIN_MESSAGES = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const BACKCHANNEL_TEXTS = ["Mm-hmm.", "I see.", "Right.", "Yeah.", "Go on.", "Interesting."];
-const FILLER_WORDS = new Set([
-  "um","uh","er","ah","hmm","like","basically","literally","actually",
-  "you","know","mean","right","okay","so","well","lah","lor","meh","kan","wah","aiya",
-]);
+// Hesitation sounds only: ordinary words ("like", "so", "right") and Manglish particles
+// aren't disfluencies (the server's analysis handles fillers in context)
+const FILLER_WORDS = new Set(["um", "umm", "uh", "uhh", "er", "err", "erm", "ah", "hmm"]);
 
 const clamp  = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 const ema    = (prev: number, next: number, a = 0.2) => prev * (1 - a) + next * a;
@@ -247,31 +237,6 @@ function computeFluency(wc: number, fc: number, elapsed: number) {
     : wpm < 200 ? 100 - (wpm - 160) * 1.5 : Math.max(30, 100 - (wpm - 160) * 2);
   const fs  = Math.max(0, 100 - (fc / Math.max(wc, 1)) * 300);
   return { score: clamp(Math.round(ws * 0.6 + fs * 0.4)), wpm };
-}
-
-function scorePhrase(spoken: string, target: string) {
-  const n = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/).filter(Boolean);
-  const sw = n(spoken), tw = n(target);
-  const hits = tw.filter((w) => sw.includes(w)).length;
-  const score = clamp(Math.round((hits / tw.length) * 100));
-  const feedback =
-    score >= 90 ? "Excellent! Near-perfect pronunciation." :
-    score >= 75 ? "Very good — just a couple of minor differences." :
-    score >= 55 ? "Good attempt. Articulate each word more clearly." :
-    score >= 35 ? "Keep practising. Try speaking more slowly." :
-                  "Let's try again — one word at a time.";
-  return { score, feedback };
-}
-
-function mockSlideOutline(fileName: string): string[] {
-  const topic = fileName.replace(/\.(pdf|pptx?|key|odp)$/i, "").replace(/[-_]/g, " ");
-  return [
-    `Opening (Slides 1–2): Hook the audience on "${topic}". State your objectives.`,
-    `Context (Slides 3–4): Background and key definitions. Establish credibility with data.`,
-    `Core Arguments (Slides 5–8): 3 key points with evidence. Clear signpost transitions.`,
-    `Discussion (Slides 9–10): Implications and connection to your stated goals.`,
-    `Conclusion (Slides 11–12): Summarise takeaways. Close memorably.`,
-  ];
 }
 
 // ── AI Orb (Sesame-inspired) ──────────────────────────────────────────────────
@@ -554,46 +519,21 @@ function InterviewerAvatar({ state }: { state: OrbState }) {
   );
 }
 
-// ── Metric pill ───────────────────────────────────────────────────────────────
-function MetricPill({ label, value, prev, color }: {
-  label: string; value: number; prev: number; color: string;
-}) {
-  const diff = value - prev;
-  return (
-    <div className="flex items-center gap-2.5 flex-1 min-w-0 px-3 sm:px-4 py-3"
-      style={{ borderRight: "1px solid rgba(255,255,255,0.05)" }}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-1 mb-1">
-          <span className="text-[10px] text-white/40 font-semibold uppercase tracking-wider truncate">{label}</span>
-          <div className="flex items-center gap-0.5 flex-shrink-0">
-            <span className="text-sm font-bold" style={{ color }}>{Math.round(value)}</span>
-            {diff > 0.5 ? <ChevronUp className="w-3 h-3 text-green-400" />
-              : diff < -0.5 ? <ChevronDown className="w-3 h-3 text-red-400" />
-              : <Minus className="w-3 h-3 text-white/20" />}
-          </div>
-        </div>
-        <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-          <div className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${value}%`, background: `linear-gradient(90deg, ${color}80, ${color})` }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Session ───────────────────────────────────────────────────────────────────
 function SessionContent() {
   const searchParams = useSearchParams();
   const router       = useRouter();
-  const mode         = (searchParams.get("mode") ?? "Conversation") as string;
+  // A session prepared beforehand (interview setup / deck Q&A) arrives as ?live=<id>&mode=…
+  const liveParam    = searchParams.get("live");
+  const mode         = (["Conversation", "Interview", "Presentation"].includes(searchParams.get("mode") ?? "")
+    ? searchParams.get("mode") : "Conversation") as SessionType;
 
   const {
     isRecording, isCameraOn, duration, setRecording, setCameraOn, incrementDuration, resetDuration,
     startSession: startLiveSession,
   } = useSessionStore();
   const {
-    liveFeedback, updateLiveFeedback, transcript, appendTranscript, reset,
-    setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setGazeTunneling, setAnalysisError,
+    updateLiveFeedback, transcript, appendTranscript, reset, setGazeTunneling, setAnalysisError,
   } = useFeedbackStore();
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -602,8 +542,6 @@ function SessionContent() {
   const [input,          setInput]          = useState("");
   const [aiTyping,       setAiTyping]       = useState(false);
   const [aiSpeaking,     setAiSpeaking]     = useState(false);
-  const [promptIndex,    setPromptIndex]    = useState(0);
-  const [prevFeedback,   setPrevFeedback]   = useState({ ...liveFeedback });
   const [isEnding,       setIsEnding]       = useState(false);
   const [mpStatus,       setMpStatus]       = useState<MpStatus>("idle");
   const [faceDetected,   setFaceDetected]   = useState(false);
@@ -621,20 +559,11 @@ function SessionContent() {
   const [wpm,            setWpm]            = useState(0);
   const [, setFillerCount]    = useState(0);
   const [voiceEnabled,   setVoiceEnabled]   = useState(true);
-  const [currentTopic,   setCurrentTopic]   = useState(RANDOM_TOPICS[0]);
+  const [currentTopic,   setCurrentTopic]   = useState(searchParams.get("topic") || RANDOM_TOPICS[0]);
 
-  // Pronunciation
-  const [pronounceIndex,    setPronounceIndex]    = useState(0);
-  const [pronounceScore,    setPronounceScore]    = useState<number | null>(null);
-  const [pronounceFeedback, setPronunceFeedback]  = useState("");
-  const [waitingAttempt,    setWaitingAttempt]    = useState(false);
-
-  // Presentation
-  const [slideFile,     setSlideFile]     = useState<File | null>(null);
-  const [slideAnalyzed, setSlideAnalyzed] = useState(false);
-  const [slideOutline,  setSlideOutline]  = useState<string[]>([]);
-  const [analyzing,     setAnalyzing]     = useState(false);
-  const slideInputRef = useRef<HTMLInputElement>(null);
+  // The prepared session (interview setup / deck) and how far through its question plan we are
+  const [prepared,      setPrepared]      = useState<LiveSession | null>(null);
+  const [planProgress,  setPlanProgress]  = useState<{ asked: number; total: number } | null>(null);
 
   // ── DOM refs ─────────────────────────────────────────────────────────────
   // Two views of the same camera stream: a large clean "mirror" (videoRef, which
@@ -680,6 +609,10 @@ function SessionContent() {
   // Face box in normalised frame coordinates, for the lighting check
   const faceNormRef         = useRef<FaceBox | null>(null);
   const pronounceRef        = useRef(72);
+  // Response time: from the end of the AI's turn to the first sound of the user's answer
+  const turnOpenedAtRef     = useRef<number | null>(null);
+  const latenciesRef        = useRef<number[]>([]);
+  const sessionStartedAtRef = useRef(0);
   const wordListRef         = useRef<string[]>([]);
   const fillerCntRef        = useRef(0);
   const startTimeRef        = useRef(0);
@@ -704,11 +637,6 @@ function SessionContent() {
   const disfluencyEventsRef = useRef<{ t: number }[]>([]);
   const lastWordRef         = useRef("");
 
-  // Pronunciation refs
-  const pronounceTargetRef  = useRef(PRONUNCIATION_PHRASES[0].phrase);
-  const pronounceIndexRef   = useRef(0);
-  const pronounceAttemptRef = useRef<(s: string) => void>(() => {});
-
   // Backchannel refs
   const backchannelUrlsRef  = useRef<string[]>([]);
   const lastBackchannelRef  = useRef(0);
@@ -722,14 +650,13 @@ function SessionContent() {
 
   // Track conversation history for real AI calls
   const messagesRef     = useRef<Message[]>([]);
-  const currentTopicRef = useRef(RANDOM_TOPICS[0]);
+  const currentTopicRef = useRef(currentTopic);
 
   // ── Sync refs ─────────────────────────────────────────────────────────────
   useEffect(() => { aiTypingRef.current      = aiTyping; },       [aiTyping]);
   useEffect(() => { voiceEnabledRef.current  = voiceEnabled; },   [voiceEnabled]);
   useEffect(() => { isRecordingRef.current   = isRecording; },    [isRecording]);
   useEffect(() => { modeRef.current          = mode; },           [mode]);
-  useEffect(() => { promptIndexRef.current   = promptIndex; },    [promptIndex]);
   useEffect(() => { messagesRef.current      = messages; },       [messages]);
   useEffect(() => { currentTopicRef.current  = currentTopic; },   [currentTopic]);
 
@@ -783,6 +710,7 @@ function SessionContent() {
       if (done || token !== speakTokenRef.current) return;
       done = true;
       setVoicePending(false); setAiSpeaking(false); aiSpeakingRef.current = false;
+      turnOpenedAtRef.current = performance.now();
       onEnd?.();
       setTimeout(resumeListening, 300);
     };
@@ -819,7 +747,7 @@ function SessionContent() {
   // ── Auto-reply after user speech (real OpenAI chat) ─────────────────────
   const triggerAIReply = useCallback(async (spokenText: string) => {
     if (!activeRef.current || aiTypingRef.current || aiSpeakingRef.current) return;
-    if (modeRef.current === "Pronunciation" || !spokenText.trim()) return;
+    if (!spokenText.trim()) return;
 
     const userMsg: Message = { role: "user", text: spokenText.trim(), ts: Date.now() };
     setMessages((p) => [...p, userMsg]);
@@ -835,11 +763,13 @@ function SessionContent() {
     }));
 
     try {
-      const { reply } = await conversationService.partnerReply(
+      const { reply, progress, total_questions } = await conversationService.partnerReply(
         history,
         modeRef.current,
         modeRef.current === "Conversation" ? currentTopicRef.current : undefined,
+        backendSessionIdRef.current ?? undefined,
       );
+      if (progress && total_questions) setPlanProgress({ asked: Math.min(progress.asked, total_questions), total: total_questions });
 
       setAiTyping(false); aiTypingRef.current = false;
       setMessages((p) => [...p, { role: "ai", text: reply, ts: Date.now() }]);
@@ -855,7 +785,7 @@ function SessionContent() {
           const acks = MODE_ACKS[modeRef.current] ?? [];
           const ack  = acks[Math.floor(Math.random() * acks.length)] ?? "";
           reply = ack + prompts[idx];
-          setPromptIndex(idx + 1); promptIndexRef.current = idx + 1;
+          promptIndexRef.current = idx + 1;
         } else {
           reply = modeRef.current === "Interview"
             ? "Excellent — that wraps up our interview session. End the session to see your full assessment."
@@ -868,30 +798,6 @@ function SessionContent() {
   }, [speakText, detachRecognizer]);
 
   useEffect(() => { triggerAIReplyRef.current = triggerAIReply; }, [triggerAIReply]);
-
-  // ── Pronunciation attempt handler ─────────────────────────────────────────
-  useEffect(() => {
-    pronounceAttemptRef.current = (spoken: string) => {
-      const target = pronounceTargetRef.current;
-      setWaitingAttempt(false);
-      const { score, feedback } = scorePhrase(spoken, target);
-      setPronounceScore(score); setPronunceFeedback(feedback);
-      const nextIdx = pronounceIndexRef.current + 1;
-      const next    = PRONUNCIATION_PHRASES[nextIdx];
-      const msg = next
-        ? `${feedback} Score: ${score} out of 100. Next phrase: "${next.phrase}"`
-        : `${feedback} Score: ${score} — amazing work, you've completed all phrases!`;
-      setTimeout(() => {
-        speakText(msg, () => {
-          if (next) {
-            pronounceIndexRef.current = nextIdx; pronounceTargetRef.current = next.phrase;
-            setPronounceIndex(nextIdx); setPronounceScore(null); setPronunceFeedback("");
-            setWaitingAttempt(true);
-          }
-        });
-      }, 700);
-    };
-  }, [speakText]);
 
   // ── Backchannels ──────────────────────────────────────────────────────────
   const prefetchBackchannels = useCallback(async () => {
@@ -1052,9 +958,6 @@ function SessionContent() {
       const { score: fluency, wpm: w } = computeFluency(wordListRef.current.length, fillerCntRef.current, elapsed);
       setWpm(w);
       const confidence = clamp(Math.round(eyeContactRef.current * 0.45 + postureRef.current * 0.55));
-      if (now - lastPrevRef.current > 5000 && lastPrevRef.current > 0)
-        setPrevFeedback({ fluency, pronunciation: pronounceRef.current, eye_contact: eyeContactRef.current, confidence, speaking_pace: w, posture: postureRef.current });
-      if (now - lastPrevRef.current > 5000) lastPrevRef.current = now;
       updateLiveFeedback({ fluency, pronunciation: pronounceRef.current, eye_contact: eyeContactRef.current, confidence, speaking_pace: w, posture: postureRef.current });
       setMood(moodRef.current);
       gazeSamplesRef.current.push({ t: elapsed, eye: eyeContactRef.current });
@@ -1067,10 +970,17 @@ function SessionContent() {
   const startSpeech = useCallback(() => {
     if (recognRef.current || voiceListenerRef.current) return;  // never two listeners at once
 
+    // First sound after the AI's turn: how long the user took to start answering
+    const noteAnswerStarted = () => {
+      const opened = turnOpenedAtRef.current;
+      if (opened == null) return;
+      turnOpenedAtRef.current = null;
+      latenciesRef.current.push(Math.round((performance.now() - opened) / 100) / 10);
+    };
+
     // One finished utterance from either recogniser
     const onFinal = (text: string, conf: number, replyDelayMs: number) => {
       lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
-      if (modeRef.current === "Pronunciation") { pronounceAttemptRef.current(text); return; }
       appendTranscript(text);
       const words = text.trim().split(/\s+/).filter(Boolean);
       wordListRef.current.push(...words);
@@ -1109,6 +1019,7 @@ function SessionContent() {
     if (sttModeRef.current === "server" && streamRef.current) {
       const listener: VoiceTurnListener = new VoiceTurnListener(conversationService.transcribe, {
         onSpeechStart: () => {
+          noteAnswerStarted();
           // The user is (still) talking: don't answer yet
           lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
           if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
@@ -1137,6 +1048,7 @@ function SessionContent() {
     // Chrome has no Malaysian English ("en-MY") model; US English is its most accurate one
     rec.continuous = true; rec.interimResults = true; rec.lang = "en-US"; rec.maxAlternatives = 1;
     rec.onresult = (ev: any) => {
+      noteAnswerStarted();
       lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
       let interim = "";
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
@@ -1268,12 +1180,6 @@ function SessionContent() {
     stopAudioMeter();
   }, [setCameraOn, stopAudioMeter]);
 
-  // ── Slide upload ──────────────────────────────────────────────────────────
-  const handleSlideUpload = useCallback((file: File) => {
-    setSlideFile(file); setAnalyzing(true);
-    setTimeout(() => { setSlideOutline(mockSlideOutline(file.name)); setAnalyzing(false); setSlideAnalyzed(true); }, 2200);
-  }, []);
-
   // ── Session start / end ───────────────────────────────────────────────────
   const startSession = useCallback(async () => {
     wordListRef.current = []; fillerCntRef.current = 0;
@@ -1281,18 +1187,19 @@ function SessionContent() {
     lastUpdateRef.current = 0; lastPrevRef.current = 0; lastTsRef.current = 0;
     lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
     gazeSamplesRef.current = []; disfluencyEventsRef.current = []; lastWordRef.current = "";
-    activeRef.current = true; startTimeRef.current = performance.now();
-    pronounceIndexRef.current = 0; pronounceTargetRef.current = PRONUNCIATION_PHRASES[0].phrase;
-    setPronounceIndex(0); setPronounceScore(null); setPronunceFeedback("");
+    activeRef.current = true; startTimeRef.current = performance.now(); sessionStartedAtRef.current = Date.now();
+    turnOpenedAtRef.current = null; latenciesRef.current = [];
     pendingUserSpeechRef.current = "";
 
     setSessionStarted(true); setRecording(true); setFillerCount(0); setWpm(0);
     resetDuration(); reset();
 
-    // A backend live session (for recording + analysis) needs sign-in; without
-    // it the session still runs, and /assessment shows the client-side results.
+    // A backend live session (for recording + analysis) needs sign-in. Interview and
+    // Presentation Q&A sessions were prepared on their setup page (with a question plan).
     const [backendSession, health] = await Promise.all([
-      liveService.start(mode as SessionType).catch(() => null),
+      (prepared ? Promise.resolve(prepared)
+        : liveService.start({ session_type: mode, topic: mode === "Conversation" ? currentTopicRef.current : undefined })
+      ).catch(() => null),
       presentationService.health().catch(() => null),
       startCamera(),
     ]);
@@ -1306,21 +1213,39 @@ function SessionContent() {
     startSpeech();
     initMediaPipe().then(() => { if (activeRef.current) animRef.current = requestAnimationFrame(runDetection); });
 
-    const prompts  = MODE_PROMPTS[mode] ?? MODE_PROMPTS.Conversation;
-    const firstMsg = mode === "Pronunciation"
-      ? `${prompts[0]} Here is your first phrase: "${PRONUNCIATION_PHRASES[0].phrase}". I'll say it aloud first.`
-      : prompts[0];
-
-    setTimeout(() => {
-      setAiTyping(true);
-      setTimeout(() => {
-        setAiTyping(false);
-        if (mode !== "Pronunciation") { setMessages([{ role: "ai", text: firstMsg, ts: Date.now() }]); setPromptIndex(1); }
-        speakText(firstMsg, () => { if (mode === "Pronunciation") setWaitingAttempt(true); });
-      }, 1200);
-    }, 600);
+    // The opening line: the plan's intro (interview / Q&A) or a greeting from the partner;
+    // scripted when no LLM is available
+    setAiTyping(true); aiTypingRef.current = true;
+    let firstMsg = (MODE_PROMPTS[mode] ?? MODE_PROMPTS.Conversation)[0];
+    try {
+      const r = await conversationService.partnerReply(
+        [], mode, mode === "Conversation" ? currentTopicRef.current : undefined, backendSession?.id);
+      firstMsg = r.reply;
+      if (r.progress && r.total_questions) setPlanProgress({ asked: r.progress.asked, total: r.total_questions });
+    } catch { promptIndexRef.current = 1; }
+    setAiTyping(false); aiTypingRef.current = false;
+    if (!activeRef.current) return;
+    setMessages([{ role: "ai", text: firstMsg, ts: Date.now() }]);
+    speakText(firstMsg);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, speakText]);
+  }, [mode, speakText, prepared]);
+
+  // Load the prepared session (interview setup / deck Q&A); without one, go and prepare it
+  useEffect(() => {
+    if (mode === "Conversation") return;
+    if (!liveParam) { router.replace(mode === "Interview" ? "/interview" : "/presentations"); return; }
+    liveService.get(liveParam)
+      .then((s) => {
+        if (s.status !== "active" || s.has_recording) {
+          router.replace(`/results/${s.id}`);
+          return;
+        }
+        setPrepared(s);
+        const total = s.context?.plan?.questions?.length;
+        if (total) setPlanProgress({ asked: 0, total });
+      })
+      .catch(() => router.replace(mode === "Interview" ? "/interview" : "/presentations"));
+  }, [mode, liveParam, router]);
 
   const endSession = useCallback(async () => {
     setIsEnding(true); activeRef.current = false;
@@ -1341,67 +1266,36 @@ function SessionContent() {
     const recordedBlob = await stopRecording();
     stopCamera(); setRecording(false);
 
+    // Client-side Gaze Tunneling from this session's own samples
+    const tunneling = computeGazeTunneling(gazeSamplesRef.current, disfluencyEventsRef.current);
+    setGazeTunneling(tunneling);
+
     const sessionId = backendSessionIdRef.current;
-    if (sessionId) {
-      try {
-        await liveService.end(sessionId, duration);
-        if (!recordedBlob) throw new Error("No recording to analyse");
-        await liveService.uploadRecording(sessionId, recordedBlob);
-        const result = await liveService.analyze(sessionId);
-        setFullAnalysis(result);
-
-        setSpeechAnalysis({
-          id: "", session_id: sessionId,
-          fluency_score: result.speech.fluency_score,
-          pronunciation_score: result.speech.pronunciation_score,
-          speaking_rate: result.speech.speaking_rate,
-          filler_word_count: result.speech.filler_count,
-          stuttering_score: result.speech.stuttering_score,
-        });
-        setVisionAnalysis({
-          id: "", session_id: sessionId,
-          eye_contact_score: result.vision.eye_contact_score,
-          confidence_score: result.vision.confidence_score,
-          posture_score: result.vision.posture_score,
-          emotion_label: result.vision.dominant_emotion,
-        });
-        setAIFeedback({
-          id: "", session_id: sessionId,
-          // The coaching plan's summary (written from the measured results), else a score line
-          summary: result.recommendations.summary ||
-            (result.communication_score.overall_score != null
-              ? `Overall score: ${result.communication_score.overall_score}% (${result.communication_score.grade}). `
-              : "Not enough signals were measured for an overall score. ") +
-            `Strengths: ${result.communication_score.strengths.join(", ") || "Keep practicing!"}. ` +
-            `Focus areas: ${result.communication_score.improvement_areas.join(", ") || "None identified"}.`,
-          recommendations: result.recommendations.exercises.map((e) => e.title),
-          created_at: new Date().toISOString(),
-        });
-        // Unmeasured scores stay 0, which /assessment treats as "no data"
-        updateLiveFeedback({
-          fluency: result.speech.fluency_score ?? 0,
-          pronunciation: result.speech.pronunciation_score ?? 0,
-          eye_contact: result.vision.eye_contact_score ?? 0,
-          confidence: result.vision.confidence_score ?? 0,
-          speaking_pace: result.speech.speaking_rate ?? 0,
-          posture: result.vision.posture_score ?? 0,
-        });
-      } catch (e) {
-        // /assessment shows this and falls back to sample data for the scores
-        setAnalysisError(e instanceof Error ? e.message : "Analysis failed");
-      }
-    } else {
+    if (!sessionId) {
       setAnalysisError("Sign in to have your session recorded and analysed.");
+      router.push("/login");
+      return;
     }
-
-    // Client-side only — doesn't depend on the backend call above, so it's
-    // still computed even if analysis upload failed.
-    setGazeTunneling(computeGazeTunneling(gazeSamplesRef.current, disfluencyEventsRef.current));
-
-    router.push("/assessment");
+    try {
+      const turns = messagesRef.current.map((m) => ({
+        role: m.role === "ai" ? "assistant" as const : "user" as const,
+        text: m.text,
+        t_sec: Math.max(0, Math.round((m.ts - sessionStartedAtRef.current) / 100) / 10),
+      }));
+      await liveService.end(sessionId, duration, turns, {
+        response_latency_sec: latenciesRef.current,
+        ...(tunneling.label !== "Not enough data" ? { gaze_tunneling: tunneling.correlation } : {}),
+      });
+      if (!recordedBlob) throw new Error("No recording to analyse");
+      await liveService.uploadRecording(sessionId, recordedBlob);
+      // The analysis runs on the server; the results page shows its progress
+      await liveService.startAnalysis(sessionId);
+    } catch (e) {
+      setAnalysisError(e instanceof Error ? e.message : "Analysis failed");
+    }
+    router.push(`/results/${sessionId}`);
   }, [
-    stopSpeech, stopRecording, stopCamera, setRecording, router, duration,
-    setSpeechAnalysis, setVisionAnalysis, setAIFeedback, setFullAnalysis, setAnalysisError, setGazeTunneling, updateLiveFeedback,
+    stopSpeech, stopRecording, stopCamera, setRecording, router, duration, setAnalysisError, setGazeTunneling,
   ]);
 
   // ── Lighting & contrast check: once a second while the camera runs (independent of
@@ -1423,7 +1317,7 @@ function SessionContent() {
       if ((Date.now() - lastSpeechTimeRef.current) / 1000 > 22 && !checkinAskedRef.current) {
         checkinAskedRef.current = true;
         const msg = CHECKIN_MESSAGES[Math.floor(Date.now() / 1000) % CHECKIN_MESSAGES.length];
-        if (modeRef.current !== "Pronunciation") setMessages((p) => [...p, { role: "ai", text: msg, ts: Date.now() }]);
+        setMessages((p) => [...p, { role: "ai", text: msg, ts: Date.now() }]);
         speakText(msg);
       }
     }, 5000);
@@ -1446,7 +1340,7 @@ function SessionContent() {
 
   const sendMessage = useCallback(() => {
     const text = input.trim();
-    if (!text || !sessionStarted || aiTyping || mode === "Pronunciation") return;
+    if (!text || !sessionStarted || aiTyping) return;
     if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
     pendingUserSpeechRef.current = "";
     lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
@@ -1456,7 +1350,7 @@ function SessionContent() {
     fillerCntRef.current += words.filter((w) => FILLER_WORDS.has(w.toLowerCase())).length;
     appendTranscript(text);
     triggerAIReplyRef.current(text);
-  }, [input, sessionStarted, aiTyping, mode, appendTranscript]);
+  }, [input, sessionStarted, aiTyping, appendTranscript]);
 
   const shuffleTopic = useCallback(() => {
     const next = RANDOM_TOPICS[Math.floor(Math.random() * RANDOM_TOPICS.length)];
@@ -1497,7 +1391,7 @@ function SessionContent() {
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   const MODE_COLORS: Record<string, string> = {
-    Conversation: "#5C729B", Interview: "#79738C", Presentation: "#9C6A28", Pronunciation: "#4D7A59",
+    Conversation: "#5C729B", Interview: "#79738C", Presentation: "#9C6A28",
   };
   const mc = MODE_COLORS[mode] ?? "#5C729B";
 
@@ -1512,11 +1406,11 @@ function SessionContent() {
     speechActive && sessionStarted ? "Listening…" :
     sessionStarted ? "Your turn"   : "Ready to start";
 
-  const currentPhrase   = PRONUNCIATION_PHRASES[pronounceIndex];
   const currentQuestion = messages.filter((m) => m.role === "ai").at(-1)?.text ?? null;
   const showYourTurn    = sessionStarted && !thinking && !aiSpeaking
-    && messages.length > 0 && messages[messages.length - 1].role === "ai"
-    && mode !== "Pronunciation";
+    && messages.length > 0 && messages[messages.length - 1].role === "ai";
+  const setup = prepared?.context?.setup;
+  const deckTitle = prepared?.context?.deck_title;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1641,9 +1535,9 @@ function SessionContent() {
           >
             <Loader2 className="w-8 h-8 animate-spin text-blue-300" />
             <div>
-              <p className="text-sm font-bold text-white">Analyzing your session…</p>
+              <p className="text-sm font-bold text-white">Saving your session…</p>
               <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>
-                Running speech and vision AI on your recording. This can take a moment.
+                Uploading your recording. Your results page opens next and fills in as the analysis finishes.
               </p>
             </div>
           </div>
@@ -1655,8 +1549,13 @@ function SessionContent() {
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold px-3 py-1.5 rounded-full"
             style={{ background: `${mc}20`, color: mc, border: `1px solid ${mc}30` }}>
-            {mode} Practice
+            {MODE_TITLES[mode]}
           </span>
+          {planProgress && (
+            <span className="text-xs font-semibold text-white/60">
+              Question {Math.max(1, Math.min(planProgress.asked, planProgress.total))} of {planProgress.total}
+            </span>
+          )}
           <span
             title="Scores and corrections are held until you finish speaking — we never interrupt mid-sentence."
             className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full cursor-help"
@@ -1699,10 +1598,11 @@ function SessionContent() {
           )}
 
           {!sessionStarted ? (
-            <button onClick={startSession}
+            <button onClick={startSession} disabled={mode !== "Conversation" && !prepared}
               className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white transition-all press-effect"
               style={{ background: mc }}>
-              <Mic className="w-4 h-4" /> Start Session
+              {mode !== "Conversation" && !prepared ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+              {mode === "Interview" ? "Start interview" : mode === "Presentation" ? "Start Q&A" : "Start conversation"}
             </button>
           ) : (
             <button onClick={endSession} disabled={isEnding}
@@ -1764,42 +1664,26 @@ function SessionContent() {
               </div>
             </div>
 
-            {/* Live performance */}
-            <div className="glass-card rounded-2xl p-4 flex-shrink-0">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-3">Live Performance</p>
-              <div className="space-y-2.5">
-                {[
-                  { label: "Fluency",       value: sessionStarted ? liveFeedback.fluency       : 0, color: "#5C729B" },
-                  { label: "Eye Contact",   value: sessionStarted ? liveFeedback.eye_contact   : 0, color: "#4D7A59" },
-                  { label: "Confidence",    value: sessionStarted ? liveFeedback.confidence    : 0, color: "#9C6A28" },
-                  { label: "Pronunciation", value: sessionStarted ? liveFeedback.pronunciation : 0, color: "#79738C" },
-                ].map(({ label, value, color }) => (
-                  <div key={label}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-white/45 font-medium">{label}</span>
-                      <span className="text-xs font-bold" style={{ color }}>{sessionStarted ? value : "–"}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
-                      <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${value}%`, background: `linear-gradient(90deg, ${color}80, ${color})` }} />
-                    </div>
-                  </div>
-                ))}
-                {wpm > 0 && (
-                  <div className="pt-1.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-white/45 font-medium">Speaking Pace</span>
-                      <span className="text-xs font-bold text-white/70">
-                        {wpm} WPM
-                        <span className="ml-1.5 text-[9px] font-semibold"
-                          style={{ color: wpm > 160 ? "#ef4444" : wpm < 100 ? "#f59e0b" : "#22c55e" }}>
-                          {wpm > 160 ? "↑ Too fast" : wpm < 100 ? "↓ Too slow" : "✓ Good"}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+            {/* What this interview is about (from the setup) */}
+            <div className="glass-card p-4 flex-shrink-0">
+              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-2">Your interview</p>
+              {setup ? (
+                <>
+                  <p className="text-sm font-semibold text-white/85">
+                    {setup.position}{setup.company ? ` · ${setup.company}` : ""}
+                  </p>
+                  <p className="text-xs text-white/45 mt-0.5 capitalize">
+                    {setup.level} level · {setup.interview_type} questions
+                    {prepared?.context?.resume_text ? " · using your resume" : ""}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-white/40">Loading your interview setup…</p>
+              )}
+              <p className="text-[11px] text-white/40 mt-3 leading-relaxed">
+                Answer as you would in the real interview. Alex asks one question at a time and may ask a
+                follow-up if an answer is short. Feedback on every answer comes after you end.
+              </p>
             </div>
 
             {/* Response transcript */}
@@ -1814,7 +1698,7 @@ function SessionContent() {
                   <p className="text-xs text-white/30 leading-relaxed">
                     {sessionStarted
                       ? "Alex is preparing your first question…"
-                      : "Start the session. Alex will conduct a realistic mock interview — speak your answers aloud."}
+                      : "Press Start interview. Alex will introduce themself and ask the first question. Speak your answers aloud."}
                   </p>
                 </div>
               ) : (
@@ -1905,7 +1789,7 @@ function SessionContent() {
 
       ) : (
 
-        /* ── Default 2-column layout (Conversation / Presentation / Pronunciation) ── */
+        /* ── Default 2-column layout (Conversation / Presentation Q&A) ── */
         <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
 
           {/* LEFT: camera stage + AI status */}
@@ -1967,145 +1851,28 @@ function SessionContent() {
             </div>
           )}
 
-          {/* Slide outline (Presentation) */}
-          {mode === "Presentation" && sessionStarted && slideAnalyzed && (
-            <div className="glass-card rounded-2xl p-3 flex-shrink-0 max-h-[140px] overflow-y-auto">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-2">Slide Outline</p>
-              {slideOutline.map((item, i) => (
-                <div key={i} className="flex gap-1.5 mb-1.5">
-                  <span className="text-[10px] font-bold" style={{ color: mc }}>{i+1}.</span>
-                  <p className="text-[10px] text-white/55 leading-relaxed line-clamp-1">{item.split(":")[0]}</p>
-                </div>
-              ))}
+          {/* Deck being rehearsed (Presentation Q&A) */}
+          {mode === "Presentation" && (
+            <div className="glass-card p-3 flex-shrink-0">
+              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-1">Q&amp;A on your deck</p>
+              <p className="text-sm font-semibold text-white/80 flex items-center gap-2">
+                <Presentation className="w-4 h-4 flex-shrink-0" style={{ color: mc }} />
+                <span className="truncate">{deckTitle ?? "Loading…"}</span>
+              </p>
+              <p className="text-[11px] text-white/40 mt-1.5 leading-relaxed">
+                The questions come from your deck&apos;s content. Answer directly first, then give your reason or evidence.
+              </p>
             </div>
           )}
         </div>
 
-        {/* RIGHT: Conversation / pronunciation / slides */}
+        {/* RIGHT: the conversation */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
 
-          {/* ── PRONUNCIATION: phrase card ─────────────────────────────── */}
-          {mode === "Pronunciation" && sessionStarted && (
-            <div className="flex-1 glass-card rounded-2xl p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider">
-                  Phrase {pronounceIndex + 1} / {PRONUNCIATION_PHRASES.length}
-                </p>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: `${mc}20`, color: mc, border: `1px solid ${mc}30` }}>
-                  {currentPhrase.focus}
-                </span>
-              </div>
-
-              <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-                <p className="text-white/30 text-xs mb-3">Repeat this phrase:</p>
-                <p className="text-2xl font-semibold text-white leading-relaxed mb-2">
-                  &ldquo;{currentPhrase.phrase}&rdquo;
-                </p>
-                <p className="text-xs text-white/40 mb-8">
-                  <span className="font-semibold text-white/60">Tip:</span> {currentPhrase.hint}
-                </p>
-
-                {pronounceScore !== null && (
-                  <div className="w-full rounded-2xl p-5 mb-5 text-center"
-                    style={{
-                      background: pronounceScore >= 75 ? "rgba(77,122,89,0.1)" : pronounceScore >= 50 ? "rgba(156,106,40,0.1)" : "rgba(156,74,64,0.1)",
-                      border: `1px solid ${pronounceScore >= 75 ? "rgba(77,122,89,0.25)" : pronounceScore >= 50 ? "rgba(156,106,40,0.25)" : "rgba(156,74,64,0.25)"}`,
-                    }}>
-                    <div className="flex justify-center gap-1 mb-2">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={cn("w-4 h-4", i < Math.round(pronounceScore / 20) ? "fill-amber-400 text-amber-400" : "text-white/15")} />
-                      ))}
-                    </div>
-                    <p className="text-3xl font-bold text-white">{pronounceScore}<span className="text-sm text-white/40">/100</span></p>
-                    <p className="text-xs text-white/50 mt-1">{pronounceFeedback}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button onClick={() => { speakText(currentPhrase.phrase, () => setWaitingAttempt(true)); }}
-                    disabled={aiSpeaking}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all press-effect disabled:opacity-40"
-                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
-                    <Volume2 className="w-4 h-4" />
-                    {aiSpeaking ? "Playing…" : "Hear it"}
-                  </button>
-                  {waitingAttempt && !aiSpeaking && (
-                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
-                      style={{ background: `${mc}18`, border: `1px solid ${mc}30`, color: mc }}>
-                      <Mic className="w-4 h-4 animate-pulse" /> Your turn — speak now
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Progress dots */}
-              <div className="flex justify-center gap-2 mt-4">
-                {PRONUNCIATION_PHRASES.map((_, i) => (
-                  <span key={i} className="rounded-full transition-all duration-300"
-                    style={{
-                      width: i === pronounceIndex ? 20 : 8, height: 8,
-                      background: i === pronounceIndex ? mc : i < pronounceIndex ? `${mc}60` : "rgba(255,255,255,0.12)",
-                    }} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── PRESENTATION: slide upload (pre-session) ────────────────── */}
-          {mode === "Presentation" && !sessionStarted && (
-            <div className="flex-1 glass-card rounded-2xl p-6 flex flex-col">
-              <p className="text-sm font-semibold text-white/80 mb-1">Upload Your Slides</p>
-              <p className="text-xs text-white/40 mb-5">AI will analyse your deck and generate a coaching script outline.</p>
-
-              {!slideFile ? (
-                <div onClick={() => slideInputRef.current?.click()}
-                  className="flex-1 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all group"
-                  style={{ borderColor: "rgba(255,255,255,0.1)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${mc}60`)}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}>
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
-                    style={{ background: `${mc}18` }}>
-                    <Upload className="w-7 h-7" style={{ color: mc }} />
-                  </div>
-                  <p className="text-sm font-semibold text-white/70">Click to upload</p>
-                  <p className="text-xs text-white/30 mt-1">PDF · PPTX · KEY · ODP</p>
-                  <input ref={slideInputRef} type="file" accept=".pdf,.pptx,.ppt,.key,.odp" className="hidden"
-                    onChange={(e) => { if (e.target.files?.[0]) handleSlideUpload(e.target.files[0]); }} />
-                </div>
-              ) : analyzing ? (
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <Loader2 className="w-8 h-8 animate-spin mb-3" style={{ color: mc }} />
-                  <p className="text-sm font-semibold text-white/70">Analysing slides…</p>
-                </div>
-              ) : slideAnalyzed ? (
-                <div className="flex-1 flex flex-col overflow-y-auto">
-                  <div className="flex items-center gap-2 mb-3 pb-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                    <FileText className="w-4 h-4" style={{ color: mc }} />
-                    <p className="text-xs font-semibold text-white/70 truncate flex-1">{slideFile.name}</p>
-                    <button onClick={() => { setSlideFile(null); setSlideAnalyzed(false); }}
-                      className="text-[10px] text-white/30 hover:text-white/60">Change</button>
-                  </div>
-                  <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-3">Script Outline</p>
-                  {slideOutline.map((item, i) => (
-                    <div key={i} className="flex gap-2.5 p-3 rounded-xl mb-2"
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                      <span className="w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center flex-shrink-0"
-                        style={{ background: mc }}>{i+1}</span>
-                      <p className="text-xs text-white/60 leading-relaxed">{item}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          )}
-
           {/* ── CONVERSATION / INTERVIEW / PRESENTATION: chat ──────────── */}
-          {mode !== "Pronunciation" && (sessionStarted || mode !== "Presentation") && (
-            <>
+          <>
               {/* Chat messages */}
-              <div className={cn("glass-card rounded-2xl p-5 overflow-y-auto min-h-0",
-                sessionStarted ? "flex-1" : mode === "Presentation" ? "hidden" : "flex-1")}>
+              <div className="flex-1 glass-card rounded-2xl p-5 overflow-y-auto min-h-0">
                 {!sessionStarted || messages.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center px-8">
                     <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
@@ -2114,8 +1881,10 @@ function SessionContent() {
                     </div>
                     <p className="text-sm text-white/40 leading-relaxed">
                       {sessionStarted
-                        ? "Your AI coach is preparing…"
-                        : "Start the session. Your AI coach will guide the conversation — just speak naturally."}
+                        ? "Your AI partner is getting ready…"
+                        : mode === "Presentation"
+                          ? "Press Start Q&A. The moderator will ask the audience's questions about your deck, one at a time."
+                          : "Press Start conversation and just talk naturally. Shuffle the topic any time."}
                     </p>
                   </div>
                 ) : (
@@ -2213,8 +1982,8 @@ function SessionContent() {
                   disabled={!sessionStarted || thinking || aiSpeaking}
                   placeholder={
                     !sessionStarted ? "Start the session first…" :
-                    aiSpeaking ? "AI Coach is speaking — listen…" :
-                    thinking   ? "AI Coach is responding…" :
+                    aiSpeaking ? "Listening to your partner…" :
+                    thinking   ? "Your partner is replying…" :
                     speechActive ? "Speaking captured — or type here…" :
                     "Speak aloud, or type your response…"
                   }
@@ -2233,37 +2002,17 @@ function SessionContent() {
                   <Send className="w-4 h-4" />
                 </button>
               </div>
-            </>
-          )}
+          </>
         </div>
         </div>
       )}
 
-      {/* ── Bottom metric strip (Yoodli-inspired) ────────────────────────── */}
-      <div className="flex-shrink-0 mt-3 glass-card rounded-xl grid grid-cols-2 sm:flex sm:overflow-hidden">
-        <MetricPill label="Fluency"       value={sessionStarted ? liveFeedback.fluency : 0}       prev={prevFeedback.fluency}       color="#5C729B" />
-        <MetricPill label="Pronunciation" value={sessionStarted ? liveFeedback.pronunciation : 0} prev={prevFeedback.pronunciation} color="#79738C" />
-        <MetricPill label="Eye Contact"   value={sessionStarted ? liveFeedback.eye_contact : 0}   prev={prevFeedback.eye_contact}   color="#4D7A59" />
-        <MetricPill label="Confidence"    value={sessionStarted ? liveFeedback.confidence : 0}    prev={prevFeedback.confidence}    color="#9C6A28" />
-        <div className="col-span-2 sm:col-span-1 flex items-center gap-2.5 px-3 sm:px-4 py-3 flex-1">
-          <div className="flex-1">
-            <div className="flex items-center justify-between gap-1 mb-1">
-              <span className="text-[10px] text-white/40 font-semibold uppercase tracking-wider truncate">Pace</span>
-              <span className="text-sm font-bold text-white/80 flex-shrink-0">{wpm > 0 ? `${wpm} WPM` : "–"}</span>
-            </div>
-            <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-              {wpm > 0 && (
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${Math.min(100,(wpm/200)*100)}%`,
-                    background: wpm > 160 ? "linear-gradient(90deg, #f9731660, #ef4444)" :
-                               wpm < 100  ? "linear-gradient(90deg, #f59e0b60, #f59e0b)" :
-                                            "linear-gradient(90deg, #22c55e60, #22c55e)",
-                  }} />
-              )}
-            </div>
-          </div>
-        </div>
+      {/* ── Bottom strip: what happens next (no live scores: feedback comes after) ── */}
+      <div className="flex-shrink-0 mt-3 glass-card px-4 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-white/45">
+        <span className="flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" />
+          Analysed after you end: voice, language, body language, confidence{mode === "Conversation" ? "" : " and the content of every answer"}
+        </span>
+        {wpm > 0 && <span>Pace so far: <b className="text-white/70">{wpm} wpm</b> (120–160 is comfortable)</span>}
       </div>
     </div>
   );

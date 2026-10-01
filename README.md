@@ -1,38 +1,56 @@
 # SpeechMate
 
-An AI-powered communication and speech-coaching web app, built as a Final Year Project (FYP), with a specific focus on **Malaysian speakers**: English, Bahasa Malaysia, and the code-switched "Manglish" speech that generic Western speech-coaching tools handle badly.
+An AI speaking coach for **Malaysian speakers**, built as a Final Year Project (FYP). It handles English, Bahasa Malaysia and code-switched "Manglish", the speech that generic Western coaching tools handle badly.
 
-You practise speaking (a live camera + mic session with an AI partner, or rehearsing a slide deck against an AI-narrated example). SpeechMate then analyses how you spoke and presented and turns that into specific, personalised, actionable feedback.
+SpeechMate does three things:
+
+| | Function | How it works | What you get |
+|---|---|---|---|
+| 💬 | **Daily conversation** | Pick a topic and talk with an AI partner (camera + mic). | Your **voice, language, body language and confidence**, with language tips |
+| 💼 | **Mock interview** | Enter the position, company, level, your background and (optionally) **your resume**. The AI curates the questions, then interviews you, following up when an answer is thin. | Everything above, plus **feedback on every answer**: relevance, STAR structure, specificity and a stronger version built from your own facts |
+| 📊 | **Presentation practice** | Upload a `.pptx` or `.pdf`. The AI **reads and summarises the deck first**, narrates an example, coaches your rehearsals slide by slide, then runs a **Q&A drawn from your deck**. | Which slides' key points you missed, Observation → Impact → Suggestion coaching, and feedback on every Q&A answer |
+
+Nothing is scored while you speak. After each session one simple results page shows:
+1. an overall score and a two-sentence summary;
+2. **four pillars**: Voice & delivery · Language & clarity · Body language · Confidence & presence (tap one for its metrics and comfortable ranges);
+3. feedback on **what you said**;
+4. **three drills**, each with the measured evidence and a target for next time.
 
 ---
 
-## 🌟 What makes this different
+## 🌟 What makes it different
 
-1. **Accent-fair pronunciation scoring.** Malaysian-English phonology (th → d/t, final-consonant reduction, vowel shifts) is treated as regional variation, not error: pronunciation scores get a documented accent allowance instead of being marked down against American/British norms.
-2. **"Never interrupts."** All scoring and correction is held until you finish speaking. This is a deliberate anxiety-reduction design choice (Cognitive Load Theory).
-3. **Gaze Tunneling.** Instead of reporting eye contact and disfluency as two separate numbers, the live session computes the Pearson correlation between gaze aversion and disfluency events over time, so the app can say "you look away right when you stumble".
-4. **Presentation coaching against an ideal version of *your* talk.** Upload your slides and SpeechMate writes a narration script for each one, speaks it with an open-source Malaysian voice and assembles an example video. It then coaches your rehearsals against that example with Observation → Impact → Suggestion feedback and a simulated audience's reaction (a re-implementation of [PresentCoach, Chen et al. 2025](backend/docs/2511.15253v2.pdf)).
+1. **Accent-fair.** Malaysian-English pronunciation counts as regional variation, not error. Manglish particles (*lah, kan*) aren't counted as filler words. Speech recognition uses Mesolitica's Malaysian Whisper (6.1% WER on our benchmark, vs 51.3% for standard Whisper).
+2. **Curated, not generic.**
+   - Interview questions come from your role and resume.
+   - Q&A questions come from your slides.
+   - The AI follows a question plan enforced in code, so even a small local model can't drift off topic.
+3. **Grounded feedback.**
+   - Every recommendation cites what was measured.
+   - Rewritten "stronger answers" are fact-checked against what you actually said.
+   - Anything that couldn't be measured is listed as such, never estimated.
+4. **Never interrupts.** All feedback comes after you finish (Cognitive Load Theory).
+5. **Gaze Tunneling.** The correlation between looking away and stumbling: "you look away right when you lose your words".
+6. **Local and private.** Everything runs on your machine (Ollama, faster-whisper, Kokoro, MediaPipe). Cloud APIs are optional.
+
+The full list of AI functions, metrics, formulas and evaluation targets is in **[`docs/AI_MATRIX.md`](docs/AI_MATRIX.md)**. It is also in the app under **How it's measured**.
 
 ---
 
-## ✨ Features
+## 🧭 Using the app
 
-| Feature | Where | What it does |
-|---|---|---|
-| **Live practice sessions** | `/practice` → `/session` | Conversation, Interview and Pronunciation modes with an AI partner that talks back (TTS). The browser tracks face, pose and speech in real time. |
-| **Multimodal analysis** | `/assessment` | After a session: transcript, fluency, fillers (EN + BM), stuttering, pronunciation, English/Malay ratio and code-switching, eye contact, posture, emotion, confidence, an overall score and recommended exercises |
-| **Presentation Coach** | `/presentations` | `.pptx` → AI script per slide → narration by a local Malaysian TTS voice → example video. Then record the whole deck or one slide and get coached, with a chat for follow-up questions. |
-| **AI Coach** | `/coach` | A general coaching chat that knows your goal and recent results, plus a follow-up chat on any presentation attempt |
-| **Deck insights** | `/presentations/[id]` | Upload **.pptx or .pdf**: before narration, SpeechMate summarises the deck: main message, structure, each slide's key point, text-heavy slides, talk length, fixes and likely audience questions |
-| **Two camera views + lighting check** | `/session` | A large clean mirror of you, a small tracking inset with the MediaPipe overlay, and live lighting/contrast advice (face brightness, backlight, contrast, how well you stand out) |
-| **Evidence-based recommendations** | `/assessment` | Up to 3 per session, each with what was measured (numbers and moments), why it matters, a drill and a target relative to your current value |
-| **Reference matrix** | `/methodology` | How every metric is measured, the ranges used for feedback, and how each component is evaluated |
-| **Notifications** | bell, top left | Session analysis, example video and practice feedback, ready or failed |
-| **Dark mode** | top bar / Settings | Light, Dark or System; text keeps at least 4.5:1 contrast in both themes |
-| **Accounts & profile** | `/register`, `/login`, `/profile` | JWT sign-in, and a coaching profile (goal, skill level, challenges) |
-| **Progress & reports** | API: `/api/progress`, `/api/reports` | Every analysed session's metrics over time, and saved summary reports |
-
-Every AI stage has a fallback. With **no API keys and no local models**, the app still runs end to end: scripts come from the slide text, the voice is offline espeak, feedback is rule-based, and anything that genuinely couldn't be measured is shown as unavailable rather than invented.
+| Page | What it's for |
+|---|---|
+| **Home** | The three functions, your next focus and recent sessions |
+| **Conversation** (`/conversation`) | Choose a scenario (small talk, your week, studies & work, an opinion…) or your own topic → start |
+| **Interview** (`/interview`) | Fill in the role and your background, upload a resume, preview the curated questions → start |
+| **Presentation** (`/presentations`) | Upload a deck → insights → example video → rehearse (whole deck or one slide) → **Start Q&A rehearsal** |
+| **Session** (`/session`) | A large camera view of yourself, a small MediaPipe tracking view, lighting advice and the AI partner's voice |
+| **Results** (`/results/<id>`) | The simple four-pillar report for one session (opens automatically, or from the bell) |
+| **Progress** (`/progress`) | Every session, the overall trend and a trend per pillar, filtered by function |
+| **How it's measured** (`/methodology`) | The reference matrix: metrics, AI functions, evaluation |
+| Bell (top left) | Notifications when an analysis, example video or rehearsal feedback is ready |
+| Settings | Light / dark / system theme, profile |
 
 ---
 
@@ -41,29 +59,38 @@ Every AI stage has a fallback. With **no API keys and no local models**, the app
 ```
 SpeechMate/
 ├── frontend/             Next.js 16 web app
-├── backend/   FastAPI API + AI pipelines (see its README for the full API)
-├── docker-compose.yml    Postgres + backend + frontend
+├── backend/              FastAPI API + AI pipelines (see backend/README.md for the full API)
+├── docs/                 AI matrix, benchmarks, sample deck, interim report and paper
+├── docker-compose.yml    Postgres + backend + frontend (+ Ollama, Kokoro)
 └── start.sh              one-command start
 ```
 
-- **Frontend:** Next.js 16 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4, Zustand, Recharts, framer-motion. MediaPipe Tasks Vision runs in the browser for live face/pose tracking, and the Web Audio + Web Speech APIs handle live mic level and transcription.
-- **Backend:** FastAPI, async SQLAlchemy + Alembic on **PostgreSQL**, JWT auth. Long jobs (video generation, coaching, live analysis) run as in-process background tasks that the frontend polls.
-- **AI:** local-first, with no cloud account needed.
-  - **LLM + vision via Ollama:** `qwen2.5` writes the chat replies, coach feedback and the live AI partner's lines; `qwen2.5vl` reads the slide images to write their scripts. Any OpenAI-compatible server works through `LLM_BASE_URL`.
-  - **Speech:** **faster-whisper** for ASR, plus **Mesolitica `wav2vec2-xls-r-300m-mixed`** for Malay / code-switched speech.
-  - **Narration:** **Mesolitica `Malaysian-TTS-0.6B-v1`**, speaking Malay, English and code-switched text in 7 voices.
-  - **Live AI partner's voice:** **Kokoro-82M** (Apache-2.0) via Kokoro-FastAPI: natural-sounding and faster than real time on CPU, with 70+ US/UK voices.
-  - **Analysis:** **Wav2Vec2** for pronunciation, **MediaPipe** for eye contact and posture, a **ViT** facial-expression classifier for emotion, and **librosa** for stutter prolongations.
-  - **Optional cloud:** OpenAI (`OPENAI_API_KEY`) for faster LLM, TTS and Whisper; ElevenLabs (`ELEVENLABS_API_KEY`) only for cloning *your own* voice.
-  - ffmpeg, LibreOffice and poppler for media and slides.
+- **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Zustand. MediaPipe Tasks Vision runs in the browser for live face and pose tracking.
+- **Backend:** FastAPI, async SQLAlchemy and Alembic on PostgreSQL, JWT auth. Analyses and video generation run as background jobs; the results page polls them, and the bell notifies you when they finish.
+- **AI** (all local by default):
 
-### How the live-session analysis works
+| Job | Model |
+|---|---|
+| Text: partner, plans, insights, feedback | Ollama `qwen2.5:3b` |
+| Vision: slide scripts | Ollama `qwen2.5vl:3b` |
+| Speech recognition | Mesolitica Malaysian Whisper large-v3-turbo (faster-whisper, auto language) + `wav2vec2-xls-r-300m-mixed` for code-switching |
+| AI partner's voice | Kokoro-82M |
+| Narration | Mesolitica Malaysian-TTS-0.6B-v1 |
+| Pronunciation | Wav2Vec2 |
+| Pitch and volume | librosa |
+| Eye contact, posture, gestures | MediaPipe |
+| Facial expression | ViT |
+
+### How a session is analysed
 
 ```
-recording (webm) → 16 kHz audio → ASR: faster-whisper; if not confidently English → code-switch model
-   → language & Manglish detection → fluency · fillers · stuttering · pronunciation (+ accent allowance)
-   → sampled video frames → eye contact · posture · emotion
-   → confidence → weighted communication score → recommendations → progress history
+recording → 16 kHz audio → speech recognition → language mix & Manglish particles
+  → fluency · pace · fillers (in context) · repetitions/blocks · pronunciation · pitch · volume · vocabulary · hedging
+  → sampled video frames → eye contact · posture · gestures · head steadiness · expression
+  → + response time and Gaze Tunneling from the browser
+  → confidence → overall score → four pillars
+  → answer feedback against the question plan (interview / Q&A) or language tips (conversation)
+  → three evidence-based drills → progress history → notification
 ```
 
 ---
@@ -81,55 +108,62 @@ recording (webm) → 16 kHz audio → ASR: faster-whisper; if not confidently En
 
 | Variable | Why |
 |---|---|
-| `SECRET_KEY` | signs login tokens. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `LLM_BASE_URL`, `LLM_MODEL`, `VLM_MODEL` | the local LLM. `LLM_BASE_URL=http://ollama:11434/v1` makes `start.sh` run the bundled Ollama and download the two models. `http://host.docker.internal:11434/v1` uses an Ollama you've installed yourself. |
-| `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | the live AI partner's voice. `TTS_BASE_URL=http://kokoro:8880/v1` makes `start.sh` run the bundled Kokoro server; pick a voice such as `af_heart`, `af_bella`, `am_michael`, `bf_emma` or `bm_george` |
-| `MALAYSIAN_TTS_VOICE` | default narrator voice (`husein`, `idayu`, `haqkiem`, …); it can also be chosen per deck in the app |
-| `OPENAI_API_KEY` | *optional*: cloud LLM/TTS/Whisper instead of, or on top of, the local models |
-| `ELEVENLABS_API_KEY` | *optional*: only for narrating in **your own cloned voice** |
+| `SECRET_KEY` | Signs login tokens. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `LLM_BASE_URL`, `LLM_MODEL`, `VLM_MODEL` | The local LLM. `http://ollama:11434/v1` runs the bundled Ollama and downloads the models. `http://host.docker.internal:11434/v1` uses your own Ollama |
+| `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | The AI partner's voice. `http://kokoro:8880/v1` runs the bundled Kokoro; voices include `af_heart`, `am_michael`, `bf_emma` |
+| `WHISPER_MODEL_SIZE`, `WHISPER_CPU_THREADS` | Speech recognition: the converted Malaysian Whisper path (`backend/scripts/convert_whisper.sh`) and CPU threads (8 was fastest) |
+| `STT_LANGUAGE` | Empty = auto-detect (recommended); `ms` / `en` forces a language |
+| `MALAYSIAN_TTS_VOICE` | Default narrator voice (`husein`, `idayu`, …); can also be chosen per deck |
+| `OPENAI_API_KEY` | *Optional:* cloud LLM, TTS and Whisper |
+| `ELEVENLABS_API_KEY` | *Optional:* narrate the example in **your own cloned voice** |
 
-**Model size vs. RAM:** `qwen2.5:3b` + `qwen2.5vl:3b` fit an 8 GB machine. Use the `7b` versions with 16 GB or more. On WSL, give Docker more memory in `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=12GB`). An NVIDIA GPU makes everything much faster: uncomment the GPU block in `docker-compose.yml`.
+**Model size vs. RAM:** `qwen2.5:3b` and `qwen2.5vl:3b` fit an 8 GB machine. With 16 GB or more, the `7b` models give noticeably better questions and feedback. On WSL, give Docker more memory in `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=12GB`). An NVIDIA GPU makes everything much faster: uncomment the GPU block in `docker-compose.yml`.
 
 ### 2. Start
 
 ```bash
-./start.sh                     # or: docker compose up --build -d
+./start.sh                     # or: docker compose --profile ollama --profile tts up --build -d
 ```
 
 | | |
 |---|---|
-| Frontend | http://localhost:3000 |
+| App | http://localhost:3000 |
 | API docs (Swagger) | http://localhost:8000/docs |
-| Health | http://localhost:8000/health: which binaries, local models and AI providers are active |
+| Health | http://localhost:8000/health (which models and providers are active) |
 
-The first build takes a while. The backend image includes the local ML libraries (about 2.5 GB). Model weights download on first use and are cached in Docker volumes:
-- speech/vision models, about 2.5 GB, on the first live analysis
-- the Malaysian TTS, about 2.5 GB, on the first deck
-- the Ollama LLMs, about 5 GB, in the background at startup (`docker compose logs -f ollama-pull`)
+The first build takes a while. Model weights download on first use and are cached in Docker volumes:
+- speech/vision models: about 2.5 GB;
+- Malaysian TTS: about 2.5 GB;
+- Ollama models: about 5 GB, in the background (`docker compose logs -f ollama-pull`).
 
-On CPU, narrating a deck takes a few minutes per slide and LLM replies take several seconds. For a much smaller image without local models:
+Database migrations run automatically.
 
-```bash
-INSTALL_ML=false ./start.sh
-```
+**Try it:** sign in as `demo@speechmate.dev` / `Demo1234!`. Step-by-step test guides and a glossary are in [`TESTING.md`](TESTING.md).
 
-Without them, the live-session analysis uses the OpenAI API for transcription (if a key is set). Pronunciation, eye contact, posture and emotion then show as unavailable, and narration uses espeak.
+### Typical timings on CPU (8 GB laptop, no GPU)
 
-**To try everything:** see [`TESTING.md`](TESTING.md) for the demo accounts (`demo@speechmate.dev` / `Demo1234!`), a step-by-step test guide and a glossary.
+| Step | Time |
+|---|---|
+| Interview question plan | ~30–60 s |
+| Q&A plan from a deck | ~25 s |
+| Deck insights | ~35 s |
+| AI partner reply (text + voice) | ~2–5 s |
+| Session analysis (2–5 min recording) | ~1–3 min |
+| Example narration | a few minutes per slide |
 
 ### Useful commands
 
 ```bash
-docker compose logs -f backend   # follow backend logs
-docker compose --profile ollama --profile tts down      # stop everything (data is kept in Docker volumes)
-docker compose --profile ollama --profile tts down -v   # stop and delete all data, recordings and cached models
+docker compose logs -f backend                               # follow backend logs
+docker compose --profile ollama --profile tts down           # stop (data kept in Docker volumes)
+docker compose --profile ollama --profile tts down -v        # stop and delete all data and cached models
 ```
 
 ---
 
 ## 🛠️ Development without Docker
 
-**Backend.** Needs Python 3.11+, Postgres, ffmpeg, LibreOffice, poppler and espeak-ng. See [`backend/README.md`](backend/README.md) for details.
+**Backend.** Needs Python 3.11+, Postgres, ffmpeg, LibreOffice, poppler and espeak-ng. See [`backend/README.md`](backend/README.md).
 
 ```bash
 cd backend
@@ -140,12 +174,10 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-**Frontend:**
+**Frontend.**
 
 ```bash
-cd frontend
-npm install
-npm run dev                                  # http://localhost:3000
+cd frontend && npm install && npm run dev     # http://localhost:3000
 ```
 
 The frontend calls `http://localhost:8000/api` by default. Set `NEXT_PUBLIC_API_URL` to point it elsewhere.
@@ -153,7 +185,7 @@ The frontend calls `http://localhost:8000/api` by default. Set `NEXT_PUBLIC_API_
 ### Tests
 
 ```bash
-cd backend && pytest              # 32 tests, SQLite, runs fully offline
+cd backend && pytest              # 57 tests, SQLite, fully offline (every AI stage's fallback path)
 cd frontend && npx tsc --noEmit && npm run lint
 ```
 
@@ -162,26 +194,28 @@ cd frontend && npx tsc --noEmit && npm run lint
 ## 📊 Data & storage
 
 - **PostgreSQL** tables:
-  - presentation coaching: `sessions`, `slides`, `practice_sessions`, `chat_messages`
-  - accounts and live practice: `users`, `live_sessions`, `progress_records`, `reports`
-- **Files** (decks, slide images, narration, videos, recordings) live under `STORAGE_BASE_PATH`, which is the `storage_data` volume under Docker.
+  - `users`;
+  - `live_sessions`: Conversation / Interview / Presentation Q&A, with their setup and question plan (`context`), transcript turns (`turns`), browser metrics and analysis;
+  - `progress_records`, `reports`, `notifications`;
+  - presentation decks: `sessions`, `slides`, `practice_sessions`, `chat_messages`.
+- **Files** (decks, slide images, narration, videos, recordings) live under `STORAGE_BASE_PATH` (the `storage_data` volume).
+- **Resumes:** only the extracted text is kept, inside the interview session that used it. Deleting the session deletes it.
 
 ---
 
 ## 📚 Documentation
 
-- [`TESTING.md`](TESTING.md): demo accounts, how to test each feature, glossary
-- [`backend/README.md`](backend/README.md): full API reference, fallbacks, pipelines and the smoke test
-- [`PROJECT.md`](PROJECT.md): project overview and positioning
-- [`TECHNICAL.md`](TECHNICAL.md): theoretical foundations, model design and the evaluation protocol
-- [`TODO.md`](TODO.md): roadmap (Phases 5–8)
-- `backend/docs/`: design specs and the PresentCoach paper
-- `docs/`: interim report and IEEE paper draft
+- [`docs/AI_MATRIX.md`](docs/AI_MATRIX.md): every AI function and metric, with formulas, fallbacks and evaluation
+- [`TESTING.md`](TESTING.md): demo accounts, how to test each function, glossary
+- [`backend/README.md`](backend/README.md): full API reference and pipelines
+- [`docs/benchmarks/`](docs/benchmarks/): speech-recognition benchmarks
+- [`PROJECT.md`](PROJECT.md): project overview · [`TECHNICAL.md`](TECHNICAL.md): theory and evaluation protocol · [`TODO.md`](TODO.md): roadmap
 
 ## ⚠️ Current limitations
 
-- **Stuttering** detection is a signal-processing heuristic (repetitions, silence blocks, energy-based prolongations). The trained CNN + BiLSTM classifier described in `TECHNICAL.md` needs a labelled dataset (SEP-28k / UCLASS) and is future work.
-- **Pronunciation** uses Wav2Vec2 CTC confidence over proportional word spans, not full forced alignment (GOP / Montreal Forced Aligner).
-- **English/Malay ratio** comes from a lexicon heuristic (~190 BM/Manglish words), not a trained language-ID model.
-- The **Progress, Reports and Dashboard pages** still show sample data. The backend's `/api/progress` and `/api/reports` endpoints are ready for them to use.
-- Presentation-coaching decks aren't tied to user accounts yet: anyone using the app can see every deck.
+- **Stuttering** detection is a signal-processing heuristic. The trained CNN + BiLSTM classifier in `TECHNICAL.md` needs a labelled dataset (SEP-28k / UCLASS).
+- **Pronunciation** uses Wav2Vec2 CTC confidence, not phoneme-level forced alignment (GOP).
+- The **English/Malay ratio** uses a lexicon of about 190 BM/Manglish words, not a trained language-ID model.
+- **Gestures** need your hands in view. At a desk the score is capped, not penalised.
+- With the default **3B** local model, plans and feedback are good but less nuanced than with a 7B+ or cloud model. See `docs/AI_MATRIX.md` §4.
+- The vision metrics have been verified on synthetic video only. They need real webcam recordings for the accuracy evaluation.

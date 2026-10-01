@@ -98,6 +98,7 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
                     "No speech was detected in the recording — check your microphone and record again."
                 )
             ideal_text = " ".join(s.script_text or "" for s in ref)
+            key_points = {x.get("slide_index"): x.get("key_point") for x in (session.insights or {}).get("slides", [])}
             ideal_duration = sum((s.audio_duration_sec or 0) + SLIDE_GAP_SEC for s in ref) or None
             metrics = compute_metrics(
                 duration_sec=duration,
@@ -105,6 +106,7 @@ async def run_coach_pipeline(practice_id: uuid.UUID) -> None:
                 transcript=transcript,
                 ideal_text=ideal_text,
                 ideal_duration_sec=ideal_duration,
+                slides=[(s.slide_index, s.script_text or "", key_points.get(s.slide_index)) for s in ref],
             )
             practice.metrics = metrics
             await db.commit()

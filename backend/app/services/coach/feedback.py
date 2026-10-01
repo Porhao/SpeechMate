@@ -258,6 +258,18 @@ def rule_based_coach_feedback(metrics: dict) -> dict:
             suggestion="Before each slide, name its one key idea to yourself and make sure you say it.",
         )))
 
+    weak = [c for c in metrics.get("slide_coverage") or [] if c["status"] == "missed"]
+    if weak:
+        w = min(weak, key=lambda c: c["coverage"])
+        point = f" (\"{w['key_point']}\")" if w.get("key_point") else ""
+        issues.append((0.9 - w["coverage"], OISItem(
+            slide_index=w["slide_index"],
+            observation=f"Slide {w['slide_index']}'s key point{point} barely came through: you covered "
+                        f"{w['coverage']:.0%} of its key terms" + (f", missing {', '.join(w['missed'][:3])}." if w["missed"] else "."),
+            impact="If a slide's main point isn't said out loud, the audience only has the slide text to go on.",
+            suggestion=f"Open slide {w['slide_index']} by saying its key point in one sentence, then explain it.",
+        )))
+
     issues.sort(key=lambda x: -x[0])
     observations = [item for _, item in issues[:3]]
     if not observations:

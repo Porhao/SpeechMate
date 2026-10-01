@@ -34,7 +34,7 @@ async def test_finished_live_analysis_notifies_its_owner_only(client):
     assert (await client.get("/api/notifications")).status_code == 401
     assert (await client.get("/api/notifications", headers=me)).json() == {"unread": 0, "items": []}
 
-    lid = (await client.post("/api/live", headers=me, json={"session_type": "Interview"})).json()["id"]
+    lid = (await client.post("/api/live", headers=me, json={"session_type": "Conversation"})).json()["id"]
     await client.post(f"/api/live/{lid}/recording", headers=me, files={"file": ("r.wav", _tone_wav([(3, True)]))})
     await client.post(f"/api/live/{lid}/analyze", headers=me)
     await tasks.wait_for_all(timeout=60)
@@ -42,7 +42,7 @@ async def test_finished_live_analysis_notifies_its_owner_only(client):
     n = (await client.get("/api/notifications", headers=me)).json()
     assert n["unread"] == 1
     item = n["items"][0]
-    assert item["kind"] == "live_analysis" and item["link"] == f"/assessment?live={lid}" and not item["read"]
+    assert item["kind"] == "live_analysis" and item["link"] == f"/results/{lid}" and not item["read"]
     assert (await client.get("/api/notifications", headers=other)).json()["unread"] == 0
 
     # Someone else can't mark it read; the owner can

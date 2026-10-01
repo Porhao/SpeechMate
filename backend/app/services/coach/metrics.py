@@ -9,10 +9,6 @@ import re
 from collections import Counter
 
 # Multi-word fillers first so "you know" isn't also counted as nothing
-FILLER_PHRASES = [
-    "you know", "i mean", "sort of", "kind of",
-    "um", "umm", "uh", "uhh", "erm", "er", "ah", "hmm", "like", "basically",
-]
 
 STOPWORDS = set("""
 a about above after again against all am an and any are as at be because been before being below
@@ -35,15 +31,10 @@ def _words(text: str) -> list[str]:
 
 
 def count_fillers(transcript: str) -> dict[str, int]:
-    text = " " + " ".join(_words(transcript)) + " "
-    counts: Counter[str] = Counter()
-    for phrase in FILLER_PHRASES:
-        pattern = rf"(?<= ){re.escape(phrase)}(?= )"
-        found = len(re.findall(pattern, text))
-        if found:
-            counts[phrase] += found
-            text = re.sub(pattern, "#", text)  # don't double count inside longer phrases
-    return dict(counts.most_common())
+    """Same rules as live sessions: hesitations always, discourse markers only in context."""
+    from app.services.live.speech import count_fillers as _count
+
+    return _count(transcript)
 
 
 def key_terms(text: str, limit: int = 25) -> list[str]:
@@ -65,6 +56,19 @@ def script_coverage(transcript: str, ideal_text: str) -> tuple[float | None, lis
     return round(1 - len(missed) / len(terms), 3), missed[:8]
 
 
+def slide_coverage(transcript: str, slides: list[tuple[int, str, str | None]]) -> list[dict]:
+    """Per slide: how much of its key point and script terms the speaker covered.
+    `slides` = [(slide_index, script_text, key_point from the deck insights)]."""
+    out = []
+    for index, script, key_point in slides:
+        coverage, missed = script_coverage(transcript, f"{key_point or ''} {key_point or ''} {script}")
+        if coverage is None:
+            continue
+        out.append({"slide_index": index, "key_point": key_point, "coverage": coverage, "missed": missed[:5],
+                    "status": "covered" if coverage >= 0.6 else "partly" if coverage >= 0.3 else "missed"})
+    return out
+
+
 def compute_metrics(
     *,
     duration_sec: float,
@@ -72,6 +76,7 @@ def compute_metrics(
     transcript: str | None,
     ideal_text: str,
     ideal_duration_sec: float | None,
+    slides: list[tuple[int, str, str | None]] | None = None,
 ) -> dict:
     """Build the metrics dict stored on the practice session."""
     inner_pauses = [
@@ -114,4 +119,6 @@ def compute_metrics(
             "script_coverage": coverage,
             "missed_key_terms": missed,
         })
+        if slides and len(slides) > 1:
+            metrics["slide_coverage"] = slide_coverage(transcript, slides)
     return metrics

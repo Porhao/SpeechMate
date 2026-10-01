@@ -29,7 +29,49 @@ export interface UserProfile {
   challenges: string[];
 }
 
-export type SessionType = "Conversation" | "Interview" | "Presentation" | "Pronunciation";
+// The three practice functions. "Presentation" = Q&A rehearsal on an uploaded deck.
+export type SessionType = "Conversation" | "Interview" | "Presentation";
+
+export interface InterviewSetup {
+  position: string;
+  company?: string;
+  level: "internship" | "graduate" | "junior" | "mid" | "senior";
+  interview_type: "behavioural" | "technical" | "mixed";
+  background?: string;
+  job_description?: string;
+  resume_text?: string;
+}
+
+export interface PlanQuestion {
+  question: string;
+  assesses: string;
+  look_for: string[];
+  slide_index?: number | null;
+}
+
+export interface PracticePlan {
+  intro: string;
+  questions: PlanQuestion[];
+  source: "llm" | "rules";
+}
+
+// What a prepared session carries: the interview setup or the deck, and the question plan
+export interface LiveContext {
+  setup?: Omit<InterviewSetup, "resume_text">;
+  resume_text?: string | null;
+  deck_id?: string;
+  deck_title?: string;
+  deck_summary?: string;
+  topic?: string;
+  plan?: PracticePlan;
+  progress?: { asked: number; followups: number };
+}
+
+export interface Turn {
+  role: "user" | "assistant";
+  text: string;
+  t_sec?: number | null;
+}
 
 // A live practice session (camera + mic with the AI partner) — GET /api/live/{id}
 export interface LiveSession {
@@ -41,8 +83,47 @@ export interface LiveSession {
   error_detail: string | null;
   warnings: string[];
   analysis: FullAnalysisResult | null;
+  context: LiveContext | null;
+  turns: Turn[] | null;
   created_at: string;
 }
+
+export type MetricStatus = "good" | "ok" | "work" | null;
+
+export interface PillarMetric {
+  key: string;
+  label: string;
+  value: number;
+  display: string;
+  score: number | null;
+  status: MetricStatus;
+  range: string;
+  hint: string;
+}
+
+export interface Pillar {
+  key: "voice" | "language" | "body" | "confidence";
+  label: string;
+  score: number | null;
+  status: MetricStatus;
+  about: string;
+  metrics: PillarMetric[];
+}
+
+export interface AnswerFeedback {
+  question: string;
+  relevance: number;
+  structure: number;
+  specificity: number;
+  went_well: string;
+  improve: string;
+  stronger_answer: string;
+}
+
+export type ContentFeedback =
+  | { kind: "answers"; source: string; summary: string; answers: AnswerFeedback[] }
+  | { kind: "conversation"; source: string; summary: string; tips: string[];
+      corrections: { said: string; better: string; why: string }[] };
 
 // Scores are null when the model that measures them wasn't available
 // (see FullAnalysisResult.warnings) — the backend never invents a number.
@@ -182,6 +263,10 @@ export interface FullAnalysisResult {
       why?: string;
     }[];
   };
+  // The simple view: four pillars of measured metrics (older sessions may not have them)
+  pillars?: Record<"voice" | "language" | "body" | "confidence", Pillar>;
+  // What was said, judged against the plan (interview / Q&A) or as language (conversation)
+  content_feedback?: ContentFeedback | null;
   // Full per-model output (fluency, fillers, stuttering events, pronunciation
   // word scores, eye contact, posture, emotion, confidence breakdown)
   details: Record<string, unknown>;
@@ -298,6 +383,9 @@ export interface PracticeMetrics {
   fillers_per_minute?: number | null;
   script_coverage?: number | null;
   missed_key_terms?: string[];
+  // Per slide: how much of its key point you actually said (whole-deck attempts)
+  slide_coverage?: { slide_index: number; key_point: string | null; coverage: number; missed: string[];
+                     status: "covered" | "partly" | "missed" }[];
 }
 
 export interface OISObservation {

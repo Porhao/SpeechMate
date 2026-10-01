@@ -1,6 +1,6 @@
 # Testing SpeechMate
 
-How to try every feature by hand, the demo accounts to do it with, and a glossary of the terms you'll see in the app and the API.
+How to try each of the three functions by hand, the demo accounts to use, and a glossary of the terms in the app.
 
 ---
 
@@ -16,94 +16,126 @@ How to try every feature by hand, the demo accounts to do it with, and a glossar
 | API docs (try any endpoint in the browser) | http://localhost:8000/docs |
 | Health (what's active) | http://localhost:8000/health |
 
-The first start downloads a lot: Docker images, the local speech/vision models (on first analysis), the Malaysian TTS model (on first deck), and the Ollama LLMs (in the background; follow with `docker compose logs -f ollama-pull`). Until an LLM has finished downloading, the features that need it use their offline fallbacks.
+The first start downloads a lot:
+- Docker images;
+- the speech/vision models (on the first analysis);
+- the Malaysian TTS (on the first deck);
+- the Ollama models (in the background; follow with `docker compose logs -f ollama-pull`).
+
+Until the LLM has downloaded, AI features use their offline fallbacks (question bank, rule-based feedback).
+
+Use **Chrome or Edge** and allow the camera and microphone. Use headphones if you can, so the AI's voice doesn't reach your mic.
 
 ---
 
 ## 2. Test accounts
 
-Created automatically at startup when `SEED_DEMO_DATA=true`, which the root `docker-compose.yml` sets by default. Existing accounts are never overwritten.
+They're created at startup when `SEED_DEMO_DATA=true`, which the root `docker-compose.yml` sets by default. Existing accounts are never overwritten.
 
 | Email | Password | Use it to test |
 |---|---|---|
-| `demo@speechmate.dev` | `Demo1234!` | **Aisyah Rahman**: profile filled in (goal *Improve Presentations*, *Intermediate*, challenges Eye Contact / Speaking Pace / Confidence) and **3 example live sessions** over the last two weeks with improving scores (64.6 → 71.3 → 79.8), so progress, reports and the history-aware AI coach have data |
-| `new@speechmate.dev` | `Demo1234!` | **Farid Hakim**: an empty account, for first-time flows (onboarding, first session, empty states) |
+| `demo@speechmate.dev` | `Demo1234!` | **Aisyah Rahman**: profile filled in (goal *Improve Presentations*). Has **3 example sessions** (conversation → interview → presentation Q&A) with improving scores, pillars and interview answer feedback, so Home, Progress and Results have data |
+| `new@speechmate.dev` | `Demo1234!` | **Farid Hakim**: an empty account, for first-time flows and empty states |
 
-- The demo sessions are marked *"Demo data created by scripts/seed_demo.py — not a real recording."* in their warnings.
-- To re-create the accounts from scratch, run `docker compose down -v`, which **deletes all data**, then `./start.sh`.
-- To add them to an existing database without restarting, run `docker compose exec backend python scripts/seed_demo.py --force`.
-- Turn seeding off for a real deployment: `SEED_DEMO_DATA=false`.
+- Demo sessions are marked *"Demo data created by scripts/seed_demo.py — not a real recording."* in their notes.
+- To add the demo accounts to an existing database: `docker compose exec backend python scripts/seed_demo.py --force`.
+- To start completely fresh: `docker compose down -v` (**deletes all data**), then `./start.sh`.
+- For a real deployment, set `SEED_DEMO_DATA=false`.
 
 **Sample deck:** `docs/samples/sample_deck.pptx` (3 slides on time management).
+**Sample resume:** any PDF, DOCX or TXT CV of your own.
 
 ---
 
 ## 3. What to test
 
-### A. Accounts & profile
-1. **Sign in** at `/login` with `demo@speechmate.dev` / `Demo1234!` → you land on the dashboard.
-2. **Profile** (`/profile`): change the skill level or challenges → *Save Changes* → reload the page. The changes are stored on the server.
-3. **Register** a new account at `/register`. Passwords need at least 8 characters, and using an email that already exists shows an error.
+### A. Accounts
+1. **Sign in** at `/login` with the demo account → you land on **Home**, which shows the three functions, *Your next focus* and *Recent sessions*.
+2. **Register** a new account. The onboarding asks for your goal and preferred practice and takes you straight to that function.
+3. **Profile and Settings:** change your goal or theme (Light / Dark / System).
 
-### B. Live practice session + analysis
-1. **Start a session:** Home or `/practice` → **Conversation** (or Interview / Pronunciation) → allow the camera and microphone.
-2. **Talk** with the AI partner for about a minute. Your turns are transcribed on the backend by faster-whisper: pause for about a second and "Transcribing…" appears, then the AI replies. If the backend has no speech model, Chrome's own recogniser is used instead. Its replies come from the local LLM (Ollama) and are spoken by the local **Kokoro** voice. If no LLM is ready you get scripted prompts; if Kokoro isn't running, the voice falls back to the browser's robotic speech.
-3. **End the session** → wait on "Analysing…". The recording is uploaded and analysed on the server, which takes about 20 seconds to a few minutes on CPU.
-4. **Check `/assessment`:**
-   - transcript
-   - fluency, pace, fillers (English + Malay), stuttering
-   - pronunciation
-   - English/Malay ratio and Manglish particles
-   - eye contact, posture, emotion
-   - confidence, the overall score and recommended exercises
+### B. Daily conversation
+1. Top bar → **Conversation** → pick a scenario (or type your own topic) → **Start conversation** → allow the camera and microphone.
+2. The partner greets you about the topic. **Talk for 2–3 minutes:**
+   - pause for about a second and "Transcribing…" appears, then the partner replies in the Kokoro voice;
+   - you can also type;
+   - **Shuffle** changes the topic.
+3. Check the camera stage: the large view is a clean mirror, the small inset shows MediaPipe tracking, and *Lighting & contrast* gives advice once a second. No scores are shown while you talk.
+4. **End.** You go straight to **Results**, which says "Analysing…" with the stages (1–3 min on CPU). The bell also notifies you.
+5. **Check Results:**
+   - the overall score and summary;
+   - four pillar cards (tap one to see each metric, your value and the comfortable range);
+   - **Your language** (corrections and tips);
+   - **Practise next** (3 drills with evidence and targets);
+   - the transcript, and notes on anything that couldn't be measured.
+6. **Malay / Manglish:** say *"Actually I think the project is good lah, tapi kita perlu more time."* The **Language mix** card should show both languages and the particle *lah*. *lah* and *tapi* must **not** count as filler words.
 
-   Any metric that couldn't be measured is listed in the notice at the top.
-5. **Try Malay / Manglish:** say something like *"Actually I think the project is good lah, tapi kita perlu more time."* The language card should show code-switching and the particle *lah*.
-6. **Signed out**, a session still runs, but the assessment page says *"Sign in to have your session recorded and analysed."*
+### C. Mock interview
+1. Top bar → **Interview**:
+   - position (e.g. *Data Analyst*), company, level, type (Behavioural / Technical / Mixed);
+   - your background;
+   - optionally a job description and a **resume** upload (the extracted text preview appears; you can remove it).
+2. **Preview questions** (30–60 s with the local LLM). The questions should mention your role, background or resume. **New set** regenerates them.
+3. **Start interview** → the session page shows *Your interview* (role, level, "using your resume") → **Start interview**:
+   - Alex greets you by name and asks question 1;
+   - the header shows **Question 1 of N**.
+4. Answer briefly (under about 25 words). Alex should ask **one follow-up** and not move on. Answer that, or give a full answer: Alex reacts in one sentence and asks the **next planned question** word for word. After the last question Alex closes the interview.
+5. **End → Results.** Besides the pillars, **Your answers** lists each question with:
+   - *On topic / Structure / Specific* (1–5);
+   - *Went well*, *Improve*;
+   - *Show a stronger answer*: it should only use facts you said; missing details appear as placeholders like "<the result>".
 
-### C. Presentation Coach
-1. Go to `/presentations` → upload `docs/samples/sample_deck.pptx`.
-2. Pick a **narrator voice** (Malaysian TTS: Husein, Idayu, …) and, optionally, an audience, e.g. *"First-year students, 5-minute talk"*.
-3. **Generate** → watch the four steps: parsing slides → writing scripts (local vision model) → synthesizing audio (Malaysian TTS) → assembling the video. On CPU the narration takes a few minutes per slide.
-4. **Watch the example video.** The script panel highlights the slide being narrated, and clicking a slide's script jumps the video there.
-5. **Practise:** record the **whole deck**, or choose **One slide** (you can play that slide's example narration first) → *Get feedback*.
-6. **Check the feedback:**
-   - encouragement
-   - Observation → Impact → Suggestion cards
-   - delivery metrics
-   - the simulated audience's reaction
-   - the transcript
-7. **Chat:** *"What should I fix first?"* A second attempt lets you ask *"Am I improving?"*; the coach compares against your earlier attempts.
-8. **Retry / Regenerate / Delete** a deck from its page or the list.
+### D. Presentation practice
+1. Top bar → **Presentation** → upload `docs/samples/sample_deck.pptx` (or a PDF). Optionally choose a narrator voice and an audience (e.g. *"First-year students, 5-minute talk"*).
+2. The three-step strip appears.
+   - **Step 1 Understand the deck:** after "Analysing content" (~35 s) the insights panel shows the summary, structure, each slide's key point, suggestions and likely questions, while the example video is still building.
+3. **Step 3 Rehearse the Q&A** (available as soon as the insights are ready) → **Start Q&A rehearsal**:
+   - the moderator thanks you and asks questions drawn from your slides;
+   - the header shows Question x of N.
+   - **End → Results:** **Your Q&A answers** has per-answer feedback.
+4. **Step 2 Rehearse the talk** (once the video is ready):
+   - watch the example narration (the script highlights the current slide);
+   - record the **whole deck** or **one slide** → feedback.
+5. **Check the rehearsal feedback:**
+   - what went well;
+   - Observation → Impact → Suggestion cards;
+   - delivery metrics;
+   - **Key point per slide** (Covered / Partly / Missed, with the terms you didn't say);
+   - the audience view;
+   - the transcript;
+   - the follow-up chat (*"What should I fix first?"*).
 
-### D. AI Coach (`/coach`)
-1. **General coaching** (signed in as the demo account): *"Based on my recent sessions, what should I focus on this week?"* The answer should mention Aisyah's goal and recent scores.
-2. **Presentation attempts:** pick an attempt from the list → the chat and its feedback appear side by side.
+### E. Progress
+**Progress** shows totals, the overall score per session, a trend per pillar and every session. Filter by function, open a session's results, or delete it.
 
-### E. Progress & reports (API; the pages still show sample data)
-In http://localhost:8000/docs:
+### F. Notifications, theme, reference
+- **Bell** (top left): a count appears when an analysis, example video or rehearsal feedback is ready (or failed). Click an item to open it.
+- **Theme:** the moon/sun button, or Settings → Appearance.
+- **How it's measured:** four tabs:
+  - Session metrics (every formula and range);
+  - Presentation practice;
+  - **AI functions** (model, input → output, fallback, quality check);
+  - Project evaluation.
 
-1. `POST /api/auth/login` with the demo account → copy the `access_token`.
-2. Click **Authorize** (top right) → paste the token.
-3. Call these:
-   - `GET /api/progress`: 18 points (6 metrics × 3 sessions)
-   - `POST /api/reports/generate`: averages, first → latest change and best score per metric
-   - `GET /api/live`: the 3 demo sessions with their full analysis
+### G. Fallbacks (no LLM)
+Stop the LLM with `docker compose stop ollama`, then:
+- interview preview shows *"standard question bank"*;
+- the interviewer still follows the plan (fixed reactions);
+- answer feedback is rule-based (marked);
+- the conversation partner uses scripted prompts.
 
-### F. Health & fallbacks
-- http://localhost:8000/health shows which local models are installed (`local_ml`), where LLM calls go (`llm`), and which cloud keys are set (`providers`).
-- Stop Ollama (`docker compose stop ollama`) and chat again. The coach should return a clear "No LLM configured / unavailable" message instead of crashing.
+Nothing crashes. Restart with `docker compose start ollama`.
 
-### G. Newer features
-1. **Theme:** the moon/sun button in the top bar, or Settings → Appearance (Light / Dark / System).
-2. **Notifications:** start a live session and end it, or upload a deck while signed in. When it's done, the bell at the top left shows a count. Click an item to open its results.
-3. **Reference matrix:** top bar → Reference. Three tabs: live metrics, presentation practice, project evaluation.
-4. **Deck insights:** upload `docs/samples/sample_deck.pptx` (or a PDF). After "Analysing content", the insights panel appears while the video is still building.
-5. **Camera and lighting:** in a live session the large view is a clean mirror. The corner inset shows the MediaPipe tracking, and *Lighting & contrast* gives advice once a second (try turning off the light in front of you).
+### H. API checks (http://localhost:8000/docs)
+1. `POST /api/auth/login` with the demo account → copy the `access_token` → **Authorize**.
+2. Try these:
+   - `POST /api/interview/plan` with `{"position": "Nurse", "interview_type": "behavioural"}`;
+   - `GET /api/live`: sessions with `context` (setup + plan), `turns`, and `analysis.pillars` / `analysis.content_feedback`;
+   - `GET /api/progress`: one point per metric per session, including `voice_score`, `language_score`, `body_score`, `presence_score`.
 
 ### Automated tests
 ```bash
-docker compose exec backend sh -c "pip install -r requirements-dev.txt && pytest"   # backend
+docker compose exec backend sh -c "pip install -r requirements-dev.txt && pytest"   # 57 backend tests
 cd frontend && npx tsc --noEmit && npm run lint                                    # frontend
 ```
 
@@ -113,38 +145,34 @@ cd frontend && npx tsc --noEmit && npm run lint                                 
 
 | Term | Meaning |
 |---|---|
-| **Accent-fair scoring** | Malaysian-English pronunciation patterns (th → d/t, dropped final consonants, vowel shifts) count as regional variation, not errors: pronunciation gets a +5% allowance for Malaysian English. |
-| **Articulation rate** | Words per minute *while actually speaking*, i.e. excluding pauses. Compare **speaking rate** (WPM). |
-| **ASR** | Automatic Speech Recognition, turning speech into a transcript. SpeechMate uses faster-whisper, re-checked by a code-switching model. |
-| **Audience reaction** | A simulated listener from your target audience rates clarity and engagement (1–5), and lists confusing moments and the questions they'd ask. |
-| **Block** | A stuttering event: an unusually long silence (≥ 1.2 s) in the middle of speech. |
-| **Code-switching / Manglish** | Mixing English and Bahasa Melayu in one sentence. *Manglish particles* are words like *lah, lor, meh, kan* that mark Malaysian English style. |
-| **Code-switch model** | Mesolitica's `wav2vec2-xls-r-300m-mixed`, a speech recognizer trained on Malay/Singlish/mixed speech. It's used when Whisper isn't confident the speech is English. |
-| **Communication score** | The overall 0–100 score: a weighted blend of fluency 25%, pronunciation 25%, confidence 20%, eye contact 15% and posture 15%, re-weighted over whichever of these were actually measured (`scored_on`). |
-| **Confidence** | Estimated from speech (pace, pauses, fluency, 40%), face (expression, tension, 35%) and body (posture, stability, 25%). |
-| **Deferred feedback** | No scores or corrections appear while you're speaking; everything comes after the session, to reduce cognitive load and anxiety. |
-| **Fallback** | What a stage does when its model or key isn't available (e.g. template scripts, espeak voice, rule-based feedback). Always recorded in `warnings`, never silent. |
-| **Filler words** | Words like *um, uh, like, you know, basically* in English and *err, macam, sebenarnya, lah* in Bahasa Melayu. Shown as a count and per minute. |
-| **Gaze Tunneling** | The correlation between looking away and stumbling over words, computed from the live session's own samples: *"you look away right when you stumble"*. |
-| **Ideal Presentation Agent** | The part that turns your `.pptx` into an example narrated video (the benchmark you practise against). |
-| **Coach Agent** | The part that compares your practice recording with the ideal version and gives OIS feedback and chat. |
-| **Key-term coverage** | The share of the example script's important words that you actually said. *Missed key terms* lists the ones you skipped. |
-| **Live session** | A camera + mic practice session with the AI partner (Conversation, Interview, Pronunciation). |
-| **Local ML** | Models that run on your own server (faster-whisper, Wav2Vec2, MediaPipe, the ViT emotion model, the Malaysian TTS). Installed from `requirements-ml.txt`. |
-| **Kokoro** | An open-source (Apache-2.0) 82M-parameter TTS model that gives the live AI partner a natural voice. It runs faster than real time on CPU, served by the `kokoro` container. |
-| **LLM / VLM** | Large language model (text: chat, feedback) / vision-language model (reads slide images to write scripts). Here: Ollama `qwen2.5` / `qwen2.5vl`. |
-| **Malaysian TTS** | Mesolitica's open-source `Malaysian-TTS-0.6B-v1`, which narrates in Malay, English and code-switched speech with a choice of 7 voices. It doesn't clone your voice. |
-| **Narrator voice** | The Malaysian TTS voice chosen for a deck's example video. |
-| **OIS** | **Observation → Impact → Suggestion**: what happened, why it matters to the audience, and one concrete thing to do next time. |
-| **Ollama** | The local LLM server that runs the text and vision models on your machine instead of a cloud API. |
-| **Pause frequency** | How many pauses longer than 0.25 s occurred between words. |
-| **Per-slide practice** | Recording just one slide and comparing it with that slide's example narration, instead of the whole deck. |
-| **Progress record** | One metric value from one analysed session, the data points behind progress charts and reports. |
-| **Prolongation** | A stuttering event: a sound held unusually long ("sssso"). |
-| **Repetition** | A stuttering event: the same word said twice in a row ("I I think"). |
-| **RTF (real-time factor)** | Processing time ÷ audio length. RTF 5× means 10 s of audio takes 50 s to generate. |
-| **Seed / demo data** | The test accounts and example sessions created by `backend/scripts/seed_demo.py`. |
-| **Speaking rate / WPM** | Words per minute over the whole recording. About 120–160 is comfortable for presenting. |
-| **Stuttering score** | 0–100: 8 points per detected repetition, block or prolongation. Severity is None / Mild / Moderate / Severe. |
-| **Voice cloning** | Narrating the deck in *your* voice from a recorded sample. Only available with an ElevenLabs key (optional). |
-| **Warnings** | The list on every session, practice run or analysis that says which fallbacks were used or what couldn't be measured. |
+| **Accent-fair scoring** | Malaysian-English patterns (th → d/t, dropped final consonants, vowel shifts) count as regional variation, not errors. Pronunciation gets a +5% allowance, and Manglish particles aren't counted as fillers. |
+| **Answer feedback** | After an interview or Q&A, each answer is rated 1–5 for *on topic* (relevance), *structure* and *specific* (concrete details), with what went well, the one thing to improve, and a stronger answer. |
+| **ASR** | Automatic Speech Recognition: speech → transcript. SpeechMate uses Mesolitica's Malaysian Whisper with automatic language detection. |
+| **Code-switching / Manglish** | Mixing English and Bahasa Melayu in one sentence. *Manglish particles* are words like *lah, lor, meh, kan*. |
+| **Comfortable range** | The range a metric is scored against (e.g. 120–160 words per minute). Inside it scores high. |
+| **Communication score / Overall** | 0–100: fluency 25%, pronunciation 25%, confidence 20%, eye contact 15%, posture 15%, re-weighted over what was measured (or the mean of the pillars). |
+| **Confidence** | Estimated from speech (40%), face (35%) and body (25%). |
+| **Deck insights** | The AI's reading of your deck before you practise: summary, main message, structure, each slide's key point, suggestions and likely questions. |
+| **Deferred feedback** | No scores or corrections while you speak; everything comes after, to reduce cognitive load. |
+| **Fact check (stronger answers)** | Any name or number in a rewritten answer that you never said makes the AI rewrite it. If it persists, a structure hint is shown instead. |
+| **Fallback** | What a stage does when its model isn't available. It's always noted, never silent. |
+| **Filler words** | Hesitations (*um, uh, err*) always count. Discourse markers (*like, you know, actually, macam, sebenarnya*) count only at the start of a clause or next to a comma. |
+| **Follow-up** | In an interview or Q&A, an answer under about 25 words gets one follow-up question before the next planned question. |
+| **Gaze Tunneling** | The correlation between looking away and stumbling over words, computed from the session's own samples. |
+| **Hand gestures** | The share of the time your hands are visible and moving. 20–60% looks natural. |
+| **Head steadiness** | How still your head is relative to your shoulders (excessive nodding or bobbing lowers it). |
+| **Hedging** | Phrases that make you sound unsure (*I think, maybe, kind of, I guess*), per 100 words. |
+| **Key point per slide** | Whether each slide's key point (from the deck insights) came through in your rehearsal: Covered, Partly or Missed. |
+| **Kokoro** | The open-source 82M TTS that gives the AI partner its natural voice. |
+| **LLM / VLM** | Large language model (text) / vision-language model (reads slide images). Here: Ollama `qwen2.5` / `qwen2.5vl`. |
+| **MATTR (vocabulary richness)** | Moving-average type-token ratio: the share of different words in each 50-word window. |
+| **OIS** | **Observation → Impact → Suggestion**: what happened, why it matters to the audience, and one thing to do next time. |
+| **Pillars** | The four simple scores on Results: **Voice & delivery**, **Language & clarity**, **Body language**, **Confidence & presence**. Each is the mean of its measured metrics. |
+| **Question plan** | The curated questions for an interview (from your setup and resume) or a Q&A (from your deck), each with what it tests and what a strong answer contains. The AI follows it in order. |
+| **Response time** | How long you take to start answering after the AI finishes. Under 2 s is comfortable. |
+| **Speaking rate / WPM** | Words per minute. 120–160 is comfortable. |
+| **STAR** | Situation, Task, Action, Result: a structure for behavioural interview answers. |
+| **Stuttering events** | Repetitions ("I I think"), blocks (silence ≥ 1.2 s mid-sentence) and prolongations ("sssso"). |
+| **Vocal variety** | How much your pitch moves, in semitones. Under 2 sounds monotone; 2–7 is lively. |
+| **Volume & steadiness** | How loud your voice is (dBFS) and how steady it stays. |
+| **Warnings / notes** | The list on every result of what couldn't be measured and which fallbacks were used. |

@@ -27,7 +27,7 @@ MAX_ITEMS = 3
 
 @dataclass
 class Recommendation:
-    area: str            # pace | pauses | fillers | repetitions | pronunciation | eye_contact | posture | expression | length
+    area: str            # pace | pauses | fillers | repetitions | pronunciation | eye_contact | posture | expression | vocal_variety | volume | hedging | response_time | length
     title: str
     evidence: str        # what was measured, with numbers / moments
     why: str             # why it matters to the listener
@@ -71,9 +71,10 @@ def _trend(name: str, now: float | None, before: float | None, lower_is_better: 
     if now is None or before is None:
         return ""
     better = now < before if lower_is_better else now > before
-    if abs(now - before) < 1e-9:
-        return f" Same as last session ({before:g}{unit})."
-    return f" {'Better' if better else 'Worse'} than last session ({before:g}{unit} → {now:g}{unit})."
+    fmt = (lambda v: f"{v:.0f}") if max(abs(now), abs(before)) >= 20 else (lambda v: f"{v:.1f}".rstrip("0").rstrip("."))
+    if fmt(now) == fmt(before):
+        return f" Same as last session ({fmt(before)}{unit})."
+    return f" {'Better' if better else 'Worse'} than last session ({fmt(before)}{unit} → {fmt(now)}{unit})."
 
 
 def build_candidates(
@@ -88,6 +89,9 @@ def build_candidates(
     duration_sec: float,
     session_type: str,
     previous: dict | None = None,
+    prosody: dict | None = None,
+    language_use: dict | None = None,
+    response_latency_sec: float | None = None,
 ) -> list[Recommendation]:
     """Every measured issue as a ranked recommendation (most severe first)."""
     prev_speech = (previous or {}).get("speech") or {}
@@ -174,7 +178,7 @@ def build_candidates(
                 f"{', '.join(bad[:3])}. Record and compare with an online dictionary's audio.",
                 "All of these words clear in a practice recording; pronunciation score above "
                 f"{min(90, int(score) + 5)}.",
-                _clamp01((85 - score) / 30 + len(bad) / 12), "Pronunciation", 10))
+                _clamp01((85 - score) / 30 + len(bad) / 12), "Conversation", 10))
 
     # ── Eye contact ──
     if eye and eye.get("eye_contact_score") is not None:
@@ -227,6 +231,51 @@ def build_candidates(
             "sentence. Practise opening lines with a deliberate, easy smile.",
             "Facial tension under 25 next session.",
             _clamp01((emotion["facial_tension"] - 20) / 50), practice, 5))
+
+    # ── Monotone voice ──
+    if prosody and prosody.get("pitch_variation_st") is not None and prosody["pitch_variation_st"] < 2.0:
+        st = prosody["pitch_variation_st"]
+        out.append(Recommendation(
+            "vocal_variety", "Add more melody to your voice",
+            f"Your pitch moved by only {st:.1f} semitones on average; 2–7 sounds lively.",
+            "A flat voice makes even good content sound uninterested, and listeners stop paying attention.",
+            "Read a short news paragraph three times: once flat, once exaggerated like a storyteller, then "
+            "in between. Lift your pitch on the key word of every sentence and drop it at the full stop.",
+            f"Vocal variety above {max(2.0, round(st + 0.7, 1))} semitones next session (now {st:.1f}).",
+            _clamp01((2.2 - st) / 1.5), practice, 5))
+    if prosody and prosody.get("loudness_dbfs") is not None and prosody["loudness_dbfs"] < -35:
+        out.append(Recommendation(
+            "volume", "Speak up",
+            f"Your voice averaged {prosody['loudness_dbfs']:.0f} dBFS, which is quiet for a microphone recording.",
+            "A quiet voice is hard to follow and can come across as unsure.",
+            "Sit upright, breathe from your belly, and speak as if to someone at the back of a small room. "
+            "Check that the mic level bar stays in the middle while you talk.",
+            "Louder than −35 dBFS next session.",
+            _clamp01((-35 - prosody["loudness_dbfs"]) / 12), practice, 5))
+
+    # ── Hedging ──
+    if language_use and language_use.get("hedges_per_100_words", 0) >= 2:
+        h = language_use["hedges_per_100_words"]
+        top = ", ".join(f"“{w}” ×{n}" for w, n in (language_use.get("top_hedges") or {}).items())
+        out.append(Recommendation(
+            "hedging", "State your points with confidence",
+            f"{language_use['hedge_count']} hedging phrases ({h:.1f} per 100 words): {top}.",
+            "Too many \"I think / maybe / kind of\" make your answers sound unsure even when you know them.",
+            "Record a 1-minute answer, then write it down and delete every hedge. Say the cleaned-up version "
+            "aloud twice: it should sound firmer, not ruder.",
+            f"Under {max(1.0, round(h * 0.6, 1))} hedges per 100 words next session (now {h:.1f}).",
+            _clamp01((h - 1) / 5), practice, 5))
+
+    # ── Slow to respond ──
+    if response_latency_sec is not None and response_latency_sec > 3:
+        out.append(Recommendation(
+            "response_time", "Start your answers sooner",
+            f"You usually took {response_latency_sec:.1f} s to start answering after a question.",
+            "Long silences before answering can read as unprepared; a short bridge buys thinking time.",
+            "Practise opening with a bridge while you think: \"That's a good question. In my experience…\" "
+            "Answer 5 random questions starting within 2 seconds.",
+            "Start answering within 2 s next session.",
+            _clamp01((response_latency_sec - 2) / 5), practice, 5))
 
     # ── Very short speaking time ──
     if duration_sec < 45:

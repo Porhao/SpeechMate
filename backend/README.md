@@ -1,6 +1,11 @@
 # SpeechMate Backend
 
-The API behind SpeechMate, an AI communication coach for Malaysian speakers. It does three things.
+The API behind SpeechMate, an AI communication coach for Malaysian speakers. It serves the app's three functions:
+- **Daily conversation**;
+- **Mock interview** (questions curated from the role, background and resume);
+- **Presentation practice** (deck insights, narrated example, coached rehearsals, Q&A drawn from the deck).
+
+Every AI function and metric is listed in [`../docs/AI_MATRIX.md`](../docs/AI_MATRIX.md).
 
 **Presentation coaching**: a dual-agent presentation coach, re-implementing the ideas of
 [PresentCoach (Chen et al., 2025, arXiv:2511.15253)](docs/2511.15253v2.pdf):
@@ -11,13 +16,27 @@ The API behind SpeechMate, an AI communication coach for Malaysian speakers. It 
    - an **Audience** reaction from a simulated listener in your target audience
    - a **chat** for follow-up questions, which also remembers your earlier attempts on the same deck
 
-**Live practice sessions**: the web app's camera + mic sessions (Conversation, Interview, Presentation, Pronunciation) with an AI conversation partner. After a session, the recording goes through a multimodal analysis:
+**Live practice sessions**: the web app's camera + mic sessions with an AI partner.
+- **Conversation**: a topic.
+- **Interview**: a question plan curated from the setup and resume (`/api/interview/*`).
+- **Presentation**: a Q&A plan drawn from a deck's insights.
 
-- **speech**: routed ASR (faster-whisper, re-run through Mesolitica's Malay/code-switching model when the speech isn't confidently English), fluency, English + Bahasa Melayu filler words, stuttering (repetitions, blocks, prolongations), Wav2Vec2 pronunciation with a Malaysian-English accent allowance, English/Malay ratio and Manglish detection
-- **vision**: eye contact (MediaPipe iris tracking), posture (MediaPipe Pose) and facial emotion (ViT expression classifier)
-- **scoring**: cross-modal confidence, a weighted communication score and prioritised practice recommendations, saved as progress history for charts and reports
+In Interview and Presentation sessions the server enforces the plan: one question at a time, word for word, with at most one follow-up for a short answer. After a session, the recording goes through a multimodal analysis:
 
-**Accounts**: register/login with JWT access + refresh tokens, and a coaching profile (goal, skill level, challenges) that the general AI coach reads.
+- **speech**:
+  - ASR: Mesolitica Malaysian Whisper with auto language detection, re-run through Mesolitica's Malay/code-switching model when the speech isn't confidently English;
+  - fluency;
+  - filler words in context (English + Bahasa Melayu);
+  - stuttering (repetitions, blocks, prolongations);
+  - Wav2Vec2 pronunciation with a Malaysian-English accent allowance;
+  - pitch variation and loudness (librosa), vocabulary richness and hedging;
+  - English/Malay ratio and Manglish detection.
+- **vision**: eye contact (MediaPipe iris tracking), posture, gestures and head steadiness (MediaPipe Pose), facial emotion (ViT expression classifier).
+- **from the browser**: response time and Gaze Tunneling.
+- **scoring**: cross-modal confidence, a weighted overall score, **four pillars** (voice, language, body, confidence) and three evidence-based drills, saved as progress history.
+- **content**: per-answer feedback against the plan for interviews and Q&A (fact-checked stronger answers), or language tips for conversations.
+
+**Accounts**: register/login with JWT access + refresh tokens, and a coaching profile (goal, skill level, challenges) that the coaching plan uses.
 
 The backend is FastAPI with async SQLAlchemy and Postgres. Jobs run in-process as asyncio tasks. Every AI stage has an offline fallback, so you can run everything with **no API keys at all**. The heavy local models for live analysis are optional too (see [Local models](#local-models-for-live-analysis)).
 
@@ -95,8 +114,9 @@ All keys are optional. The AI layer is local-first: an LLM served by Ollama (`LL
 | Coach OIS feedback | LLM, JSON-validated, re-prompted once if invalid or over 150 words | Rule-based OIS from the metrics |
 | Audience feedback | LLM role-plays your target audience | Rule-based from the metrics |
 | Chat | LLM with deck, attempt and history context | Replies with your saved suggestions |
-| Live session: AI partner + TTS | the LLM writes the partner's replies (`/api/chat/message`); its voice (`/api/tts/speak`) comes from a local Kokoro server (`TTS_BASE_URL`), then OpenAI TTS, then the Malaysian TTS on a GPU | `503`: the frontend falls back to scripted prompts and the browser's speech synthesis |
-| Live session: general coach | `OPENAI_API_KEY`, with the user's profile and recent results as context | `503` with a clear message |
+| Live session: AI partner + TTS | the LLM writes the partner's replies (`/api/chat/message`); its voice (`/api/tts/speak`) comes from a local Kokoro server (`TTS_BASE_URL`), then OpenAI TTS, then the Malaysian TTS on a GPU | Conversation: `503`, and the frontend falls back to scripted prompts and the browser's speech synthesis. Interview / Q&A: still follows its plan, with fixed reactions |
+| Interview / Q&A question plan | LLM, JSON-validated and re-prompted; labels and placeholders stripped | Behavioural / technical question bank; for a deck, its likely questions and key points |
+| Answer feedback / language tips | LLM, JSON-validated; stronger answers fact-checked against what was said | Rule-based (STAR cue words, numbers, length, overlap with the question) |
 | Live session: speech recognition | Local faster-whisper (+ code-switch model), else OpenAI Whisper with word timestamps | Word-level metrics skipped; pauses and stutter blocks are still measured from the audio |
 
 Every fallback is recorded in the `warnings` field of the session, practice or live-session response. Nothing fails silently, and no metric is ever made up: one that couldn't be measured is `null`.
@@ -219,24 +239,25 @@ Interactive docs are at `/docs`. All routes are under `/api` except `/health`.
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/api/live` | JSON `{session_type}`: `Conversation` / `Interview` / `Presentation` / `Pronunciation` |
+| `POST` | `/api/interview/resume` | multipart `file` (PDF/DOCX/TXT, ≤ 5 MB) → `{text, chars}`. Nothing is stored. |
+| `POST` | `/api/interview/plan` | `{position, company?, level, interview_type, background?, job_description?, resume_text?}` → `{intro, questions: [{question, assesses, look_for}], source}` |
+| `POST` | `/api/live` | `{session_type, topic?}` for `Conversation`; `{session_type: "Interview", interview: {…setup}, plan?}` (the plan is built if omitted); `{session_type: "Presentation", deck_id}` (Q&A plan built from the deck's insights, `409` until they exist). The response's `context` holds the setup and plan. |
 | `GET` | `/api/live` | your sessions, newest first |
-| `GET` | `/api/live/{id}` | `status` (`active` → `analyzing` → `complete`/`failed`), `analysis`, `warnings` |
-| `POST` | `/api/live/{id}/end` | JSON `{duration_sec}` |
+| `GET` | `/api/live/{id}` | `status` (`active` → `analyzing` → `complete`/`failed`), `context`, `turns`, `analysis` (incl. `pillars`, `content_feedback`, `recommendations`), `warnings` |
+| `POST` | `/api/live/{id}/end` | `{duration_sec, turns?: [{role, text, t_sec}], client_metrics?: {response_latency_sec: [...], gaze_tunneling}}` |
 | `POST` | `/api/live/{id}/recording` | multipart `file`: the session recording (audio + video, or audio only) |
 | `POST` | `/api/live/{id}/analyze` | `202`, starts the analysis. Re-running it replaces the session's progress points. |
 | `DELETE` | `/api/live/{id}` | the session, its progress points and its recording |
-| `GET` | `/api/progress` | every metric from every analysed session, oldest first |
+| `GET` | `/api/progress` | every metric from every analysed session, oldest first (incl. `voice_score`, `language_score`, `body_score`, `presence_score`) |
 | `POST` | `/api/reports/generate` | snapshot report: per-metric average/first/latest/best/change, session totals, latest recommendations |
 | `GET` | `/api/reports`, `/api/reports/{id}` | saved reports |
 
-**Conversation** (need `OPENAI_API_KEY`, otherwise `503`)
+**Conversation**
 
 | Method | Path | Notes |
 |---|---|---|
-| `POST` | `/api/chat/message` | the live-session AI partner: `{messages, mode, topic?}` → `{reply}` (one persona per mode) |
-| `POST` | `/api/coach/chat` | the general AI coach: `{question, history}` → `{answer}`. With a token, it also sees your profile and last 3 analysed sessions. |
-| `POST` | `/api/stt` | multipart `file`: one spoken turn (WAV/WebM) → `{text, engine}`. Local faster-whisper (English by default, `STT_LANGUAGE`), else OpenAI; `503` makes the frontend use the browser's recogniser. |
+| `POST` | `/api/chat/message` | the AI partner: `{messages, mode, topic?, live_id?}` → `{reply, progress?, total_questions?}`. With the `live_id` of a planned Interview / Presentation session (and your token), it follows that plan. Empty `messages` gives the opening line. Free conversation needs an LLM, otherwise `503`. |
+| `POST` | `/api/stt` | multipart `file`: one spoken turn (WAV/WebM) → `{text, engine}`. Local faster-whisper (auto language, or `STT_LANGUAGE`), else OpenAI; `503` makes the frontend use the browser's recogniser. |
 | `POST` | `/api/tts/speak` | `{text, voice?}` → streamed MP3 |
 | `GET` | `/api/tts/voices` | the available voices |
 

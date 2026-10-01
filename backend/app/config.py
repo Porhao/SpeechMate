@@ -71,10 +71,10 @@ class Settings(BaseSettings):
     # CPU threads for Whisper; 0 = faster-whisper's default (4). 8 was fastest on a 24-core
     # machine (docs/benchmarks/stt-benchmark-2026-09-30.md); more threads start to contend.
     whisper_cpu_threads: int = 0
-    # Language token for transcription. Empty = the model's own default: "ms" for
-    # Mesolitica's Malaysian Whisper (trained to transcribe Malay, English and Manglish
-    # under "ms"), "en" for standard Whisper (whose auto-detect sometimes hears
-    # Malaysian English as Malay and translates it). "auto" = let Whisper detect it.
+    # Language token for transcription. Empty = the model's own default: auto-detect for
+    # Mesolitica's Malaysian Whisper (forcing "ms" makes it translate English into Malay),
+    # "en" for standard Whisper (whose auto-detect sometimes hears Malaysian English as
+    # Malay and translates it). "auto" = always detect; or force a code like "ms" / "en".
     stt_language: str = ""
 
     # Natural-sounding local TTS server with an OpenAI-compatible API, e.g. Kokoro-FastAPI

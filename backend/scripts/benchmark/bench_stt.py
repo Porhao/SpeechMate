@@ -4,13 +4,13 @@ Categories:
   malay_real  – 25 real Malaysian speakers reading Malay (Google FLEURS ms_my test split)
   english     – Malaysian-accented English (local Malaysian TTS voices)
   mixed       – Manglish / code-switched (local Malaysian TTS voices)
+  english_std – US/UK-accented English (Kokoro voices, make_synth_kokoro.py; optional)
 Each config is run exactly as the app runs it (faster-whisper, int8, VAD filter,
 the app's initial prompt, condition_on_previous_text=False).
 """
-import gc, io, json, re, sys, time, wave
+import gc, json, re, sys, time
 from pathlib import Path
 
-import pyarrow.parquet as pq
 from faster_whisper import WhisperModel
 
 PROMPT = "Malaysian English conversation. The speaker may use words like lah, kan, tapi, sebenarnya."
@@ -25,6 +25,8 @@ CONFIGS = [
 ]
 if "--beam" in sys.argv:  # beam size 5 (faster-whisper default) vs 1 (greedy) on turbo
     CONFIGS = [("turbo-v3, beam 5", TURBO, "ms", 5), ("turbo-v3, beam 1", TURBO, "ms", 1)]
+if "--auto" in sys.argv:  # forcing the Malay token vs. letting the model detect the language
+    CONFIGS = [("turbo-v3, lang=ms (forced)", TURBO, "ms", 5, 8), ("turbo-v3, auto-detect", TURBO, None, 5, 8)]
 if "--threads" in sys.argv:  # faster-whisper uses 4 CPU threads unless told otherwise
     CONFIGS = [(f"turbo-v3, beam 5, {n} threads", TURBO, "ms", 5, n) for n in (4, 8, 12, 16)]
 N_FLEURS = 25
@@ -61,6 +63,7 @@ items = []
 # Extract the chosen clips once into the model cache; later runs just read those WAVs.
 CACHE = Path("/models/eval/fleurs"); MANIFEST = CACHE / "manifest.json"
 if not MANIFEST.exists():
+    import pyarrow.parquet as pq  # only needed to extract the clips the first time
     CACHE.mkdir(parents=True, exist_ok=True)
     rows = pq.read_table("/models/eval/fleurs_ms_test.parquet", columns=["id", "audio", "transcription"]).to_pylist()
     seen, picked = set(), []
@@ -83,6 +86,9 @@ if not MANIFEST.exists():
 items += json.loads(MANIFEST.read_text())
 items += json.loads(Path("/models/eval/synth/manifest.json").read_text())
 cats = ["malay_real", "english", "mixed"]
+if Path("/models/eval/synth_kokoro/manifest.json").exists():
+    items += json.loads(Path("/models/eval/synth_kokoro/manifest.json").read_text())
+    cats.append("english_std")
 print("test set:", {c: sum(1 for it in items if it["category"] == c) for c in cats},
       f"| {sum(duration(it['path']) for it in items):.0f}s audio", flush=True)
 
@@ -110,10 +116,12 @@ for name, model_id, lang, beam, *threads in CONFIGS:
            "sec_per_5s_turn": round(5 * proc_s / audio_s, 2), "load_s": round(load_s, 1),
            "ram_mb": round(mem), "samples": samples}
     results.append(res)
-    print(f"{name:38s} WER malay {wer['malay_real']:5.1f}% | english {wer['english']:5.1f}% | mixed {wer['mixed']:5.1f}% "
+    std = f"| std-en {wer['english_std']:5.1f}% " if "english_std" in wer else ""
+    print(f"{name:38s} WER malay {wer['malay_real']:5.1f}% | english {wer['english']:5.1f}% | mixed {wer['mixed']:5.1f}% {std}"
           f"| all {total:5.1f}% | {res['sec_per_5s_turn']:.2f}s per 5s turn | load {res['load_s']}s | +{res['ram_mb']} MB",
           flush=True)
     del model; gc.collect()
 
-Path("/models/eval/" + ("results_beam.json" if "--beam" in sys.argv else "results_threads.json" if "--threads" in sys.argv else "results.json")).write_text(json.dumps(results, indent=1, ensure_ascii=False))
+Path("/models/eval/" + ("results_beam.json" if "--beam" in sys.argv else "results_threads.json" if "--threads" in sys.argv
+                        else "results_auto.json" if "--auto" in sys.argv else "results.json")).write_text(json.dumps(results, indent=1, ensure_ascii=False))
 print("BENCH_DONE")

@@ -27,7 +27,7 @@ export function useAuth() {
         skill_level: (user.skill_level as "Beginner" | "Intermediate" | "Advanced") ?? "Beginner",
         challenges: user.challenges,
       });
-      router.push("/dashboard");
+      router.push("/home");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
     } finally {

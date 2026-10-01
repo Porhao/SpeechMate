@@ -107,6 +107,31 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
         </div>
       )}
 
+      {m?.slide_coverage && m.slide_coverage.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold mb-2" style={{ color: "var(--muted)" }}>Key point per slide</p>
+          <ul className="space-y-1.5">
+            {m.slide_coverage.map((c) => {
+              const color = c.status === "covered" ? "var(--ok)" : c.status === "partly" ? "var(--warn)" : "var(--bad)";
+              return (
+                <li key={c.slide_index} className="flex items-start gap-3 text-sm">
+                  <span className="w-14 flex-shrink-0 text-xs font-semibold pt-0.5" style={{ color: "var(--muted)" }}>Slide {c.slide_index}</span>
+                  <span className="flex-1 min-w-0" style={{ color: "var(--ink-3)" }}>
+                    {c.key_point ?? "—"}
+                    {c.status !== "covered" && c.missed.length > 0 && (
+                      <span className="block text-xs" style={{ color: "var(--muted)" }}>Not said: {c.missed.slice(0, 4).join(", ")}</span>
+                    )}
+                  </span>
+                  <span className="text-xs font-semibold flex-shrink-0" style={{ color }}>
+                    {c.status === "covered" ? "Covered" : c.status === "partly" ? "Partly" : "Missed"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {aud && (
         <div className="glass-card rounded-xl p-4 space-y-2">
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: "#5A5470" }}>

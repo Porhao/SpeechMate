@@ -1,6 +1,6 @@
 import { api } from "./api";
 import { blobFilename } from "./presentation";
-import type { FullAnalysisResult, LiveSession, SessionType } from "@/types";
+import type { FullAnalysisResult, InterviewSetup, LiveSession, PracticePlan, SessionType, Turn } from "@/types";
 
 const POLL_MS = 2500;
 // Local models can take a while on CPU for long recordings
@@ -8,10 +8,15 @@ const ANALYSIS_TIMEOUT_MS = 10 * 60 * 1000;
 
 // Live practice sessions (camera + mic with the AI partner). Requires sign-in.
 export const liveService = {
-  start: (session_type: SessionType) => api.post<LiveSession>("/live", { session_type }),
+  /** Conversation: just a type (and topic). Interview: the setup (+ the previewed plan).
+   *  Presentation: the deck whose Q&A to rehearse. */
+  start: (body: {
+    session_type: SessionType; topic?: string;
+    interview?: InterviewSetup; plan?: PracticePlan; deck_id?: string;
+  }) => api.post<LiveSession>("/live", body),
 
-  end: (id: string, durationSec: number) =>
-    api.post<LiveSession>(`/live/${id}/end`, { duration_sec: durationSec }),
+  end: (id: string, durationSec: number, turns: Turn[] = [], clientMetrics?: Record<string, unknown>) =>
+    api.post<LiveSession>(`/live/${id}/end`, { duration_sec: durationSec, turns, client_metrics: clientMetrics }),
 
   uploadRecording: (id: string, blob: Blob) => {
     const form = new FormData();
@@ -22,6 +27,9 @@ export const liveService = {
   get: (id: string) => api.get<LiveSession>(`/live/${id}`),
   history: () => api.get<LiveSession[]>("/live"),
   remove: (id: string) => api.delete<void>(`/live/${id}`),
+
+  /** Start the analysis in the background (poll `get` for the result). */
+  startAnalysis: (id: string) => api.post<LiveSession>(`/live/${id}/analyze`, {}),
 
   /** Start the multimodal analysis and wait for the result. */
   analyze: async (id: string): Promise<FullAnalysisResult> => {
@@ -37,14 +45,23 @@ export const liveService = {
   },
 };
 
-// The AI partner, the general coach and TTS. They return 503 when the backend
+// Mock-interview preparation: read a resume, preview the curated question plan
+export const interviewService = {
+  readResume: (file: File) => {
+    const form = new FormData();
+    form.append("file", file, file.name);
+    return api.upload<{ text: string; chars: number }>("/interview/resume", form);
+  },
+  plan: (setup: InterviewSetup) => api.post<PracticePlan>("/interview/plan", setup),
+};
+
+// The AI partner and its voice. They return 503 when the backend
 // has no OpenAI key; callers fall back (scripted prompts, browser speech).
 export const conversationService = {
-  partnerReply: (messages: { role: "user" | "assistant"; content: string }[], mode: string, topic?: string) =>
-    api.post<{ reply: string }>("/chat/message", { messages, mode, topic }),
-
-  coach: (question: string, history: { role: "user" | "assistant"; content: string }[]) =>
-    api.post<{ answer: string }>("/coach/chat", { question, history }),
+  /** With `liveId` of an Interview / Q&A session the partner follows its question plan. */
+  partnerReply: (messages: { role: "user" | "assistant"; content: string }[], mode: string, topic?: string, liveId?: string) =>
+    api.post<{ reply: string; progress?: { asked: number; followups: number }; total_questions?: number }>(
+      "/chat/message", { messages, mode, topic, live_id: liveId }),
 
   /** Transcribe one spoken turn on the backend (local faster-whisper). 503 = not available. */
   transcribe: async (audio: Blob): Promise<string> => {

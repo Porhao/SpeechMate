@@ -53,10 +53,16 @@ def test_fluency_falls_back_to_audio_silences():
 
 
 def test_fillers_english_and_malay():
-    r = speech.detect_fillers("um so basically um the idea lah is you know simple", 60)
-    assert r.total_fillers == 5
-    assert r.top_filler == "um"
-    assert r.filler_breakdown["lah"] == 1
+    r = speech.detect_fillers("Um, so basically, um the idea is, you know, simple. Err macam, sebenarnya okay lah.", 60)
+    assert r.filler_breakdown == {"um": 2, "basically": 1, "you know": 1, "err": 1, "macam": 1, "sebenarnya": 1}
+    assert r.top_filler == "um" and r.total_fillers == 7
+
+
+def test_filler_words_need_filler_context():
+    # Ordinary uses of "like", "kind of", "right", "tapi" and particles aren't fillers
+    r = speech.detect_fillers("I like working with data. What kind of tool is right for you? Tapi kita boleh lah.", 60)
+    assert r.total_fillers == 0
+    assert speech.count_fillers("Like, I was like, you know, so nervous. Well, it went right.") == {"like": 2, "you know": 1, "well": 1}
 
 
 def test_stuttering_repetition_and_block(tmp_path):
@@ -200,7 +206,7 @@ async def test_auth_and_profile(client: httpx.AsyncClient):
 async def test_conversation_endpoints_without_key(client: httpx.AsyncClient):
     r = await client.post("/api/chat/message", json={"messages": [{"role": "user", "content": "hi"}]})
     assert r.status_code == 503
-    assert (await client.post("/api/coach/chat", json={"question": "help"})).status_code == 503
+    assert (await client.post("/api/coach/chat", json={"question": "help"})).status_code == 404  # removed
     assert (await client.post("/api/tts/speak", json={"text": "hello"})).status_code == 503
     assert len((await client.get("/api/tts/voices")).json()["voices"]) == 8
     # No local model and no key: the frontend falls back to the browser's speech recognition
@@ -213,9 +219,16 @@ async def test_live_session_analysis_loop(client: httpx.AsyncClient):
     headers = await _sign_in(client)
     other = await _sign_in(client, "someone@example.com")
 
-    r = await client.post("/api/live", headers=headers, json={"session_type": "Presentation"})
+    # Interview needs its setup; without an LLM the plan comes from the question bank
+    assert (await client.post("/api/live", headers=headers, json={"session_type": "Interview"})).status_code == 422
+    r = await client.post("/api/live", headers=headers, json={
+        "session_type": "Interview",
+        "interview": {"position": "Data Analyst", "company": "Petronas", "interview_type": "behavioural"},
+    })
     assert r.status_code == 201, r.text
     lid = r.json()["id"]
+    plan = r.json()["context"]["plan"]
+    assert plan["source"] == "rules" and "Data Analyst" in plan["intro"]
 
     # Another user can't see it; analysis needs a recording first
     assert (await client.get(f"/api/live/{lid}", headers=other)).status_code == 404
@@ -224,8 +237,11 @@ async def test_live_session_analysis_loop(client: httpx.AsyncClient):
     recording = _tone_wav([(3, True), (2, False), (3, True)])  # 2 s mid-utterance silence
     r = await client.post(f"/api/live/{lid}/recording", headers=headers, files={"file": ("rec.wav", recording)})
     assert r.status_code == 200 and r.json()["has_recording"]
-    r = await client.post(f"/api/live/{lid}/end", headers=headers, json={"duration_sec": 8})
-    assert r.json()["duration_sec"] == 8
+    turns = [{"role": "assistant", "text": plan["questions"][0]["question"]},
+             {"role": "user", "text": "I studied statistics and at my internship I built a dashboard which reduced report time by 30%."}]
+    r = await client.post(f"/api/live/{lid}/end", headers=headers,
+                          json={"duration_sec": 8, "turns": turns, "client_metrics": {"response_latency_sec": [4.0, 5.0]}})
+    assert r.json()["duration_sec"] == 8 and len(r.json()["turns"]) == 2
 
     r = await client.post(f"/api/live/{lid}/analyze", headers=headers)
     assert r.status_code == 202
@@ -244,9 +260,16 @@ async def test_live_session_analysis_loop(client: httpx.AsyncClient):
     assert a["details"]["stuttering"]["block_count"] == 1
     assert any("speech recognition" in w for w in live["warnings"])
     assert any("Vision analysis" in w for w in live["warnings"])
+    # The simple view: pillars list only what was measured (here: the browser's response time)
+    assert a["pillars"]["voice"]["score"] is None
+    assert [m["key"] for m in a["pillars"]["confidence"]["metrics"]] == ["response_time"]
+    assert any(e["area"] == "response_time" for e in a["recommendations"]["exercises"])
+    # Content feedback judges the answer against the plan (rule-based without an LLM)
+    fb = a["content_feedback"]
+    assert fb["kind"] == "answers" and fb["source"] == "rules" and len(fb["answers"]) == 1
 
-    # No measured scores → no progress points; report still summarises the session
-    assert (await client.get("/api/progress", headers=headers)).json() == []
+    # Only measured scores become progress points (here: presence, from the response time)
+    assert [p["metric_name"] for p in (await client.get("/api/progress", headers=headers)).json()] == ["presence_score"]
     r = await client.post("/api/reports/generate", headers=headers)
     assert r.status_code == 201
     report = r.json()

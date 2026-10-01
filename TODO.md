@@ -2,6 +2,13 @@
 
 This document tracks the action items for Phases 5–8 of the SpeechMate project, as defined in the Interim Report and IEEE paper, and what has been built so far.
 
+**Scope (2026-10-01):** SpeechMate does three things:
+1. **Daily conversation**;
+2. **Mock interview** (questions curated from the role, background and resume);
+3. **Presentation practice** (deck insights → rehearsal → Q&A from the deck).
+
+The separate Pronunciation mode, general AI Coach chat, Dashboard and Reports pages were removed. Pronunciation remains a metric in every session. Every AI function is listed in [`docs/AI_MATRIX.md`](docs/AI_MATRIX.md).
+
 Legend: `[x]` done · `[~]` partly done (the note says what's left) · `[ ]` not started
 
 ---
@@ -14,16 +21,20 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 
 | Stage | Local model (`backend/requirements-ml.txt`) | Cloud (`OPENAI_API_KEY`) | Neither available |
 |---|---|---|---|
-| Speech recognition | ✅ **Primary**: Mesolitica **Malaysian Whisper large-v3-turbo** via faster-whisper (CPU int8), also for each live-conversation turn (`/api/stt`, ~3–5 s per turn) | Fallback: OpenAI Whisper API | no transcript (conversation: browser recogniser) |
+| Speech recognition | ✅ **Primary**: Mesolitica **Malaysian Whisper large-v3-turbo** via faster-whisper (CPU int8, auto language detection), also for each live turn (`/api/stt`, ~2.5 s per 5 s turn) | Fallback: OpenAI Whisper API | no transcript (conversation: browser recogniser) |
 | Malay / code-switched ASR | ✅ Mesolitica `wav2vec2-xls-r-300m-mixed` | — | Whisper transcript kept, with a warning |
 | Pronunciation | ✅ Wav2Vec2 `facebook/wav2vec2-base-960h` | — | shown as unavailable |
 | Stutter prolongations | ✅ librosa energy analysis | — | transcript-only hint |
 | Eye contact, posture | ✅ MediaPipe Face Mesh / Pose | — | shown as unavailable |
 | Facial emotion | ✅ ViT `trpakov/vit-face-expression` | — | shown as unavailable |
-| Fluency, pauses, fillers, language ratio, scoring, recommendations | ✅ plain code (ffmpeg + rules, no model) | — | always runs |
+| Pitch variation, loudness | ✅ librosa (YIN + RMS) | — | shown as unavailable |
+| Gestures, head steadiness | ✅ MediaPipe Pose | — | shown as unavailable |
+| Fluency, pauses, fillers (in context), vocabulary, hedging, language ratio, pillars, recommendations | ✅ plain code (ffmpeg + rules, no model) | — | always runs |
 | AI conversation partner | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | scripted prompts |
+| Interview question plan (role + resume) / Q&A plan (deck) | ✅ Ollama `qwen2.5` (validated JSON) | `gpt-4o-mini` | question bank / deck insights |
+| Interviewer & moderator turns | ✅ plan enforced in code + `qwen2.5` one-line reactions | `gpt-4o-mini` | fixed reactions |
+| Answer feedback (interview, Q&A) & language tips (conversation) | ✅ Ollama `qwen2.5`, fact-checked | `gpt-4o-mini` | rule-based (STAR cues, specificity) |
 | Partner's voice | ✅ **Kokoro-82M** (natural, ~3.5× faster than real time on CPU); Malaysian TTS on a GPU | OpenAI TTS | browser speech synthesis |
-| General AI coach chat | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | unavailable (`503`) |
 
 **Presentation coaching:**
 
@@ -57,6 +68,7 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
   - [x] Code-switching ASR routing: faster-whisper, re-run through Mesolitica's mixed-language model when the speech isn't confidently English, plus a Bahasa Malaysia / Manglish lexicon for the language ratio and particle detection.
 - [~] **Initial Benchmarking**
   - [x] ASR baseline (`docs/benchmarks/stt-benchmark-2026-09-30.md`): Whisper medium vs. Mesolitica Malaysian Whisper small-v3 / large-v3-turbo-v3 on FLEURS Malay (real speakers) + Malaysian-accented English and Manglish. Turbo-v3 won with 7.9% WER overall (vs 51.3% for the previous medium setup) and is now the default.
+  - [x] Language token (`docs/benchmarks/stt-benchmark-2026-10-01.md`): forcing `ms` translated US/UK-accented English answers into Malay. Auto-detect fixed it and improved real Malay to 6.4% WER (6.1% overall), so it is now the default.
   - [ ] Re-run on a held-out set of real recordings from the app's own users, WER split by pure Malay / pure English / mixed.
   - [ ] Precision, Recall and F1 for stutter and filler detection against manual annotations.
 
@@ -65,19 +77,20 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 
 - [~] **Front-End (Next.js / Tailwind CSS)**
   - [x] User management: register, login (with automatic token refresh), and a profile page that saves to the backend.
-  - [~] Onboarding. *Left:* the answers are only stored in the browser; send them to `PUT /api/users/profile`.
-  - [x] **Practice Session Interface**: Conversation / Interview / Pronunciation modes with an AI partner (voice), live face, pose and speech tracking in the browser, recording, and upload for analysis.
-  - [ ] Audit the session screen against the *Deferred Feedback* design: a silent elapsed timer, with no on-screen scores, warnings or live metrics while speaking.
-  - [x] **Presentation Coach** (`/presentations`): upload a deck → AI example video in your cloned voice → practise the whole deck or one slide → Observation / Impact / Suggestion feedback, audience reaction and a follow-up chat.
-  - [x] **Assessment page**: post-session results from the real analysis, with a notice listing any metric that couldn't be measured.
-  - [~] **Performance Dashboard**. *Left:* the Dashboard, Progress and Reports pages still show sample data. Wire them to `GET /api/progress` and `/api/reports`, draw the radar chart against the previous session, and add PDF export.
+  - [x] Onboarding saves the goal, level and challenges to the profile and opens the chosen function.
+  - [x] **Three functions**: Conversation (`/conversation`, topic scenarios), Mock interview (`/interview`, setup + resume + question preview), Presentation practice (`/presentations`, insights → rehearsal → Q&A rehearsal).
+  - [x] **Session screen** follows *Deferred Feedback*: no live scores (removed the score bars), only the timer, the question count and lighting advice.
+  - [x] **Presentation Coach**: upload a deck → insights → AI example video → practise the whole deck or one slide → Observation / Impact / Suggestion feedback, **key point per slide**, audience reaction and a follow-up chat.
+  - [x] **Results page** (`/results/[id]`): overall score, four pillars with metric details, answer feedback / language tips, three drills, and notes on anything not measured. Analysis progress is shown live.
+  - [x] **Progress page**: real history, overall trend and a trend per pillar, filter by function (sample-data Dashboard and Reports pages removed).
+  - [ ] PDF export of a results page.
 - [x] **Back-End (FastAPI)**
   - [x] Core API routes: `auth`, `users/profile`, `live` (practice sessions + recording + analysis), `progress`, `reports`, `chat` (AI partner), `coach`, `tts`, plus `sessions` / `practice` for presentation coaching.
   - [x] Background processing for heavy analysis: in-process asyncio jobs with a concurrency limit and restart recovery, polled by the frontend, instead of Celery. Revisit Celery / arq if several servers are ever needed.
   - [x] PostgreSQL with Alembic migrations; Docker Compose runs the whole stack (`./start.sh`).
 - [~] **Integration**
   - [x] Frontend services and Zustand stores wired to the backend (`services/api.ts`, `auth.ts`, `live.ts`, `presentation.ts`).
-  - [ ] Tie presentation decks to user accounts; right now everyone using the app sees every deck.
+  - [x] Presentation decks belong to the user who uploaded them.
 
 ## Phase 7: System Integration & Unit Testing
 *Status: Underway*
@@ -85,9 +98,10 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 - [~] **Pipeline Integration**
   - [x] Unified multimodal pipeline for live sessions (`backend/app/services/live/pipeline.py`): ASR → language → fluency / fillers / stuttering / pronunciation → eye contact / posture / emotion → confidence → communication score → recommendations → progress history.
   - [x] **Gaze Tunneling**: the Pearson correlation between gaze aversion and disfluency events, computed in the browser from the live session's own samples.
-  - [~] LLM feedback on live sessions. *Done:* the LLM powers presentation-coaching feedback (OIS format, validated and re-prompted), the live AI partner and the general coach (which reads the user's recent results). *Left:* live-session recommendations are still rule-based; send the analysis to the LLM for concrete, moment-anchored feedback, and move Gaze Tunneling to the backend so the LLM can use it.
+  - [x] LLM feedback on live sessions: an evidence-grounded coaching plan (the LLM may only choose measured issues), per-answer interview / Q&A feedback with a fact check, and conversation language tips. Gaze Tunneling and response time are sent to the backend with the session.
 - [~] **Testing & QA**
-  - [x] Backend: 27 automated tests (unit + end-to-end), fully offline: auth, live-session analysis, metrics, scoring, presentation pipeline and coach.
+  - [x] Backend: 57 automated tests (unit + end-to-end), fully offline: auth, live-session analysis, metrics, pillars, fillers in context, interview/Q&A plans, plan-following partner, answer feedback and fact check, resume reading, presentation pipeline, notifications.
+  - [x] Full-pipeline check with real models: synthesised spoken answers → upload → analysis (~80–110 s on CPU) → pillars + LLM answer feedback.
   - [ ] Frontend tests (none yet; type-check and lint only).
   - [ ] Test the vision stages with real webcam recordings (so far only verified on synthetic video with no face in it).
   - [ ] Internal User Acceptance Testing (UAT) with the planned questionnaire: does the system reduce speaking anxiety and deliver actionable feedback?
@@ -102,10 +116,11 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
   - Adjust parameters and fix issues based on the evaluation results (e.g., pronunciation scoring inconsistencies).
   - [x] Documentation: README, backend README and PROJECT.md match the code; TESTING.md has demo accounts, a test guide and a glossary.
   - [x] Local-first AI: Ollama for LLM + vision, local Malaysian TTS for narration, demo accounts seeded for testing.
-  - [x] UI: single plain top bar, near-square corners, no glassmorphism or emoji; dark mode with WCAG AA contrast; notifications; reference matrix; real stats on Home/Practice (no invented numbers).
+  - [x] UI: single plain top bar (Home · Conversation · Interview · Presentation · Progress · How it's measured), near-square corners; dark mode with WCAG AA contrast; notifications; reference matrix with an AI-functions tab; real stats only (no invented numbers).
   - [x] Live sessions: large clean camera view and a separate MediaPipe tracking inset; lighting & contrast advice.
   - [x] Recommendations grounded in measured evidence with drills and relative targets (LLM picks/words them, can't invent issues).
   - [x] Presentation decks: .pptx or .pdf, and deck insights (summary, structure, key points, suggestions) before narration.
-  - [ ] Connect the Dashboard, Progress and Reports charts to `/api/progress` and `/api/reports` (they're labelled as sample data until then).
+  - [x] Progress uses real data (sample-data pages removed).
+  - [ ] Collect 30–50 consenting user recordings to measure real-user WER, filler F1, pronunciation correlation and gaze accuracy (`docs/AI_MATRIX.md` §3).
   - [ ] Deploy the prototype: set a real `SECRET_KEY`, add API keys, and pick a host with enough RAM/CPU for the local models.
   - Compile the final project report summarizing the quantitative results and user acceptance findings.

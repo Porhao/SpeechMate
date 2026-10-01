@@ -6,7 +6,7 @@ renormalised over the inputs that exist, and recommendations only use metrics
 that were actually measured.
 """
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 
 
 def _weighted(parts: list[tuple[float | None, float]]) -> float | None:

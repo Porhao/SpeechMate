@@ -7,7 +7,7 @@ def test_count_fillers_counts_phrases_once():
     assert counts["um"] == 1 and counts["umm"] == 1
     assert counts["uh"] == 1
     assert counts["like"] == 1
-    assert counts["kind of"] == 1
+    assert "kind of" not in counts  # a hedge, measured separately (extra_metrics.py)
 
 
 def test_count_fillers_ignores_substrings():
