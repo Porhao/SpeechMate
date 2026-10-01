@@ -1,0 +1,9 @@
+# pip install torch --index-url https://download.pytorch.org/whl/cu128   (CUDA build first)
+# pip install -r requirements.txt
+torch
+transformers
+datasets
+peft
+accelerate
+jiwer
+soundfile

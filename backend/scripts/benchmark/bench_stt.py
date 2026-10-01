@@ -5,6 +5,7 @@ Categories:
   english     – Malaysian-accented English (local Malaysian TTS voices)
   mixed       – Manglish / code-switched (local Malaysian TTS voices)
   english_std – US/UK-accented English (Kokoro voices, make_synth_kokoro.py; optional)
+  real        – --real only: your own recordings (spec M1) instead of all of the above
 Each config is run exactly as the app runs it (faster-whisper, int8, VAD filter,
 the app's initial prompt, condition_on_previous_text=False).
 """
@@ -33,7 +34,15 @@ if "--prompt" in sys.argv:  # previous /stt prompt vs. the verbatim Manglish pro
                ("turbo-v3, auto, Manglish prompt", TURBO, None, 5, 8, PROMPT, 500)]
 if "--threads" in sys.argv:  # faster-whisper uses 4 CPU threads unless told otherwise
     CONFIGS = [(f"turbo-v3, beam 5, {n} threads", TURBO, "ms", 5, n) for n in (4, 8, 12, 16)]
+# Real recordings: /models/eval/real/refs.json = {"001": "text exactly as spoken, fillers and commas included"}
+# next to 001.wav, ... (16 kHz mono). Run with the shipped settings.
+REAL = Path("/models/eval/real")
+if "--real" in sys.argv:
+    CONFIGS = [("turbo-v3, auto, shipped settings", TURBO, None, 5, 8, PROMPT, 500)]
 N_FLEURS = 25
+
+sys.path.insert(0, "/app")
+from app.services.live.speech import count_fillers  # noqa: E402  same filler rules as the app
 
 
 def rss_mb() -> float:
@@ -63,36 +72,44 @@ def duration(path: str) -> float:
 
 # ── Test set ────────────────────────────────────────────────────────────────
 items = []
-# The FLEURS Parquet file is one ~520 MB row group, so reading any clip decodes ~3 GB.
-# Extract the chosen clips once into the model cache; later runs just read those WAVs.
-CACHE = Path("/models/eval/fleurs"); MANIFEST = CACHE / "manifest.json"
-if not MANIFEST.exists():
-    import pyarrow.parquet as pq  # only needed to extract the clips the first time
-    CACHE.mkdir(parents=True, exist_ok=True)
-    rows = pq.read_table("/models/eval/fleurs_ms_test.parquet", columns=["id", "audio", "transcription"]).to_pylist()
-    seen, picked = set(), []
-    step = max(len(rows) // (N_FLEURS * 2), 1)
-    for r in rows[::step]:                    # spread across the split; one clip per sentence id
-        if r["id"] in seen:
-            continue
-        seen.add(r["id"]); picked.append(r)
-        if len(picked) == N_FLEURS:
-            break
-    fleurs = []
-    for i, r in enumerate(picked):
-        p = CACHE / f"fleurs_{i}.wav"
-        p.write_bytes(r["audio"]["bytes"])
-        fleurs.append({"category": "malay_real", "path": str(p), "text": r["transcription"]})
-    MANIFEST.write_text(json.dumps(fleurs, indent=1, ensure_ascii=False))
-    del rows, picked
-    if "--extract-only" in sys.argv:
-        print("EXTRACTED", len(fleurs)); sys.exit()
-items += json.loads(MANIFEST.read_text())
-items += json.loads(Path("/models/eval/synth/manifest.json").read_text())
-cats = ["malay_real", "english", "mixed"]
-if Path("/models/eval/synth_kokoro/manifest.json").exists():
-    items += json.loads(Path("/models/eval/synth_kokoro/manifest.json").read_text())
-    cats.append("english_std")
+if "--real" in sys.argv:
+    refs = json.loads((REAL / "refs.json").read_text(encoding="utf-8"))
+    items = [{"category": "real", "path": str(REAL / f"{k}.wav"), "text": t} for k, t in refs.items()]
+    missing = [it["path"] for it in items if not Path(it["path"]).exists()]
+    if missing:
+        sys.exit(f"missing audio: {missing}")
+    cats = ["real"]
+else:
+    # The FLEURS Parquet file is one ~520 MB row group, so reading any clip decodes ~3 GB.
+    # Extract the chosen clips once into the model cache; later runs just read those WAVs.
+    CACHE = Path("/models/eval/fleurs"); MANIFEST = CACHE / "manifest.json"
+    if not MANIFEST.exists():
+        import pyarrow.parquet as pq  # only needed to extract the clips the first time
+        CACHE.mkdir(parents=True, exist_ok=True)
+        rows = pq.read_table("/models/eval/fleurs_ms_test.parquet", columns=["id", "audio", "transcription"]).to_pylist()
+        seen, picked = set(), []
+        step = max(len(rows) // (N_FLEURS * 2), 1)
+        for r in rows[::step]:                    # spread across the split; one clip per sentence id
+            if r["id"] in seen:
+                continue
+            seen.add(r["id"]); picked.append(r)
+            if len(picked) == N_FLEURS:
+                break
+        fleurs = []
+        for i, r in enumerate(picked):
+            p = CACHE / f"fleurs_{i}.wav"
+            p.write_bytes(r["audio"]["bytes"])
+            fleurs.append({"category": "malay_real", "path": str(p), "text": r["transcription"]})
+        MANIFEST.write_text(json.dumps(fleurs, indent=1, ensure_ascii=False))
+        del rows, picked
+        if "--extract-only" in sys.argv:
+            print("EXTRACTED", len(fleurs)); sys.exit()
+    items += json.loads(MANIFEST.read_text())
+    items += json.loads(Path("/models/eval/synth/manifest.json").read_text())
+    cats = ["malay_real", "english", "mixed"]
+    if Path("/models/eval/synth_kokoro/manifest.json").exists():
+        items += json.loads(Path("/models/eval/synth_kokoro/manifest.json").read_text())
+        cats.append("english_std")
 print("test set:", {c: sum(1 for it in items if it["category"] == c) for c in cats},
       f"| {sum(duration(it['path']) for it in items):.0f}s audio", flush=True)
 
@@ -104,7 +121,7 @@ for name, model_id, lang, beam, *rest in CONFIGS:
     model = WhisperModel(model_id, device="cpu", compute_type="int8", cpu_threads=threads)
     load_s, mem = time.time() - t, rss_mb() - base
     model.transcribe(items[0]["path"], language=lang)          # warm-up, not timed
-    per = {c: [0, 0] for c in cats}; audio_s = proc_s = 0.0; samples = []
+    per = {c: [0, 0] for c in cats}; audio_s = proc_s = 0.0; samples = []; fill_kept = fill_ref = 0
     for it in items:
         t = time.time()
         segs, _ = model.transcribe(it["path"], language=lang, initial_prompt=prompt, vad_filter=True,
@@ -114,20 +131,24 @@ for name, model_id, lang, beam, *rest in CONFIGS:
         proc_s += time.time() - t; audio_s += duration(it["path"])
         ref = norm(it["text"]); e = edits(ref, norm(hyp))
         per[it["category"]][0] += e; per[it["category"]][1] += len(ref)
+        ref_f, hyp_f = count_fillers(it["text"]), count_fillers(hyp)
+        fill_ref += sum(ref_f.values()); fill_kept += sum(min(n, hyp_f.get(f, 0)) for f, n in ref_f.items())
         if it["category"] != "malay_real" or len(samples) < 12:
             samples.append({"category": it["category"], "ref": it["text"], "hyp": hyp})
     wer = {c: round(100 * e / n, 1) for c, (e, n) in per.items()}
     total = round(100 * sum(e for e, _ in per.values()) / sum(n for _, n in per.values()), 1)
     res = {"config": name, "wer": wer, "wer_all": total, "rtf": round(proc_s / audio_s, 3),
            "sec_per_5s_turn": round(5 * proc_s / audio_s, 2), "load_s": round(load_s, 1),
-           "ram_mb": round(mem), "samples": samples}
+           "ram_mb": round(mem), "filler_retention": round(100 * fill_kept / fill_ref, 1) if fill_ref else None,
+           "samples": samples}
     results.append(res)
-    std = f"| std-en {wer['english_std']:5.1f}% " if "english_std" in wer else ""
-    print(f"{name:38s} WER malay {wer['malay_real']:5.1f}% | english {wer['english']:5.1f}% | mixed {wer['mixed']:5.1f}% {std}"
-          f"| all {total:5.1f}% | {res['sec_per_5s_turn']:.2f}s per 5s turn | load {res['load_s']}s | +{res['ram_mb']} MB",
+    fill = f"| fillers kept {res['filler_retention']}% " if fill_ref else ""
+    print(f"{name:38s} WER " + " | ".join(f"{c} {w:5.1f}%" for c, w in wer.items()) + f" | all {total:5.1f}% {fill}"
+          f"| {res['sec_per_5s_turn']:.2f}s per 5s turn | load {res['load_s']}s | +{res['ram_mb']} MB",
           flush=True)
     del model; gc.collect()
 
-Path("/models/eval/" + ("results_beam.json" if "--beam" in sys.argv else "results_threads.json" if "--threads" in sys.argv
-                        else "results_auto.json" if "--auto" in sys.argv else "results_prompt.json" if "--prompt" in sys.argv else "results.json")).write_text(json.dumps(results, indent=1, ensure_ascii=False))
+mode = next((m for m in ("beam", "threads", "auto", "prompt", "real") if f"--{m}" in sys.argv), None)
+Path(f"/models/eval/results_{mode}.json" if mode else "/models/eval/results.json").write_text(
+    json.dumps(results, indent=1, ensure_ascii=False))
 print("BENCH_DONE")
