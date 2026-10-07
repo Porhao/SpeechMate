@@ -27,7 +27,7 @@ All models run locally by default (Ollama, faster-whisper, Kokoro, Mesolitica, M
 |---|---|---|---|---|---|---|---|
 | 1 | Speech recognition (session) | C I P | Mesolitica **Malaysian Whisper large-v3-turbo-v3** (CTranslate2 int8, faster-whisper, 8 CPU threads, beam 5, **auto language detection**, VAD filter) | 16 kHz audio → transcript + word timings | OpenAI Whisper → (live turns) typed input | WER per language: **6.1% overall, 6.4% Malay, 4.0% Malaysian English, 17.0% Manglish, 0.0% US/UK English** (`docs/benchmarks/stt-benchmark-2026-10-01.md`) | `live/asr.py` |
 | 2 | Speech recognition (each live turn) | C I P | same model, per spoken turn (`/api/stt`) | one turn → text (about 2.5 s per 5 s turn) | OpenAI Whisper → typed input (no browser recogniser: it sends audio to Google) | same as 1 | `routers/conversation.py` |
-| 3 | Code-switch re-check | C I P | Mesolitica `wav2vec2-xls-r-300m-mixed` | audio Whisper isn't confident is English → Malay/mixed transcript | Whisper transcript + warning | WER on mixed speech | `live/asr.py` |
+| 3 | Code-switch re-check | C I P | Mesolitica `wav2vec2-xls-r-300m-mixed` | audio Whisper isn't confident is English → Malay/mixed transcript | Whisper transcript + warning | WER on mixed speech: **worse than Whisper** (15.4% → 36.7% with routing on; never fires on English). Skipped with the default Malaysian Whisper (`docs/benchmarks/stt-routing-and-finetune-2026-10-06.md`) | `live/asr.py` |
 | 4 | Conversation partner | C | Ollama **qwen2.5:3b** | last 12 turns + topic → 2–3 spoken sentences | scripted prompts | UAT naturalness rating | `routers/conversation.py` |
 | 5 | Interview question plan | I | qwen2.5:3b, JSON validated (Pydantic) and re-prompted once | role, company, level, type, background, job description, resume text → 6–8 questions, each with *what it tests* and *what a strong answer contains* | question bank (behavioural / technical / mixed) | relevance rating by users/supervisor | `practice_plans.py` |
 | 6 | Resume reading | I | `pdftotext` / DOCX XML / plain text | resume file → text (max 8,000 chars) | user types their background | — | `practice_plans.py` |
@@ -122,6 +122,8 @@ The results page groups every measured metric into four pillars.
 |---|---|---|---|---|
 | Speech recognition | WER by Malay / English / mixed / US-UK English | FLEURS ms_my (25 real speakers) + Malaysian TTS + Kokoro clips | clear reduction vs. Whisper baseline | **Done:** 6.1% vs 51.3% baseline |
 | Speech recognition (real users) | WER on app recordings | 30–50 transcribed user clips | ≤ 10% | Needs data (see §4) |
+| Code-switch routing | WER routing on vs off | 200 FLEURS en_us + 200 Synth-Manglish (synthetic) | routing on ≤ off | **Done:** English 5.3% → 5.3%, mixed 15.4% → 36.7% (routing hurts) (`docs/benchmarks/stt-routing-and-finetune-2026-10-06.md`) |
+| Fine-tuned ASR (not deployed) | WER vs shipped model | same 400 clips | clear reduction, silence stays empty | **Done on public data:** English 9.4% → 6.7%, mixed 14.5% → 6.7%, 0/10 silent clips with text; real speakers still needed |
 | Filler & disfluency detection | precision, recall, F1 | manually annotated transcripts/audio | F1 ≥ 0.75 | Needs data |
 | Pronunciation | Pearson / Spearman r with human ratings | 2–3 raters on ~20 clips | r ≥ 0.7 | Needs data |
 | Eye contact / gestures / posture | accuracy vs. manual frame coding | coded webcam clips | ≥ 0.8 | Needs data |

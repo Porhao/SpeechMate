@@ -55,9 +55,10 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
 ---
 
 ## Phase 5: Data Collection & AI Model Training
-*Status: Underway. Everything runs on pretrained models; nothing has been trained yet.*
+*Status: Underway. The app runs on pretrained models. A first speech-recognition fine-tune exists (`fine-tune/`) but is not deployed.*
 
-- [ ] **Data Collection & Preparation**
+- [~] **Data Collection & Preparation**
+  - *Done:* recording kit in `fine-tune/`: transcription style guide (`STYLE_GUIDE.md`, incl. disfluency marking for F1), session prompts (`RECORDING_PROMPTS.md`), English + Malay consent form (Claude Doc). Public training set (`scripts/prepare_public.py`: 10.3 h, Synth-Manglish + FLEURS, CC BY 4.0). *Left:* the recordings themselves.
   - Collect local Malaysian English and code-switched (Manglish) speech/video samples from consenting volunteers across casual, mock interview, and presentation scenarios.
   - Generate synthetic disfluent data by injecting controlled stutters into standard Malaysian-accented reading transcripts using a Stutter-TTS approach to augment the training set.
   - Conduct a lightweight manual annotation pass to mark filler words, repetitions, and prolonged pauses, cross-checking with automated Whisper transcripts.
@@ -65,11 +66,13 @@ SpeechMate is **local-first**: every stage has a local option, and cloud APIs ar
   - [~] Stuttering/disfluency detection. *Done:* a signal-processing heuristic (repetitions from the transcript, mid-utterance blocks from silence detection, energy-based prolongations with librosa) in `backend/app/services/live/speech.py`. *Left:* train the CNN + BiLSTM + attention classifier on UCLASS, SEP-28K and locally augmented data, and plug it in where the heuristic runs.
   - [~] Accent-fair pronunciation. *Done:* Wav2Vec2 CTC-confidence scoring over proportional word spans, plus a +5% Malaysian-English allowance (`pronunciation.py`, `language.py`). *Left:* real GOP forced-alignment scoring with relaxed thresholds, and splitting deviations into "regional" vs. "intelligibility" (the assessment page's `pronunciation_flags` still shows sample data).
   - [~] Gaze tracking. *Done:* MediaPipe iris-based gaze classification (camera / left / right / down) on the backend, and live face and pose tracking in the browser. *Left:* map it to the tri-zone (left / right / slide) distribution metric.
-  - [x] Code-switching ASR routing: faster-whisper, re-run through Mesolitica's mixed-language model when the speech isn't confidently English, plus a Bahasa Malaysia / Manglish lexicon for the language ratio and particle detection.
+  - [~] Code-switching ASR routing: faster-whisper, re-run through Mesolitica's mixed-language model when the speech isn't confidently English, plus a Bahasa Malaysia / Manglish lexicon for the language ratio and particle detection. *Fixed 2026-10-06:* the torch 2.4.1 pin made the mixed-language model fail to load, so routing silently fell back to Whisper (now torch 2.6.0; **rebuild the backend to apply**). *Measured:* routing detects mixed speech but doubles WER (15.4% → 36.7%). *Left:* drop or replace the second engine.
+  - [~] Speech-recognition fine-tune (`fine-tune/`, plan in `fine-tune/docs/manglish-finetune-plan.md`): LoRA on Mesolitica turbo-v3 with 10.3 h public data. English 9.4% → 6.7%, mixed 14.5% → 6.7% WER, silence still empty. *Left:* go/no-go on real recordings (`bench_stt.py --real`), Mesolitica licence answer, then deploy via `WHISPER_MODEL_SIZE`.
 - [~] **Initial Benchmarking**
   - [x] ASR baseline (`docs/benchmarks/stt-benchmark-2026-09-30.md`): Whisper medium vs. Mesolitica Malaysian Whisper small-v3 / large-v3-turbo-v3 on FLEURS Malay (real speakers) + Malaysian-accented English and Manglish. Turbo-v3 won with 7.9% WER overall (vs 51.3% for the previous medium setup) and is now the default.
   - [x] Language token (`docs/benchmarks/stt-benchmark-2026-10-01.md`): forcing `ms` translated US/UK-accented English answers into Malay. Auto-detect fixed it and improved real Malay to 6.4% WER (6.1% overall), so it is now the default.
-  - [ ] Re-run on a held-out set of real recordings from the app's own users, WER split by pure Malay / pure English / mixed.
+  - [x] Routing and fine-tune evaluation on 400 public clips (`docs/benchmarks/stt-routing-and-finetune-2026-10-06.md`).
+  - [ ] Re-run on a held-out set of real recordings from the app's own users, WER split by pure Malay / pure English / mixed (`bench_stt.py --real` is ready).
   - [ ] Precision, Recall and F1 for stutter and filler detection against manual annotations.
 
 ## Phase 6: Front-End and Back-End Development

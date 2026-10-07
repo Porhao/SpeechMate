@@ -1,9 +1,9 @@
 # Fine-Tuning Plan: Your Own Manglish Speech Model (8 GB VRAM)
 
-Companion to `docs/manglish-transcription-spec.md`. Status: draft v2, 2 Oct 2026.
+Companion to `docs/manglish-transcription-spec.md`. Status: draft v2, 2 Oct 2026; phase status updated 8 Oct 2026 (§3).
 Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcribes your users better than **the model SpeechMate already ships**, and you own the resulting weights.
 
-**Read this first:** the code in this file is a starting skeleton. It has not been run. Library versions change (`transformers`, `peft`, `bitsandbytes`), so expect to fix small API differences. Everything is gated on measured results, not on hope.
+**Read this first:** the code blocks in this file are the original skeleton. The tested versions are in `fine-tune/scripts/` (`prepare_public.py`, `train_lora.py`, `export.py`, `eval_finetune.py`); results are in `fine-tune/RESULTS.md`. Library versions change (`transformers`, `peft`, `bitsandbytes`), so expect to fix small API differences. Everything is gated on measured results, not on hope.
 
 **v2 changes:** this version was checked against the repo. The baseline is now Mesolitica turbo-v3, not vanilla Whisper. The language token is auto-detected, not forced. The prompt is the same in training and inference. Speed is measured on CPU int8, the way the app runs. The plan reuses `bench_stt.py` and `convert_whisper.sh`. The training script has fixes for bf16, `device_map`, the 30 s limit, and empty metrics.
 
@@ -39,18 +39,18 @@ Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcrib
 
 ## 3. Phases
 
-| Phase | What | Done when |
-|---|---|---|
-| F0 | Environment, licences, ethics | `nvidia-smi` shows the GPU. Packages install. Mesolitica licence answered (this picks the base model). Data licences written down. **University ethics approval** for recording people. WSL RAM raised (see §9). |
-| F1 | Finish the bake-off (spec M1-M3) | Mostly done: `bench_stt.py` plus three reports in `docs/benchmarks/`. **Remaining: M1, real recordings.** All English and Manglish clips so far are synthetic TTS. |
-| F2 | Collect and clean data | 5+ hours of verified clips, speaker-split train/dev/test |
-| F3 | Build the manifest and the dataset | `data/` loads with `datasets`; test set locked; no clip over 30 s |
-| F4 | Smoke test on `whisper-small` | 200 steps run end to end; loss drops; no crashes |
-| F5 | Real training run | Adapter saved; dev WER logged every epoch |
-| F6 | Evaluate vs the shipped baseline | Report with every metric in §7 |
-| F7 | Merge and convert | `/models/ct2/<name>` loads in faster-whisper (via `convert_whisper.sh`) |
-| F8 | Plug into SpeechMate | `WHISPER_MODEL_SIZE` switch; code-switch routing and prompt handled (§8); A/B against baseline |
-| F9 | Improvement loop | Tap-to-correct data feeds the next training round |
+| Phase | What | Done when | Status (8 Oct) |
+|---|---|---|---|
+| F0 | Environment, licences, ethics | `nvidia-smi` shows the GPU. Packages install. Mesolitica licence answered (this picks the base model). Data licences written down. **University ethics approval** for recording people. WSL RAM raised (see §9). | **Partly.** Environment done (`.venv`, `.venv-app`, `.venv-convert`). Licence question and ethics approval still open. |
+| F1 | Finish the bake-off (spec M1-M3) | Mostly done: `bench_stt.py` plus three reports in `docs/benchmarks/`. **Remaining: M1, real recordings.** All English and Manglish clips so far are synthetic TTS. | **Partly.** Public bake-off done; real recordings (M1) not started. |
+| F2 | Collect and clean data | 5+ hours of verified clips, speaker-split train/dev/test | **Partly.** Recording kit ready (`STYLE_GUIDE.md`, `RECORDING_PROMPTS.md`, consent form). Public substitute: 10.3 h (`scripts/prepare_public.py`). Own recordings not started. |
+| F3 | Build the manifest and the dataset | `data/` loads with `datasets`; test set locked; no clip over 30 s | **Done for public data** (`data/train.csv`, `dev.csv`, split by voice). |
+| F4 | Smoke test on `whisper-small` | 200 steps run end to end; loss drops; no crashes | **Done** (whisper-small, vanilla turbo, Mesolitica; `RESULTS.md`). |
+| F5 | Real training run | Adapter saved; dev WER logged every epoch | **Done on public data.** Mesolitica base, lr 1e-4, dev WER 19.5% → 4.1% (`out/adapter/`). |
+| F6 | Evaluate vs the shipped baseline | Report with every metric in §7 | **Partly.** 400 public clips: English 9.4% → 6.7%, mixed 14.5% → 6.7%, silence 0/10 (`docs/benchmarks/stt-routing-and-finetune-2026-10-06.md`). Real speakers and noisy real speech still needed. |
+| F7 | Merge and convert | `/models/ct2/<name>` loads in faster-whisper (via `convert_whisper.sh`) | **Done** (`scripts/export.py` → `out/ct2/`). |
+| F8 | Plug into SpeechMate | `WHISPER_MODEL_SIZE` switch; code-switch routing and prompt handled (§8); A/B against baseline | Not started: waits on F6 with real speakers and the licence answer. |
+| F9 | Improvement loop | Tap-to-correct data feeds the next training round | Not started. |
 
 **Do F1 (M1) before anything else.** A real test set is worth more than any fine-tune. Only fine-tune if the shipped model clearly fails on it.
 
