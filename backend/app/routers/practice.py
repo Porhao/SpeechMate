@@ -6,9 +6,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_optional_user
 from app.database import get_db
 from app.models.chat_message import ChatMessage
 from app.models.practice_session import PracticeSession
+from app.models.user import User
 from app.routers.sessions import audio_extension, get_session_or_404, get_slides
 from app.schemas.practice import (
     ChatHistoryResponse,
@@ -20,7 +22,10 @@ from app.schemas.practice import (
 from app.services import tasks
 from app.services.coach.chat import generate_reply
 from app.services.coach.pipeline import run_coach_pipeline
+from app.limits import MB
 from app.services.storage import storage_service
+
+MAX_PRACTICE_BYTES = 300 * MB  # a whole-deck rehearsal recording
 
 router = APIRouter(prefix="/sessions/{session_id}/practice", tags=["practice"])
 
@@ -59,10 +64,10 @@ async def create_practice(
     audio: UploadFile = File(..., description="Practice recording (audio, or video with audio)"),
     recording_granularity: str = Form("whole_deck", description="whole_deck | per_slide"),
     slide_index: int | None = Form(None, description="Required when recording_granularity=per_slide"),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user),
 ):
     """Upload a practice recording and start the Coach Agent analysis."""
-    session = await get_session_or_404(db, session_id)
+    session = await get_session_or_404(db, session_id, user)
     if session.status != "complete":
         raise HTTPException(
             status_code=409,
@@ -80,8 +85,8 @@ async def create_practice(
 
     ext = audio_extension(audio.filename)
     practice_id = uuid.uuid4()
-    audio_path = await storage_service.save_upload(
-        str(session_id), f"practice/{practice_id}/user_audio_upload{ext}", await audio.read()
+    audio_path = await storage_service.save_upload_limited(
+        str(session_id), f"practice/{practice_id}/user_audio_upload{ext}", audio, MAX_PRACTICE_BYTES, "The practice recording"
     )
 
     db.add(PracticeSession(
@@ -99,9 +104,9 @@ async def create_practice(
 
 
 @router.get("", response_model=list[PracticeResponse])
-async def list_practice(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def list_practice(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """All practice runs for a session, oldest first (for progress over time)."""
-    await get_session_or_404(db, session_id)
+    await get_session_or_404(db, session_id, user)
     result = await db.execute(
         select(PracticeSession)
         .where(PracticeSession.session_id == session_id)
@@ -111,14 +116,16 @@ async def list_practice(session_id: uuid.UUID, db: AsyncSession = Depends(get_db
 
 
 @router.get("/{practice_id}", response_model=PracticeResponse)
-async def get_practice(session_id: uuid.UUID, practice_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_practice(session_id: uuid.UUID, practice_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """Poll a practice run; metrics + feedback appear once status is `complete`."""
+    await get_session_or_404(db, session_id, user)
     return _to_response(await _practice_or_404(db, session_id, practice_id))
 
 
 @router.get("/{practice_id}/chat", response_model=ChatHistoryResponse)
-async def get_chat(session_id: uuid.UUID, practice_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_chat(session_id: uuid.UUID, practice_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """Chat history for a practice run."""
+    await get_session_or_404(db, session_id, user)
     await _practice_or_404(db, session_id, practice_id)
     result = await db.execute(
         select(ChatMessage)
@@ -135,10 +142,10 @@ async def post_chat(
     session_id: uuid.UUID,
     practice_id: uuid.UUID,
     body: ChatRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user),
 ):
     """Ask the Coach Agent a follow-up question about this practice run."""
-    session = await get_session_or_404(db, session_id)
+    session = await get_session_or_404(db, session_id, user)
     practice = await _practice_or_404(db, session_id, practice_id)
     if practice.status != "complete":
         raise HTTPException(status_code=409, detail=f"Feedback is not ready yet (status: {practice.status})")

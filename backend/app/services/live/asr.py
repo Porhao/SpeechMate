@@ -16,6 +16,7 @@
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -89,14 +90,22 @@ _HALLUCINATIONS = (
 )
 
 
-def whisper_segments(path: Path, language: str | None, word_timestamps: bool = False):
+def _norm(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9']+", text.lower()))
+
+
+def whisper_segments(path: Path, language: str | None, word_timestamps: bool = False, context: str | None = None):
     """faster-whisper with the Manglish settings (docs/manglish-transcription-spec.md §7):
     verbatim Manglish prompt, VAD, no conditioning on previous text, and segments that look
     like silence hallucinations dropped. Returns (segments, info); info is None when VAD
-    found no speech at all."""
+    found no speech at all.
+    `context` (e.g. the question just asked) goes into the prompt ahead of the Manglish one, so topic
+    words ("Power BI", the job title) are heard right; a segment that only repeats it is dropped."""
+    ctx = " ".join((context or "").split())[-240:]
     try:
         segments, info = _whisper_model().transcribe(
-            str(path), task="transcribe", language=language, initial_prompt=VERBATIM_PROMPT,
+            str(path), task="transcribe", language=language,
+            initial_prompt=f"{ctx} {VERBATIM_PROMPT}" if ctx else VERBATIM_PROMPT,
             vad_filter=True, vad_parameters={"min_silence_duration_ms": 500},
             condition_on_previous_text=False, word_timestamps=word_timestamps,
         )
@@ -109,6 +118,8 @@ def whisper_segments(path: Path, language: str | None, word_timestamps: bool = F
         seg for seg in segments
         if not (seg.no_speech_prob > 0.6 and seg.avg_logprob < -1.0)
         and not any(h in seg.text.lower() for h in _HALLUCINATIONS)
+        # the prompt's context read back (or the AI's own voice leaking into the mic)
+        and not (ctx and len(_norm(seg.text)) > 15 and _norm(seg.text) in _norm(ctx))
     ]
     return kept, info
 

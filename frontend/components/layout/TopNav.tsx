@@ -1,15 +1,23 @@
 "use client";
 
-// The app's only navigation: one slim, solid top bar. Text links with an
-// underline for the current page; on small screens they fold into a plain list.
+// The app's only navigation: a floating clay bar (see .clay-nav in globals.css) with
+// raised 3D tabs and a live 3D clay microphone as the logo. On small screens the
+// links fold into a clay drop-down panel. It's the fixed anchor of page transitions.
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Menu, Mic2, Settings, X } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { ThemeToggleButton } from "@/components/theme/ThemeToggle";
 import NotificationBell from "@/components/layout/NotificationBell";
+
+// The logo: the 3D clay mic from the home page, turning slowly (an icon until it loads)
+const ClayScene = dynamic(() => import("@/components/three/ClayScene"), {
+  ssr: false,
+  loading: () => <Mic2 className="w-4 h-4 m-auto" style={{ color: "var(--pink)" }} />,
+});
 
 // The three practice functions, then progress and the reference matrix
 const LINKS: { href: string; label: string; also?: string[] }[] = [
@@ -40,55 +48,43 @@ export default function TopNav() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[var(--surface)]" style={{ borderBottom: "1px solid var(--line)" }}>
-      <div className="max-w-[1320px] mx-auto h-14 px-4 sm:px-6 flex items-center gap-8">
-        <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-          <span className="w-7 h-7 flex items-center justify-center" style={{ background: "var(--accent)" }}>
-            <Mic2 className="w-3.5 h-3.5 text-white" />
+    <header className="sticky top-0 z-50 px-2 sm:px-4 pt-2 sm:pt-3" style={{ viewTransitionName: "site-header" }}>
+      <div className="clay-nav max-w-[1320px] mx-auto h-16 pl-2 pr-2 sm:pr-3 flex items-center gap-3 sm:gap-5 rounded-2xl">
+        <Link href="/home" className="nav-logo flex items-center gap-2.5 flex-shrink-0" aria-label="SpeechMate home">
+          <span className="clay w-11 h-11 rounded-lg relative overflow-hidden flex"
+            style={{ background: "radial-gradient(90% 90% at 50% 35%, #FFE3CF, var(--peach))" }}>
+            <ClayScene variant="logo" className="absolute inset-0" />
           </span>
-          <span className="font-semibold text-[15px] tracking-tight text-[var(--ink)]">SpeechMate</span>
+          <span className="font-display text-[17px] text-[var(--ink)] hidden sm:inline">SpeechMate</span>
         </Link>
-        {/* Notifications sit at the top left, next to the wordmark */}
-        <div className="-ml-5"><NotificationBell /></div>
+        <div className="-ml-2"><NotificationBell /></div>
 
-        <nav className="hidden lg:flex items-stretch h-full gap-6" aria-label="Main">
+        <nav className="hidden lg:flex items-center gap-1.5" aria-label="Main">
           {LINKS.map(({ href, label }) => {
             const active = isActive(href);
             return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className="relative flex items-center text-sm transition-colors"
-                style={{ color: active ? "var(--ink)" : "var(--muted)", fontWeight: active ? 600 : 400 }}
-              >
+              <Link key={href} href={href} aria-current={active ? "page" : undefined}
+                className={`nav-pill px-4 py-2 rounded-full text-sm font-medium ${active ? "nav-pill-active" : ""}`}>
                 {label}
-                {active && <span className="absolute left-0 right-0 bottom-0 h-[2px]" style={{ background: "var(--accent)" }} />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggleButton />
-          <Link
-            href="/settings"
-            aria-label="Settings"
-            className="w-9 h-9 hidden sm:flex items-center justify-center transition-colors hover:bg-[var(--surface-2)]"
-            style={{ color: isActive("/settings") ? "var(--ink)" : "var(--muted)" }}
-          >
+          <Link href="/settings" aria-label="Settings"
+            className="nav-pill w-9 h-9 rounded-full hidden sm:flex items-center justify-center"
+            style={{ color: isActive("/settings") ? "var(--ink)" : "var(--muted)" }}>
             <Settings className="w-4 h-4" />
           </Link>
-          <Link
-            href="/profile"
-            aria-label="Profile"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-semibold"
-            style={{ background: "var(--accent)", outline: isActive("/profile") ? "2px solid #23345C55" : "none", outlineOffset: 2 }}
-          >
+          <Link href="/profile" aria-label="Profile"
+            className="clay w-9 h-9 rounded-full flex items-center justify-center text-white text-[11px] font-semibold transition-transform hover:-translate-y-0.5"
+            style={{ background: "var(--accent)", outline: isActive("/profile") ? "2px solid var(--accent-ink)" : "none", outlineOffset: 2 }}>
             <span suppressHydrationWarning>{initials(user?.full_name)}</span>
           </Link>
           <button
-            className="lg:hidden w-9 h-9 flex items-center justify-center text-[var(--ink)] hover:bg-[var(--surface-2)]"
+            className="nav-pill lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-[var(--ink)]"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             onClick={() => { setOpen((v) => !v); setOpenedAt(pathname); }}
@@ -99,21 +95,12 @@ export default function TopNav() {
       </div>
 
       {open && (
-        <nav className="lg:hidden bg-[var(--surface)]" style={{ borderTop: "1px solid var(--line)" }} aria-label="Main">
+        <nav className="clay-nav lg:hidden max-w-[1320px] mx-auto mt-2 p-2 rounded-2xl flex flex-col gap-1" aria-label="Main">
           {[...LINKS, { href: "/settings", label: "Settings" }, { href: "/profile", label: "Profile" }].map(({ href, label }) => {
             const active = isActive(href);
             return (
-              <Link
-                key={href}
-                href={href}
-                className="block px-5 py-3 text-sm"
-                style={{
-                  color: active ? "var(--ink)" : "var(--ink-2)",
-                  fontWeight: active ? 600 : 400,
-                  borderLeft: `3px solid ${active ? "#23345C" : "transparent"}`,
-                  borderBottom: "1px solid var(--line-2)",
-                }}
-              >
+              <Link key={href} href={href} aria-current={active ? "page" : undefined}
+                className={`nav-pill px-4 py-3 rounded-xl text-sm font-medium ${active ? "nav-pill-active" : ""}`}>
                 {label}
               </Link>
             );

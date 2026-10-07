@@ -27,7 +27,9 @@ export function useAuth() {
         skill_level: (user.skill_level as "Beginner" | "Intermediate" | "Advanced") ?? "Beginner",
         challenges: user.challenges,
       });
-      router.push("/home");
+      // Back to where sign-in was asked for; same-origin paths only (no open redirect)
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next?.startsWith("/") && !next.startsWith("//") ? next : "/home");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Login failed");
     } finally {

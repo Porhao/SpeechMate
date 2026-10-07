@@ -23,6 +23,7 @@ from app.models.user import User
 from app.services import practice_plans
 from app.services.live import asr, coaching, extra_metrics, language, pronunciation, scoring, speech, vision
 from app.services.live._ml import available
+from app.services.live.talk import talk_feedback
 from app.services.notifications import notify
 from app.services.live.audio import to_16k_wav
 from app.services.media import MediaError, detect_silences, wav_duration
@@ -61,89 +62,39 @@ async def analyze_recording(
     if duration - sum(e - s for s, e in silences) < 1.0:
         raise MediaError("No speech was detected in the recording — check your microphone and try again.")
 
-    # ── Speech ────────────────────────────────────────────────────────────
-    asr_result = await asr.transcribe(wav, warnings)
-    transcript = asr_result.transcript if asr_result else ""
-    words = asr_result.word_timestamps if asr_result else []
-
-    lang = language.detect_language_and_accent(transcript) if transcript else None
-    fluency = speech.analyze_fluency(transcript, duration, words, silences) if transcript else None
-    fillers = speech.detect_fillers(transcript, duration) if transcript else None
-    stutter = speech.detect_stuttering(transcript, words, silences, duration, wav)
-
-    pron = None
-    if transcript:
-        if available("transformers", "torch", "numpy"):
-            try:
-                pron = await asyncio.to_thread(pronunciation.assess, wav, transcript)
-            except Exception as e:  # noqa: BLE001
-                logger.exception("Pronunciation assessment failed")
-                warnings.append(f"Pronunciation scoring failed ({e}).")
-        else:
-            warnings.append("Pronunciation scoring needs the local Wav2Vec2 model (requirements-ml.txt); skipped.")
-    pron_score = language.adjust_pronunciation_for_accent(pron.score, lang) if pron and lang else None
-
-    prosody = None
-    if available("librosa", "numpy"):
-        try:
-            prosody = await asyncio.to_thread(extra_metrics.analyze_prosody, wav)
-        except Exception as e:  # noqa: BLE001
-            logger.exception("Prosody analysis failed")
-            warnings.append(f"Vocal variety / volume analysis failed ({e}).")
-    else:
-        warnings.append("Vocal variety and volume need librosa (requirements-ml.txt); skipped.")
-    lang_use = extra_metrics.analyze_language_use(transcript) if transcript else None
-
-    # ── Vision ────────────────────────────────────────────────────────────
-    eye = posture = emotion = gestures = None
-    if available("cv2", "mediapipe"):
-        frames = await asyncio.to_thread(vision.sample_frames, str(recording), 60)
-        if not frames:
-            warnings.append("The recording has no readable video frames, so eye contact, posture and emotion were skipped.")
-        else:
-            for name, fn in (("Eye contact", vision.analyze_eye_contact), ("Posture", vision.analyze_posture)):
-                try:
-                    result = await asyncio.to_thread(fn, frames)
-                except Exception as e:  # noqa: BLE001
-                    logger.exception("%s analysis failed", name)
-                    warnings.append(f"{name} analysis failed ({e}).")
-                    continue
-                if result is None:
-                    warnings.append(f"{name}: no face/body was detected in the video.")
-                elif name == "Eye contact":
-                    eye = result
-                else:
-                    posture = result
-            try:
-                gestures = await asyncio.to_thread(extra_metrics.analyze_gestures, frames)
-            except Exception as e:  # noqa: BLE001
-                logger.exception("Gesture analysis failed")
-                warnings.append(f"Gesture analysis failed ({e}).")
-            if available("transformers", "torch", "PIL"):
-                try:
-                    emotion = await asyncio.to_thread(vision.analyze_emotion, frames)
-                    if emotion is None:
-                        warnings.append("Facial emotion: no face was detected in the video.")
-                except Exception as e:  # noqa: BLE001
-                    logger.exception("Emotion analysis failed")
-                    warnings.append(f"Facial emotion analysis failed ({e}).")
-            else:
-                warnings.append("Facial emotion needs transformers + torch (requirements-ml.txt); skipped.")
-    else:
-        warnings.append(
-            "Vision analysis (eye contact, posture, emotion) needs OpenCV + MediaPipe "
-            "(requirements-ml.txt); skipped."
-        )
+    # The content feedback (an LLM call on the turns) needs nothing measured from the
+    # recording, so it runs alongside the speech and vision models instead of after them
+    # A presentation talk is judged slide by slide from the transcript's word timings (after ASR)
+    talk = (context or {}).get("kind") == "talk"
+    content_task = None if talk else asyncio.create_task(practice_plans.content_feedback(session_type, context, turns))
+    try:
+        # Speech, then vision: running both model sets at once ran a 7.6 GB machine out of
+        # memory (OOM-killed). Each stage still runs its own light parts in parallel.
+        sp = await _speech_stage(wav, duration, silences, warnings)
+        vi = await _vision_stage(recording, warnings)
+    except BaseException:
+        if content_task:
+            content_task.cancel()
+        raise
+    asr_result, transcript, lang, fluency, fillers, stutter, pron, pron_score, prosody, lang_use = sp
+    eye, posture, emotion, gestures = vi
 
     # ── Scoring ───────────────────────────────────────────────────────────
+    # The user's own talking time (turn gaps excluded), so every count becomes a fair per-minute rate
+    talk_min = speech._count_words(transcript) / fluency.speaking_rate if fluency and fluency.speaking_rate else None
     confidence = scoring.estimate_confidence(
         speaking_rate=fluency.speaking_rate if fluency else None,
+        talk_minutes=talk_min,
         pause_frequency=fluency.pause_frequency if fluency else None,
-        fluency_score=fluency.fluency_score if fluency else None,
+        repetition_count=stutter.repetition_count if transcript else None,
+        block_count=(stutter.block_count + stutter.prolongation_count) if transcript else None,
+        fillers_per_minute=round(fillers.total_fillers / talk_min, 1) if fillers and talk_min else None,
+        response_latency_sec=extra_metrics.median_latency(client_metrics),
         emotion_confidence=emotion.confidence_level if emotion else None,
         facial_tension=emotion.facial_tension if emotion else None,
         posture_score=posture.posture_score if posture else None,
         body_stability=posture.body_stability if posture else None,
+        eye_contact_score=eye.eye_contact_score if eye else None,
     )
     comm = scoring.compute_communication_score({
         "Fluency": fluency.fluency_score if fluency else None,
@@ -210,7 +161,11 @@ async def analyze_recording(
         },
         "recommendations": recs.to_dict(),
         # What was said, judged against the plan (interview answers, Q&A) or as language
-        "content_feedback": await practice_plans.content_feedback(session_type, context, turns),
+        "content_feedback": (
+            await talk_feedback(context, asr_result.word_timestamps if asr_result else [],
+                                (client_metrics or {}).get("slide_times"), duration)
+            if talk else await content_task
+        ),
         # Full per-model output, for anyone who wants more than the summary above
         "details": {
             "asr_engine": asr_result.engine if asr_result else None,
@@ -231,6 +186,87 @@ async def analyze_recording(
     # The simple view: four pillars, each with its measured metrics
     analysis["pillars"] = extra_metrics.build_pillars(analysis, prosody, lang_use, gestures, client_metrics)
     return analysis, warnings
+
+
+async def _speech_stage(wav, duration: float, silences, warnings: list[str]):
+    """ASR, then everything that reads the words; prosody (audio only) runs alongside ASR."""
+    async def prosody_part():
+        if not available("librosa", "numpy"):
+            warnings.append("Vocal variety and volume need librosa (requirements-ml.txt); skipped.")
+            return None
+        try:
+            return await asyncio.to_thread(extra_metrics.analyze_prosody, wav)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Prosody analysis failed")
+            warnings.append(f"Vocal variety / volume analysis failed ({e}).")
+            return None
+
+    prosody_task = asyncio.create_task(prosody_part())
+    asr_result = await asr.transcribe(wav, warnings)
+    transcript = asr_result.transcript if asr_result else ""
+    words = asr_result.word_timestamps if asr_result else []
+
+    lang = language.detect_language_and_accent(transcript) if transcript else None
+    fluency = speech.analyze_fluency(transcript, duration, words, silences) if transcript else None
+    fillers = speech.detect_fillers(transcript, duration) if transcript else None
+    stutter = speech.detect_stuttering(transcript, words, silences, duration, wav)
+
+    pron = None
+    if transcript:
+        if available("transformers", "torch", "numpy"):
+            try:
+                pron = await asyncio.to_thread(pronunciation.assess, wav, transcript)
+            except Exception as e:  # noqa: BLE001
+                logger.exception("Pronunciation assessment failed")
+                warnings.append(f"Pronunciation scoring failed ({e}).")
+        else:
+            warnings.append("Pronunciation scoring needs the local Wav2Vec2 model (requirements-ml.txt); skipped.")
+    pron_score = language.adjust_pronunciation_for_accent(pron.score, lang) if pron and lang else None
+    lang_use = extra_metrics.analyze_language_use(transcript) if transcript else None
+    return asr_result, transcript, lang, fluency, fillers, stutter, pron, pron_score, await prosody_task, lang_use
+
+
+async def _vision_stage(recording, warnings: list[str]):
+    """Eye contact, posture, gestures and emotion: independent reads of the same frames, run in parallel."""
+    if not available("cv2", "mediapipe"):
+        warnings.append(
+            "Vision analysis (eye contact, posture, emotion) needs OpenCV + MediaPipe "
+            "(requirements-ml.txt); skipped."
+        )
+        return None, None, None, None
+    frames = await asyncio.to_thread(vision.sample_frames, str(recording), 60)
+    if not frames:
+        warnings.append("The recording has no readable video frames, so eye contact, posture and emotion were skipped.")
+        return None, None, None, None
+
+    async def run(label: str, fn, *, none_msg: str | None = None):
+        try:
+            result = await asyncio.to_thread(fn, frames)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("%s analysis failed", label)
+            warnings.append(f"{label} analysis failed ({e}).")
+            return None
+        if result is None and none_msg:
+            warnings.append(none_msg)
+        return result
+
+    async def emotion_part():
+        if not available("transformers", "torch", "PIL"):
+            warnings.append("Facial emotion needs transformers + torch (requirements-ml.txt); skipped.")
+            return None
+        return await run("Facial emotion", vision.analyze_emotion, none_msg="Facial emotion: no face was detected in the video.")
+
+    # Posture and gestures share one MediaPipe Pose instance, which isn't thread-safe: run them in turn
+    async def body_part():
+        posture = await run("Posture", vision.analyze_posture, none_msg="Posture: no face/body was detected in the video.")
+        return posture, await run("Gesture", extra_metrics.analyze_gestures)
+
+    eye, (posture, gestures), emotion = await asyncio.gather(
+        run("Eye contact", vision.analyze_eye_contact, none_msg="Eye contact: no face/body was detected in the video."),
+        body_part(),
+        emotion_part(),
+    )
+    return eye, posture, emotion, gestures
 
 
 async def run_live_analysis(live_id: uuid.UUID) -> None:

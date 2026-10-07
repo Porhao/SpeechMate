@@ -25,7 +25,7 @@ class RefreshRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
+    refresh_token: str | None = None  # now an httpOnly cookie (routers/auth.py); kept for old clients
     token_type: str = "bearer"
 
 

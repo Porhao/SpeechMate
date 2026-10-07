@@ -3,13 +3,10 @@
 import { CheckCircle2, Circle, Loader2, XCircle, RotateCcw } from "lucide-react";
 import type { DeckStatusResponse } from "@/types";
 
-// Named steps map 1:1 to the Ideal Presentation Agent's status values.
+// Named steps map 1:1 to the deck preparation's status values (services/pipeline.py).
 const STEPS = [
-  { status: "processing_slides", label: "Parsing slide content", progress: "rendered" },
-  { status: "analyzing_content", label: "Analysing content (summary & insights)", progress: null },
-  { status: "generating_scripts", label: "Generating narration scripts", progress: "scripted" },
-  { status: "synthesizing_audio", label: "Synthesizing audio track", progress: "synthesized" },
-  { status: "assembling_video", label: "Assembling video", progress: null },
+  { status: "processing_slides", label: "Reading your slides", progress: "rendered" },
+  { status: "analyzing_content", label: "Understanding them: summary, key points, Q&A questions", progress: null },
 ] as const;
 
 export default function GenerationProgress({
@@ -20,13 +17,13 @@ export default function GenerationProgress({
   // Where a failed run stopped: the first step whose per-slide count isn't full.
   const p = deck.slides_progress;
   const failedIdx = failed
-    ? (!p ? 0 : p.rendered < p.total ? 0 : !deck.insights ? 1 : p.scripted < p.total ? 2 : p.synthesized < p.total ? 3 : 4)
+    ? (!p || p.rendered < p.total ? 0 : 1)
     : -1;
 
   return (
     <div className="glass-card rounded-2xl p-6 max-w-[560px] mx-auto">
       <h2 className="text-base font-semibold mb-1" style={{ color: "var(--ink)" }}>
-        {failed ? "Generation failed" : deck.status === "queued" ? "Waiting in the queue…" : "Building your example presentation"}
+        {failed ? "Preparing the deck failed" : deck.status === "queued" ? "Waiting in the queue…" : "Preparing your deck (about a minute)"}
       </h2>
       <p className="text-xs mb-5" style={{ color: "var(--faint)" }}>
         {deck.original_filename}{deck.slide_count ? ` · ${deck.slide_count} slides` : ""}
@@ -57,7 +54,7 @@ export default function GenerationProgress({
 
       {failed && (
         <div className="mt-5 space-y-3">
-          <p className="text-sm px-3 py-2 rounded-lg" style={{ background: "rgba(140,59,50,0.06)", color: "var(--bad)", border: "1px solid rgba(140,59,50,0.2)" }}>
+          <p className="text-sm px-3 py-2 rounded-lg" style={{ background: "rgba(194,52,44,0.06)", color: "var(--bad)", border: "1px solid rgba(194,52,44,0.2)" }}>
             {deck.error_detail ?? "Something went wrong."}
           </p>
           <button

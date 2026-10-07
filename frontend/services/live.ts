@@ -13,6 +13,7 @@ export const liveService = {
   start: (body: {
     session_type: SessionType; topic?: string;
     interview?: InterviewSetup; plan?: PracticePlan; deck_id?: string;
+    presentation_mode?: "talk" | "qa";
   }) => api.post<LiveSession>("/live", body),
 
   end: (id: string, durationSec: number, turns: Turn[] = [], clientMetrics?: Record<string, unknown>) =>
@@ -64,9 +65,11 @@ export const conversationService = {
       "/chat/message", { messages, mode, topic, live_id: liveId }),
 
   /** Transcribe one spoken turn on the backend (local faster-whisper). 503 = not available. */
-  transcribe: async (audio: Blob): Promise<string> => {
+  /** `context` (the AI's last line, the role or deck…) helps the model hear topic words right. */
+  transcribe: async (audio: Blob, context?: string): Promise<string> => {
     const form = new FormData();
     form.append("file", audio, "turn.wav");
+    if (context) form.append("context", context.slice(-1000));
     return (await api.upload<{ text: string }>("/stt", form)).text;
   },
 

@@ -65,6 +65,21 @@ export interface LiveContext {
   topic?: string;
   plan?: PracticePlan;
   progress?: { asked: number; followups: number };
+  // Presentation: "talk" = the user presents the deck; "qa" = audience Q&A rehearsal
+  kind?: "talk" | "qa";
+  slides?: TalkSlide[];
+}
+
+/** One slide of a deck being presented: what the talk is checked against. */
+export interface TalkSlide { index: number; title: string; text: string; key_point: string }
+
+/** How the talk matched one slide (analysis.content_feedback.kind === "slides"). */
+export interface SlideFeedback {
+  slide_index: number; title: string; key_point: string;
+  seconds: number; said: string;
+  coverage: number | null; missed_terms: string[];
+  status: "covered" | "partly" | "missed" | "silent" | "skipped";
+  alignment: number | null; covered: string; missing: string; tip: string;
 }
 
 export interface Turn {
@@ -118,12 +133,14 @@ export interface AnswerFeedback {
   went_well: string;
   improve: string;
   stronger_answer: string;
+  answer?: string;          // what the learner actually said (sessions analysed after Oct 2026)
 }
 
 export type ContentFeedback =
   | { kind: "answers"; source: string; summary: string; answers: AnswerFeedback[] }
   | { kind: "conversation"; source: string; summary: string; tips: string[];
-      corrections: { said: string; better: string; why: string }[] };
+      corrections: { said: string; better: string; why: string }[] }
+  | { kind: "slides"; source: string; summary: string; slides: SlideFeedback[]; total_sec: number };
 
 // Scores are null when the model that measures them wasn't available
 // (see FullAnalysisResult.warnings) — the backend never invents a number.
@@ -187,7 +204,7 @@ export interface ChatMessage {
 
 export interface AuthTokens {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string | null;  // now an httpOnly cookie; absent from new responses
   token_type: string;
 }
 

@@ -13,6 +13,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession, ProgressRecord, Report
 from app.models.session import Session as Deck
+from app.models.slide import Slide
 from app.models.user import User
 from app.routers.sessions import audio_extension
 from app.schemas.live import (
@@ -26,6 +27,7 @@ from app.schemas.live import (
 )
 from app.services import practice_plans, tasks
 from app.services.live.pipeline import run_live_analysis
+from app.limits import MB, rate_limit, read_limited
 from app.services.storage import storage_service
 
 router = APIRouter(tags=["live sessions"])
@@ -58,23 +60,22 @@ async def _own_session(db: AsyncSession, user: User, live_id: uuid.UUID) -> Live
     return s
 
 
-MAX_RESUME_BYTES = 5 * 1024 * 1024
+MAX_RESUME_BYTES = 5 * MB
+MAX_RECORDING_BYTES = 500 * MB  # ~25 min of 720p webm; recordings stream to disk, never into memory
 
 
 def _first_name(user: User) -> str | None:
     return (user.full_name or "").split(" ")[0] or None
 
 
-@router.post("/interview/resume")
+@router.post("/interview/resume", dependencies=[Depends(rate_limit("resume", 10))])
 async def read_resume(
     file: UploadFile = File(..., description="Resume as PDF, DOCX or TXT"),
     user: User = Depends(get_current_user),
 ):
     """Extract the resume's text so the user can check it before it's used for the interview.
     Nothing is stored here; the text is saved only with the interview session it's used in."""
-    data = await file.read()
-    if len(data) > MAX_RESUME_BYTES:
-        raise HTTPException(status_code=413, detail="Resume must be under 5 MB")
+    data = await read_limited(file, MAX_RESUME_BYTES, "The resume")
     try:
         text = practice_plans.extract_resume_text(data, file.filename or "")
     except ValueError as e:
@@ -82,22 +83,35 @@ async def read_resume(
     return {"text": text, "chars": len(text)}
 
 
-@router.post("/interview/plan", response_model=PracticePlan)
+@router.post("/interview/plan", response_model=PracticePlan, dependencies=[Depends(rate_limit("plan", 6))])
 async def interview_plan(body: InterviewSetup, user: User = Depends(get_current_user)):
     """Curate the mock-interview questions from the candidate's setup (and resume) for preview."""
     return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user))
 
 
-async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID) -> dict:
+async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: str = "qa") -> dict:
     deck = await db.get(Deck, deck_id)
     if not deck or (deck.user_id is not None and deck.user_id != user.id):
         raise HTTPException(status_code=404, detail="Deck not found")
     if not deck.insights:
         raise HTTPException(status_code=409, detail="This deck hasn't been analysed yet: wait for its insights first")
     title = deck.original_filename.rsplit(".", 1)[0]
-    plan = await practice_plans.build_qa_plan(title, deck.insights, deck.requirement_prompt)
-    return {"deck_id": str(deck.id), "deck_title": title, "deck_summary": deck.insights.get("summary", ""),
-            "audience": deck.requirement_prompt, "plan": plan}
+    base = {"deck_id": str(deck.id), "deck_title": title, "deck_summary": deck.insights.get("summary", ""),
+            "audience": deck.requirement_prompt}
+    if mode == "talk":
+        # What each slide is about, to check the talk against: its title, text and key point
+        points = {p.get("slide_index"): p.get("key_point") for p in deck.insights.get("slides") or []}
+        titles = {p.get("slide_index"): p.get("title") for p in (deck.insights.get("stats") or {}).get("per_slide") or []}
+        rows = (await db.execute(select(Slide).where(Slide.session_id == deck.id).order_by(Slide.slide_index))).scalars()
+        return {**base, "kind": "talk", "slides": [
+            {"index": s.slide_index, "title": titles.get(s.slide_index) or "", "text": (s.slide_text or "")[:1500],
+             "key_point": points.get(s.slide_index) or ""} for s in rows]}
+    # Built once (normally by the deck pipeline, right after the insights) and reused for every rehearsal
+    plan = deck.insights.get("qa_plan")
+    if not plan:
+        plan = await practice_plans.build_qa_plan(title, deck.insights, deck.requirement_prompt)
+        deck.insights = {**deck.insights, "qa_plan": plan}
+    return {**base, "kind": "qa", "plan": plan}
 
 
 @router.post("/live", response_model=LiveSessionResponse, status_code=201)
@@ -118,7 +132,7 @@ async def start_live_session(
     elif body.session_type == "Presentation":
         if not body.deck_id:
             raise HTTPException(status_code=422, detail="Choose the deck to rehearse the Q&A for")
-        context = await _deck_context(db, user, body.deck_id)
+        context = await _deck_context(db, user, body.deck_id, body.presentation_mode)
     elif body.topic:
         context = {"topic": body.topic}
     if context and context.get("plan"):
@@ -174,8 +188,8 @@ async def upload_recording(
     if s.status in LIVE_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="This session is being analysed")
     ext = audio_extension(file.filename)
-    s.recording_storage_path = await storage_service.save_upload(
-        f"{LIVE_STORAGE_PREFIX}/{live_id}", f"recording{ext}", await file.read()
+    s.recording_storage_path = await storage_service.save_upload_limited(
+        f"{LIVE_STORAGE_PREFIX}/{live_id}", f"recording{ext}", file, MAX_RECORDING_BYTES, "The recording"
     )
     await db.commit()
     return _to_response(s)

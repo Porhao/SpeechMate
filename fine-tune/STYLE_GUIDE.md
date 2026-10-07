@@ -1,6 +1,6 @@
 # Transcription Style Guide (Manglish recordings)
 
-Every clip in the test set and the training set follows these rules. The model learns your spelling habits. The smoke test showed this: after training on FLEURS it wrote "tiga" instead of "3". So **consistency matters more than any single choice**. When a case isn't covered, decide once, add it to §11, and apply it everywhere.
+Every clip in the test set and the training set follows these rules. The model learns your spelling habits. The smoke test showed this: after training on FLEURS it wrote "tiga" instead of "3". So **consistency matters more than any single choice**. When a case isn't covered, decide once, add it to §12, and apply it everywhere.
 
 **Golden rule: write what the speaker said, not what they meant.** Don't fix grammar, don't translate, don't tidy up.
 
@@ -129,7 +129,29 @@ s03_007.wav,"Um, so basically, saya rasa the project okay lah.",en,s03,own-recor
 - Listen to every clip in full, even when pre-filling with a model's output. Model drafts anchor you to their mistakes: "Actually" vs "Ashley", fillers silently dropped.
 - A second person re-checks a random 10%. If they disagree with more than about 1 word in 20, find which rule caused it and fix the rule here.
 
-## 11. Decisions log
+## 11. Disfluency marking (ground truth for the F1 score)
+
+Mark 50-60 of your own clips by ear. Interview answers (block B) have the most hesitations. Do it **before** looking at what SpeechMate flagged, so its output can't anchor you. The categories match what the app detects (`backend/app/services/live/speech.py`):
+
+| type | Mark when | App's rule |
+|---|---|---|
+| `filler` | A hesitation sound or filler word from §2 | Filler word list (§2) |
+| `pause` | Silence of **1.2 s or longer** in the middle of speech (not at the start or end) | `BLOCK_MIN_SECONDS = 1.2` |
+| `repetition` | The same whole word said twice in a row, within about 0.6 s ("I I think") | `REPETITION_MAX_GAP = 0.6` |
+
+Find times in Audacity or any audio editor; 0.1 s precision is enough. One row per event; a clip with none gets one row with type `none`.
+
+```csv
+clip_id,type,start_s,end_s,word
+s03_007,filler,1.4,1.7,um
+s03_007,pause,4.2,5.9,
+s03_007,repetition,6.1,6.6,i
+s03_012,none,,,
+```
+
+Scoring: a system flag counts as correct when its type matches and its start is within 0.5 s of a hand-marked event (each hand mark matched at most once).
+
+## 12. Decisions log
 
 Add new cases here as they come up (date, case, rule).
 

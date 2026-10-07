@@ -108,7 +108,7 @@ class SpeechSynthesizer:
             except Exception as e:  # noqa: BLE001
                 logger.error("Cloned-voice TTS failed, falling back: %s", e)
 
-        if malaysian_tts.is_available():
+        if malaysian_tts.is_available() and voice.narrator_voice != malaysian_tts.FAST_VOICE:
             try:
                 await asyncio.to_thread(malaysian_tts.synthesize, text, raw, voice.narrator_voice)
                 await self._finish(raw, out_wav)

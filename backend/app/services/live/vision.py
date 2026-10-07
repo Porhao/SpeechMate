@@ -270,7 +270,7 @@ def _classify(frame, classifier, detector) -> dict[str, float] | None:
 def analyze_emotion(frames: list) -> EmotionResult | None:
     classifier, detector = _emotion_models()
     # The most expensive per-frame op: use fewer frames than eye contact/posture
-    step = max(len(frames) // 24, 1)
+    step = max(len(frames) // 12, 1)  # ~1 s per frame on CPU: 12 frames are plenty for a mood read
     dists = [d for f in frames[::step] if (d := _classify(f, classifier, detector))]
     if not dists:
         return None

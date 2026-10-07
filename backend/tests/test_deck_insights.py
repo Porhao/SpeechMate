@@ -101,8 +101,7 @@ async def test_pdf_deck_end_to_end(tmp_path):
         ins = s["insights"]
         assert ins["stats"]["slide_count"] == 3
         assert ins["slides"][0]["key_point"].startswith("Five Strategies")  # text extracted from the PDF
-        scripts = (await client.get(f"/api/sessions/{sid}/scripts")).json()["slides"]
-        assert all(sl["script_text"] for sl in scripts)
+        assert s["video_ready"] is False  # decks are presented by the user; no example narration
 
     r = await httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test").post(
         "/api/sessions", files={"pptx": ("deck.docx", b"x")})

@@ -165,6 +165,15 @@ _QUESTION_BANK = {
 }
 
 
+def _interview_greeting(setup: dict, candidate_name: str | None) -> str:
+    """Built from the setup, not by the model: a small model mixes up the slots (it once
+    greeted "Aisyah" for "the Data Analyst position at Aisyah" when no company was given)."""
+    position = setup.get("position") or "this"
+    company = f" at {setup['company']}" if setup.get("company") else ""
+    return (f"Hi{' ' + candidate_name if candidate_name else ''}, I'm Alex, and I'll be interviewing you today "
+            f"for the {position} position{company}.")
+
+
 def _fallback_interview_plan(setup: dict, candidate_name: str | None = None) -> dict:
     kind = "technical" if setup.get("interview_type") == "technical" else "behavioural"
     bank = _QUESTION_BANK[kind]
@@ -172,10 +181,8 @@ def _fallback_interview_plan(setup: dict, candidate_name: str | None = None) -> 
         bank = _QUESTION_BANK["behavioural"][:3] + _QUESTION_BANK["technical"][1:3] + _QUESTION_BANK["behavioural"][-1:]
     position = setup.get("position") or "this"
     questions = [{"question": q.format(position=position), "assesses": a, "look_for": lf} for q, a, lf in bank]
-    company = f" at {setup['company']}" if setup.get("company") else ""
     return {
-        "intro": f"Hi{' ' + candidate_name if candidate_name else ''}, I'm Alex, and I'll be interviewing you today "
-                 f"for the {position} position{company}. {questions[0]['question']}",
+        "intro": f"{_interview_greeting(setup, candidate_name)} {questions[0]['question']}",
         "questions": questions,
         "source": "rules",
     }
@@ -196,7 +203,9 @@ async def build_interview_plan(setup: dict, candidate_name: str | None = None) -
         payload = {**setup, **({"candidate_name": candidate_name} if candidate_name else {})}
         plan = await _llm_json(INTERVIEW_SYSTEM, payload, _Plan)
         if plan:
-            return _finish(plan, candidate_name)
+            result = _finish(plan, candidate_name)
+            result["intro"] = f"{_interview_greeting(setup, candidate_name)} {result['questions'][0]['question']}"
+            return result
     except Exception as e:  # noqa: BLE001
         logger.error("Interview plan failed: %s", e)
     return _fallback_interview_plan(setup, candidate_name)
@@ -335,7 +344,7 @@ class _AnswerFeedback(BaseModel):
     relevance: int = Field(ge=1, le=5)
     structure: int = Field(ge=1, le=5)
     specificity: int = Field(ge=1, le=5)
-    went_well: str = Field(min_length=3, max_length=300)
+    went_well: str = Field(default="", max_length=300)  # a small model sometimes skips it: keep the rest
     improve: str = Field(min_length=3, max_length=300)
     stronger_answer: str = Field(min_length=10, max_length=600)
 
@@ -348,7 +357,7 @@ class _AnswersReport(BaseModel):
 class _Correction(BaseModel):
     said: str = Field(min_length=1, max_length=300)
     better: str = Field(min_length=1, max_length=300)
-    why: str = Field(min_length=3, max_length=200)
+    why: str = Field(default="", max_length=300)  # a small model sometimes skips it: keep the correction
 
 
 class _ConversationReport(BaseModel):
@@ -363,15 +372,23 @@ specificity (concrete examples, numbers, names vs. generic). Say what went well 
 and write a short stronger version of the answer using ONLY facts the candidate actually said (plus {extra}):
 never add tools, companies, places, numbers or results they didn't mention; where a detail is missing, write a
 placeholder like "<the result>" so they know to fill it in.
-Be encouraging and concrete. Then a 2-sentence overall summary.
-Return JSON only: {{"summary": "...", "answers": [{{"question", "relevance", "structure", "specificity", "went_well", "improve", "stronger_answer"}}]}}"""
+Write for a language learner: plain everyday words, short sentences, no jargon. In "went_well" and "improve",
+quote a few of the candidate's own words so they can see exactly which part you mean, and make "improve" one
+concrete action ("Start with the result: 'We cut errors by half'"), not general advice ("be more specific").
+Be encouraging. Then a 2-sentence overall summary.
+Return JSON only, every field filled:
+{{"summary": "...", "answers": [{{"question": "...", "relevance": 1-5, "structure": 1-5, "specificity": 1-5,
+"went_well": "...", "improve": "...", "stronger_answer": "..."}}]}}"""
 
 CONVERSATION_SYSTEM = """You are a friendly English communication coach for a Malaysian learner. From the learner's turns in
 a casual conversation, pick up to 5 real grammar or word-choice issues worth fixing (quote what they said, give the natural
-version, explain briefly). Malaysian English expressions and particles like "lah" are fine — only correct things that would
-confuse a listener or sound wrong in a formal setting. Add up to 3 tips about keeping a conversation going (asking questions
-back, giving detail). Then a 2-sentence summary starting with something they did well.
-Return JSON only: {"summary": "...", "corrections": [{"said", "better", "why"}], "tips": ["..."]}"""
+version, explain in one short plain sentence why it's better). Malaysian English expressions and particles like "lah" are
+fine — only correct things that would confuse a listener or sound wrong in a formal setting. Add up to 3 tips about keeping a
+conversation going, each tied to something they actually said ("When asked about your week you said 'okay only' — add one
+detail, like what you did on Saturday"). Then a 2-sentence summary starting with something they did well. Plain everyday
+words, no grammar jargon.
+Return JSON only, every field filled:
+{"summary": "...", "corrections": [{"said": "...", "better": "...", "why": "..."}], "tips": ["..."]}"""
 
 _STAR_CUES = {
     "situation": ("when i", "at my", "during", "in my", "last year", "once", "while i"),
@@ -445,8 +462,11 @@ async def content_feedback(session_type: str, context: dict | None, turns: list[
                     if invented_terms(a.stronger_answer, facts_for(i)):
                         a.stronger_answer = ("Lead with your main point, then the situation, what you did and the result, "
                                              "using your own details.")
-                return {"kind": "answers", **report.model_dump(), "source": "llm"}
-            answers = [_rule_answer(p, (plan_q.get(p["question"]) or {}).get("look_for")) for p in pairs]
+                out = report.model_dump()
+                for i, a in enumerate(out["answers"]):  # the learner's own words, shown next to the feedback
+                    a["answer"] = pairs[i]["answer"] if i < len(pairs) else ""
+                return {"kind": "answers", **out, "source": "llm"}
+            answers = [{**_rule_answer(p, (plan_q.get(p["question"]) or {}).get("look_for")), "answer": p["answer"]} for p in pairs]
             avg = sum(a["structure"] for a in answers) / len(answers)
             return {"kind": "answers", "source": "rules", "answers": answers,
                     "summary": f"You answered {len(answers)} question(s). "

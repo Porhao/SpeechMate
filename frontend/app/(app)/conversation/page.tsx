@@ -6,6 +6,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Coffee, Globe2, GraduationCap, MessageCircle, Shuffle, Sparkles, Users } from "lucide-react";
+import { authService } from "@/services/auth";
+import ClayArt from "@/components/three/ClayArt";
 import { Button, Card, Field, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 
 const SCENARIOS = [
@@ -30,11 +32,15 @@ export default function ConversationPage() {
   const [custom, setCustom] = useState("");
 
   const chosen = custom.trim() || topic;
-  const start = () => router.push(`/session?mode=Conversation&topic=${encodeURIComponent(chosen)}`);
+  const start = () => {
+    // Sessions are only recorded and analysed when signed in: ask before, not after, the talk
+    if (!authService.isSignedIn()) { router.push("/login?next=/conversation"); return; }
+    router.push(`/session?mode=Conversation&topic=${encodeURIComponent(chosen)}`);
+  };
 
   return (
     <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto">
-      <PageHeader eyebrow="Daily conversation" title="What would you like to talk about?">
+      <PageHeader eyebrow="Daily conversation" title="What would you like to talk about?" art={<ClayArt variant="mic" className="h-[260px]" />}>
         Have a relaxed spoken conversation with your AI partner. Nothing is scored while you talk; afterwards
         you get a simple report on how you sounded, the words you used and how you came across on camera.
       </PageHeader>
@@ -46,7 +52,7 @@ export default function ConversationPage() {
               const active = !custom.trim() && topic === t;
               return (
                 <button key={title} onClick={() => { setTopic(t); setCustom(""); }} aria-pressed={active}
-                  className="text-left p-4 flex gap-3 transition-colors"
+                  className="text-left p-4 rounded-lg flex gap-3 transition-colors hover:border-[var(--line-strong)]"
                   style={{ background: active ? "var(--surface-2)" : "var(--surface)", border: `1px solid ${active ? "var(--accent-ink)" : "var(--line)"}` }}>
                   <Icon className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "var(--accent-ink)" }} />
                   <span>

@@ -3,18 +3,22 @@
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   Mic, MicOff, PhoneOff, Send, Volume2, VolumeX, Shuffle,
-  Activity, Loader2, Video, VideoOff, Briefcase, EarOff, Presentation, ListChecks,
+  Activity, Loader2, Video, VideoOff, Briefcase, Presentation, ListChecks, Pencil, Keyboard,
 } from "lucide-react";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
-import { cn } from "@/lib/utils";
+import { cn, inkOf } from "@/lib/utils";
 import { liveService, conversationService } from "@/services/live";
 import { presentationService } from "@/services/presentation";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
 import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
 import type { SessionType, LiveSession, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
+
+// The partner's 3D orb (three.js, client-only)
+const VoiceOrb = dynamic(() => import("@/components/auth/VoiceOrb"), { ssr: false });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Message  = { role: "ai" | "user"; text: string; ts: number };
@@ -198,11 +202,11 @@ function computeGazeTunneling(
 type Blendshape = { categoryName: string; score: number };
 
 const MOOD_STATES = {
-  Engaged:     { color: "#5C729B" },
-  Confident:   { color: "#3F6B4C" },
-  Enthusiastic:{ color: "#8A5A22" },
-  Tense:       { color: "#8C3B32" },
-  Uncertain:   { color: "#5A5470" },
+  Engaged:     { color: "#3E6FB0" },
+  Confident:   { color: "#2F7A4F" },
+  Enthusiastic:{ color: "#A8620F" },
+  Tense:       { color: "#C2342C" },
+  Uncertain:   { color: "#6B4FC4" },
 } as const;
 type MoodLabel = keyof typeof MOOD_STATES;
 
@@ -239,130 +243,40 @@ function computeFluency(wc: number, fc: number, elapsed: number) {
   return { score: clamp(Math.round(ws * 0.6 + fs * 0.4)), wpm };
 }
 
-// ── AI Orb (Sesame-inspired) ──────────────────────────────────────────────────
-// `level` (0–1) is the user's live mic amplitude from a real AnalyserNode —
-// while listening, the orb visibly breathes with the user's actual voice
-// instead of running a generic canned loop.
-function AIOrb({ state, level = 0 }: { state: OrbState; level?: number }) {
-  const glow = {
-    idle:      "0 0 40px rgba(92,114,155,0.35), 0 0 80px rgba(92,114,155,0.1), inset 0 0 30px rgba(255,255,255,0.04)",
-    thinking:  "0 0 40px rgba(156,106,40,0.5), 0 0 80px rgba(156,106,40,0.2)",
-    speaking:  "0 0 60px rgba(92,114,155,0.7), 0 0 120px rgba(99,102,241,0.35), inset 0 0 40px rgba(255,255,255,0.08)",
-    listening: "0 0 50px rgba(77,122,89,0.55), 0 0 100px rgba(77,122,89,0.2)",
-  }[state];
-
-  const grad = {
-    idle:      "radial-gradient(circle at 35% 30%, #93c5fd 0%, #3b82f6 35%, #1e40af 65%, #0f172a 100%)",
-    thinking:  "radial-gradient(circle at 35% 30%, #fde68a 0%, #f59e0b 35%, #92400e 65%, #0f172a 100%)",
-    speaking:  "radial-gradient(circle at 35% 30%, #a5b4fc 0%, #6366f1 30%, #3b82f6 55%, #1e3a8a 75%, #0f172a 100%)",
-    listening: "radial-gradient(circle at 35% 30%, #86efac 0%, #22c55e 35%, #15803d 65%, #0f172a 100%)",
-  }[state];
-
+// ── The user's own message, with "Fix" for when speech recognition misheard ──
+function UserBubble({ text, className, style, onFix }: {
+  text: string; className: string; style: React.CSSProperties; onFix: (text: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  if (editing) {
+    return (
+      <form className="flex-1 max-w-[85%] flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); onFix(draft); setEditing(false); }}>
+        <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} aria-label="What you actually said"
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onFix(draft); setEditing(false); } if (e.key === "Escape") setEditing(false); }}
+          className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ background: "var(--surface)", border: "1px solid var(--accent-ink)", color: "var(--ink)" }} />
+        <span className="flex gap-2 justify-end">
+          <button type="button" onClick={() => setEditing(false)} className="text-xs font-semibold px-3 py-1.5 rounded-md" style={{ color: "var(--muted)" }}>Cancel</button>
+          <button type="submit" className="text-xs font-semibold px-3 py-1.5 rounded-md text-white" style={{ background: "var(--accent)" }}>Save</button>
+        </span>
+      </form>
+    );
+  }
   return (
-    <div className="relative flex items-center justify-center select-none" style={{ width: 200, height: 200 }}>
-
-      {/* Outermost ambient glow ring */}
-      <div className="absolute rounded-full pointer-events-none"
-        style={{
-          inset: -20,
-          background: state === "listening"
-            ? "radial-gradient(circle, rgba(77,122,89,0.08) 0%, transparent 70%)"
-            : "radial-gradient(circle, rgba(92,114,155,0.07) 0%, transparent 70%)",
-        }} />
-
-      {/* Ripple rings — speaking */}
-      {state === "speaking" && [0, 1, 2].map((i) => (
-        <div key={i} className="absolute rounded-full border pointer-events-none"
-          style={{
-            inset: -(i + 1) * 18,
-            borderColor: `rgba(99,102,241,${0.25 - i * 0.07})`,
-            animation: `ping 1.6s cubic-bezier(0,0,0.2,1) ${i * 0.45}s infinite`,
-          }} />
-      ))}
-
-      {/* Listening pulse ring */}
-      {state === "listening" && (
-        <div className="absolute rounded-full border-2 border-green-400/40 pointer-events-none animate-pulse"
-          style={{ inset: -12 }} />
-      )}
-
-      {/* Thinking spin ring */}
-      {state === "thinking" && (
-        <div className="absolute rounded-full pointer-events-none"
-          style={{
-            inset: -6,
-            border: "2px solid transparent",
-            borderTopColor: "rgba(156,106,40,0.7)",
-            borderRightColor: "rgba(156,106,40,0.3)",
-            animation: "spin 1.4s linear infinite",
-          }} />
-      )}
-
-      {/* Orb body */}
-      <div className="relative rounded-full overflow-hidden"
-        style={{
-          width: 200, height: 200,
-          background: grad,
-          boxShadow: state === "listening" ? `${glow}, 0 0 ${40 + level * 60}px rgba(77,122,89,${0.25 + level * 0.35})` : glow,
-          transform: state === "listening" ? `scale(${1 + Math.min(level, 1) * 0.09})` : undefined,
-          transition: state === "listening"
-            ? "transform 0.1s ease-out, box-shadow 0.1s ease-out, background 0.6s ease"
-            : "background 0.6s ease, box-shadow 0.6s ease",
-          animation: state === "idle" ? "orb-breathe 4s ease-in-out infinite"
-                   : state === "speaking" ? "orb-speak-pulse 1.2s ease-in-out infinite"
-                   : undefined,
-        }}>
-        {/* Specular highlight */}
-        <div className="absolute rounded-full bg-white/20 blur-[6px]"
-          style={{ width: "42%", height: "28%", top: "14%", left: "18%" }} />
-        {/* Inner depth */}
-        <div className="absolute rounded-full bg-white/5 blur-xl"
-          style={{ inset: "20%" }} />
-        {/* Bottom shadow */}
-        <div className="absolute bottom-0 left-0 right-0 h-1/3 rounded-b-full"
-          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }} />
-      </div>
-
-      {/* Waveform bars below orb — speaking */}
-      {state === "speaking" && (
-        <div className="absolute flex gap-[3px] items-end" style={{ bottom: -32, left: "50%", transform: "translateX(-50%)" }}>
-          {[3, 5, 8, 12, 9, 6, 10, 7, 4, 8, 5, 3].map((h, i) => (
-            <div key={i} className="rounded-full"
-              style={{
-                width: 3,
-                height: h * 2,
-                background: "rgba(99,102,241,0.75)",
-                animation: `waveform-bar 0.7s ease-in-out ${i * 0.07}s infinite alternate`,
-              }} />
-          ))}
-        </div>
-      )}
-
-      {/* Mic bars below orb — listening, driven by real mic amplitude.
-          Each bar samples the same level with a different responsiveness
-          curve so the row doesn't move as one flat block. */}
-      {state === "listening" && (
-        <div className="absolute flex gap-[3px] items-end" style={{ bottom: -32, left: "50%", transform: "translateX(-50%)", height: 24 }}>
-          {[0.5, 0.75, 1, 1.3, 1, 0.75, 1, 1.3, 1, 0.75, 0.5].map((mult, i) => {
-            const h = Math.max(4, Math.min(24, 4 + level * 60 * mult));
-            return (
-              <div key={i} className="rounded-full"
-                style={{
-                  width: 3,
-                  height: h,
-                  background: "rgba(77,122,89,0.8)",
-                  transition: "height 0.09s ease-out",
-                }} />
-            );
-          })}
-        </div>
-      )}
+    <div className="group flex flex-row-reverse items-start gap-1.5 max-w-[85%]">
+      <div className={className} style={style}>{text}</div>
+      <button onClick={() => { setDraft(text); setEditing(true); }} title="Misheard? Correct what you said"
+        aria-label={`Fix this message: ${text}`}
+        className="mt-1 flex items-center gap-1 text-[11px] font-semibold px-1.5 py-1 rounded-md opacity-60 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--surface-3)]"
+        style={{ color: "var(--muted)" }}>
+        <Pencil className="w-3 h-3" /> Fix
+      </button>
     </div>
   );
 }
 
 // ── Header mic pulse — tiny live waveform next to the session timer ──────────
-function HeaderPulse({ level, active, color = "#5C729B" }: { level: number; active: boolean; color?: string }) {
+function HeaderPulse({ level, active, color = "#3E6FB0" }: { level: number; active: boolean; color?: string }) {
   return (
     <div className="flex items-end gap-[2px]" style={{ height: 13 }}>
       {[0.6, 1, 0.7, 1.2, 0.7].map((mult, i) => {
@@ -378,8 +292,8 @@ function HeaderPulse({ level, active, color = "#5C729B" }: { level: number; acti
 // ── Interviewer Avatar ────────────────────────────────────────────────────────
 function InterviewerAvatar({ state }: { state: OrbState }) {
   const s = {
-    idle:      { border: "rgba(35,52,92,0.32)", glow: "rgba(35,52,92,0.18)", text: "Ready",       tc: "rgba(255,255,255,0.38)" },
-    speaking:  { border: "rgba(35,52,92,0.85)", glow: "rgba(35,52,92,0.48)", text: "Speaking…",   tc: "#60a5fa" },
+    idle:      { border: "rgba(26,58,58,0.32)", glow: "rgba(26,58,58,0.18)", text: "Ready",       tc: "rgba(255,255,255,0.38)" },
+    speaking:  { border: "rgba(26,58,58,0.85)", glow: "rgba(26,58,58,0.48)", text: "Speaking…",   tc: "#60a5fa" },
     listening: { border: "rgba(77,122,89,0.72)",  glow: "rgba(77,122,89,0.32)",  text: "Listening…",  tc: "#4ade80" },
     thinking:  { border: "rgba(156,106,40,0.72)", glow: "rgba(156,106,40,0.32)", text: "Thinking…",   tc: "#fbbf24" },
   }[state];
@@ -511,7 +425,7 @@ function InterviewerAvatar({ state }: { state: OrbState }) {
           <p className="text-[10px] transition-colors duration-500" style={{ color: s.tc }}>{s.text}</p>
         </div>
         <span className="text-[9px] font-bold px-2 py-0.5 rounded-md"
-          style={{ background: "rgba(35,52,92,0.22)", color: "#93c5fd", border: "1px solid rgba(35,52,92,0.35)" }}>
+          style={{ background: "rgba(26,58,58,0.22)", color: "#93c5fd", border: "1px solid rgba(26,58,58,0.35)" }}>
           AI
         </span>
       </div>
@@ -556,10 +470,36 @@ function SessionContent() {
   // AI reply text is ready and its voice is loading: shown as "thinking" until audio really plays
   const [voicePending,   setVoicePending]   = useState(false);
   const [interimText,    setInterimText]    = useState("");
+  // Presentation talk: the slide on screen, and when each slide was put up (seconds into the recording)
+  const [slideIdx, setSlideIdx] = useState(1);
+  const [showCue, setShowCue] = useState(false);
+  const slideTimesRef = useRef<{ slide_index: number; t_sec: number }[]>([]);
+  const recStartRef = useRef(0);
+  const isTalkRef = useRef(false);
+  const slideIdxRef = useRef(1);
+  const slideCountRef = useRef(0);
+  // Move to slide n (clamped); while presenting, note when it went up
+  const goToSlide = (n: number) => {
+    const next = Math.max(1, Math.min(slideCountRef.current, n));
+    if (!slideCountRef.current || next === slideIdxRef.current) return;
+    slideIdxRef.current = next;
+    setSlideIdx(next);
+    if (activeRef.current && recStartRef.current) {
+      slideTimesRef.current.push({ slide_index: next, t_sec: Math.round((Date.now() - recStartRef.current) / 100) / 10 });
+    }
+  };
+  // Words already transcribed and waiting for the AI's reply (shows "I'm done, reply now")
+  const [pendingSpeech,  setPendingSpeech]  = useState(false);
+  const replyAsapRef = useRef(false);           // the user pressed "reply now": skip the wait
+  const replyWhenQuietRef = useRef<() => void>(() => {});
+  // Why the camera/mic couldn't start (permission denied, no device, in use elsewhere)
+  const [camError,       setCamError]       = useState<string | null>(null);
   const [wpm,            setWpm]            = useState(0);
   const [, setFillerCount]    = useState(0);
   const [voiceEnabled,   setVoiceEnabled]   = useState(true);
   const [currentTopic,   setCurrentTopic]   = useState(searchParams.get("topic") || RANDOM_TOPICS[0]);
+  // A drill from the results page ("Practise this now"): the one skill to focus on, kept on screen
+  const drillFocus = searchParams.get("focus");
 
   // The prepared session (interview setup / deck) and how far through its question plan we are
   const [prepared,      setPrepared]      = useState<LiveSession | null>(null);
@@ -595,6 +535,13 @@ function SessionContent() {
   const audioLevelRef = useRef(0);
   const audioMeterRafRef = useRef<number>(0);
   const [audioLevel, setAudioLevel] = useState(0);
+  // What the user is answering, sent with each turn so speech recognition gets topic words right
+  const sttContextRef = useRef("");
+  // Drives the partner orb: it ripples with the user's voice while they speak
+  const orbEnergyRef = useRef(0);
+  useEffect(() => {
+    if (interimText === "Hearing you…") orbEnergyRef.current = Math.min(1, Math.max(orbEnergyRef.current, audioLevel * 3));
+  }, [audioLevel, interimText]);
 
   // ── Value refs ────────────────────────────────────────────────────────────
   const activeRef           = useRef(false);
@@ -651,6 +598,7 @@ function SessionContent() {
 
   // Track conversation history for real AI calls
   const messagesRef     = useRef<Message[]>([]);
+  const replyGenRef     = useRef(0);
   const currentTopicRef = useRef(currentTopic);
 
   // ── Sync refs ─────────────────────────────────────────────────────────────
@@ -687,6 +635,9 @@ function SessionContent() {
   }, []);
 
   const resumeListening = useCallback(() => {
+    // The user's turn starts now: the "still there?" check-in counts silence from here, not
+    // from before the AI's (possibly slow) reply, which made it fire as soon as the AI stopped
+    lastSpeechTimeRef.current = Date.now();
     if (activeRef.current && isRecordingRef.current && !aiSpeakingRef.current && !aiTypingRef.current)
       startSpeechRef.current();
   }, []);
@@ -743,12 +694,13 @@ function SessionContent() {
   const triggerAIReply = useCallback(async (spokenText: string) => {
     if (!activeRef.current || aiTypingRef.current || aiSpeakingRef.current) return;
     if (!spokenText.trim()) return;
+    const gen = ++replyGenRef.current;  // a fix to this message while the reply is written makes it stale
 
     const userMsg: Message = { role: "user", text: spokenText.trim(), ts: Date.now() };
     setMessages((p) => [...p, userMsg]);
     setAiTyping(true); aiTypingRef.current = true;
     if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
-    pendingUserSpeechRef.current = "";
+    pendingUserSpeechRef.current = ""; setPendingSpeech(false); replyAsapRef.current = false;
     detachRecognizer();  // the user's turn is over; nothing said now would be answered
 
     // Build conversation history for the API (last 12 msgs + the new user msg)
@@ -764,6 +716,7 @@ function SessionContent() {
         modeRef.current === "Conversation" ? currentTopicRef.current : undefined,
         backendSessionIdRef.current ?? undefined,
       );
+      if (gen !== replyGenRef.current) return;  // the user corrected what they said: that reply was for the misheard words
       if (progress && total_questions) setPlanProgress({ asked: Math.min(progress.asked, total_questions), total: total_questions });
 
       setAiTyping(false); aiTypingRef.current = false;
@@ -774,6 +727,7 @@ function SessionContent() {
       const prompts = MODE_PROMPTS[modeRef.current] ?? MODE_PROMPTS.Conversation;
       const idx = promptIndexRef.current;
       setTimeout(() => {
+        if (gen !== replyGenRef.current) return;
         setAiTyping(false); aiTypingRef.current = false;
         let reply: string;
         if (idx < prompts.length) {
@@ -793,6 +747,24 @@ function SessionContent() {
   }, [speakText, detachRecognizer]);
 
   useEffect(() => { triggerAIReplyRef.current = triggerAIReply; }, [triggerAIReply]);
+
+  // "Fix": correct a misheard message. In Conversation, if the AI is still writing its reply to
+  // it, that reply is dropped and asked again with the right words. (Interview and Q&A replies
+  // advance the server's question plan, so there the fix corrects the record and the feedback only.)
+  const fixMessage = useCallback((i: number, text: string) => {
+    const t = text.trim();
+    const msgs = messagesRef.current;
+    if (!t || msgs[i]?.role !== "user" || msgs[i].text === t) return;
+    if (i === msgs.length - 1 && aiTypingRef.current && modeRef.current === "Conversation") {
+      replyGenRef.current++;
+      messagesRef.current = msgs.slice(0, -1);
+      setMessages(messagesRef.current);
+      setAiTyping(false); aiTypingRef.current = false;
+      triggerAIReplyRef.current(t);
+      return;
+    }
+    setMessages((p) => p.map((m, j) => (j === i ? { ...m, text: t } : m)));
+  }, []);
 
   // ── Backchannels ──────────────────────────────────────────────────────────
   const prefetchBackchannels = useCallback(async () => {
@@ -997,11 +969,17 @@ function SessionContent() {
       pronounceRef.current = Math.round(ema(pronounceRef.current, conf * 100, 0.3));
       pendingUserSpeechRef.current += (pendingUserSpeechRef.current ? " " : "") + text.trim();
       if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
-      autoReplyTimerRef.current = setTimeout(() => {
+      const replyWhenQuiet = () => {
+        // Still talking, or their next words are being transcribed: check again shortly
+        // (that transcript resets this timer with everything said)
+        if (voiceListenerRef.current?.isBusy) { autoReplyTimerRef.current = setTimeout(replyWhenQuiet, 500); return; }
         const spoken = pendingUserSpeechRef.current.trim();
-        pendingUserSpeechRef.current = "";
+        pendingUserSpeechRef.current = ""; setPendingSpeech(false);
         if (spoken) triggerAIReplyRef.current(spoken);
-      }, replyDelayMs);
+      };
+      replyWhenQuietRef.current = replyWhenQuiet;
+      setPendingSpeech(true);
+      autoReplyTimerRef.current = setTimeout(replyWhenQuiet, replyAsapRef.current ? 0 : replyDelayMs);
     };
 
     const opened = () => {
@@ -1015,16 +993,15 @@ function SessionContent() {
     };
     // Backend transcription (faster-whisper) of each spoken turn
     if (!sttAvailableRef.current || !streamRef.current) return;
-    const listener: VoiceTurnListener = new VoiceTurnListener(conversationService.transcribe, {
+    const listener: VoiceTurnListener = new VoiceTurnListener((wav) => conversationService.transcribe(wav, sttContextRef.current), {
       onSpeechStart: () => {
         noteAnswerStarted();
-        // The user is (still) talking: don't answer yet
+        // The user is (still) talking: a pending reply now waits (see replyWhenQuiet)
         lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
-        if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
         setInterimText("Hearing you…");
       },
       onTranscribing: () => setInterimText("Transcribing…"),
-      // The listener already waited ~1 s of silence before sending the turn
+      // The listener already waited ~1.6 s of silence before sending the turn
       onText: (text) => { setInterimText(""); if (text) onFinal(text, 0.85, 1200); },
       onError: () => {
         // Backend STT unavailable: the user types for the rest of the session
@@ -1040,6 +1017,15 @@ function SessionContent() {
   useEffect(() => { startSpeechRef.current = startSpeech; }, [startSpeech]);
 
   const stopSpeech = detachRecognizer;
+
+  // "I'm done, reply now": answer as soon as the last words are transcribed, without the usual wait
+  const replyNow = useCallback(() => {
+    replyAsapRef.current = true;
+    if (pendingUserSpeechRef.current.trim()) {
+      if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
+      replyWhenQuietRef.current();
+    }
+  }, []);
 
   const interruptAI = useCallback(() => {
     speakTokenRef.current++;  // cancels a voice still loading, and the old utterance's callbacks
@@ -1087,6 +1073,7 @@ function SessionContent() {
 
   // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
+    setCamError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -1112,9 +1099,17 @@ function SessionContent() {
         const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         mr.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
         mr.start(1000);
+        recStartRef.current = Date.now();
         mediaRecorderRef.current = mr;
       } catch { /* MediaRecorder unsupported — session still works, just without backend analysis */ }
-    } catch { /* ok */ }
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : "";
+      setCamError(
+        name === "NotAllowedError" ? "Camera and microphone access was blocked. Allow it in your browser's address bar, then reload this page."
+        : name === "NotFoundError" ? "No camera or microphone was found. Connect one and reload, or type your replies below."
+        : name === "NotReadableError" ? "Your camera or microphone is being used by another app. Close it and reload."
+        : "Couldn't start your camera and microphone. You can still type your replies below.");
+    }
   }, [setCameraOn, startAudioMeter]);
 
   const stopRecording = useCallback((): Promise<Blob | null> => {
@@ -1168,10 +1163,16 @@ function SessionContent() {
     backendSessionIdRef.current = backendSession?.id ?? null;
     if (backendSession) startLiveSession(backendSession, mode as SessionType);
 
-    prefetchBackchannels();
     timerRef.current = setInterval(() => incrementDuration(), 1000);
-    startSpeech();
     initMediaPipe().then(() => { if (activeRef.current) animRef.current = requestAnimationFrame(runDetection); });
+    if (isTalkRef.current) {
+      // Presenting: the user talks, the AI stays silent; the analysis afterwards uses the recording
+      // and when each slide was shown (from the start of the recording)
+      slideTimesRef.current = [{ slide_index: slideIdxRef.current, t_sec: 0 }];
+      return;
+    }
+    prefetchBackchannels();
+    startSpeech();
 
     // The opening line: the plan's intro (interview / Q&A) or a greeting from the partner;
     // scripted when no LLM is available
@@ -1244,6 +1245,7 @@ function SessionContent() {
       }));
       await liveService.end(sessionId, duration, turns, {
         response_latency_sec: latenciesRef.current,
+        ...(isTalkRef.current ? { slide_times: slideTimesRef.current } : {}),
         ...(tunneling.label !== "Not enough data" ? { gaze_tunneling: tunneling.correlation } : {}),
       });
       if (!recordedBlob) throw new Error("No recording to analyse");
@@ -1272,9 +1274,10 @@ function SessionContent() {
   useEffect(() => {
     if (!sessionStarted) return;
     silenceCheckRef.current = setInterval(() => {
-      if (!activeRef.current || aiTypingRef.current || aiSpeakingRef.current) return;
+      if (!activeRef.current || aiTypingRef.current || aiSpeakingRef.current || isTalkRef.current) return;
+      if (voiceListenerRef.current?.isBusy) { lastSpeechTimeRef.current = Date.now(); return; }
       if ((performance.now() - startTimeRef.current) / 1000 < 20) return;
-      if ((Date.now() - lastSpeechTimeRef.current) / 1000 > 22 && !checkinAskedRef.current) {
+      if ((Date.now() - lastSpeechTimeRef.current) / 1000 > 30 && !checkinAskedRef.current) {
         checkinAskedRef.current = true;
         const msg = CHECKIN_MESSAGES[Math.floor(Date.now() / 1000) % CHECKIN_MESSAGES.length];
         setMessages((p) => [...p, { role: "ai", text: msg, ts: Date.now() }]);
@@ -1291,6 +1294,30 @@ function SessionContent() {
     else { streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = true)); startSpeech(); }
     setRecording(!isRecording);
   };
+
+  // Keyboard: Space = "I'm done", Esc = interrupt the AI, M = mute/unmute (not while typing)
+  const keysRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    keysRef.current = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (e.ctrlKey || e.metaKey || e.altKey || el?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (isTalkRef.current) {  // presenting: the keys a clicker sends move the slides
+        if (["ArrowRight", "PageDown", " "].includes(e.key)) { e.preventDefault(); goToSlide(slideIdxRef.current + 1); }
+        else if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); goToSlide(slideIdxRef.current - 1); }
+        else if (sessionStarted && e.key.toLowerCase() === "m") { e.preventDefault(); toggleMic(); }
+        return;
+      }
+      if (!sessionStarted) return;
+      if (e.key === " " && (pendingUserSpeechRef.current || voiceListenerRef.current?.isBusy)) { e.preventDefault(); replyNow(); }
+      else if (e.key === "Escape" && aiSpeakingRef.current) { e.preventDefault(); interruptAI(); }
+      else if (e.key.toLowerCase() === "m") { e.preventDefault(); toggleMic(); }
+    };
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keysRef.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const toggleCamera = () => {
     if (!sessionStarted) return;
@@ -1322,6 +1349,14 @@ function SessionContent() {
     }
   }, [sessionStarted, speakText]);
 
+  // Closing or reloading the tab mid-session would lose the recording: ask first
+  useEffect(() => {
+    if (!sessionStarted || isEnding) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [sessionStarted, isEnding]);
+
   // ── Scroll + cleanup ──────────────────────────────────────────────────────
   // Scroll only the chat box to its latest message (scrollIntoView would also scroll the page)
   useEffect(() => {
@@ -1351,9 +1386,10 @@ function SessionContent() {
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   const MODE_COLORS: Record<string, string> = {
-    Conversation: "#5C729B", Interview: "#79738C", Presentation: "#9C6A28",
+    Conversation: "#D6245F", Interview: "#1A3A3A", Presentation: "#6B4FC4",
   };
-  const mc = MODE_COLORS[mode] ?? "#5C729B";
+  const mc = MODE_COLORS[mode] ?? "#D6245F";
+  const mcInk = inkOf(mc);  // the mode colour as readable text in either theme
 
   const orbState: OrbState =
     thinking   ? "thinking"  :
@@ -1361,16 +1397,141 @@ function SessionContent() {
     speechActive && sessionStarted ? "listening" : "idle";
 
   const stateLabel =
+    prepared?.context?.kind === "talk" ? (sessionStarted ? "Presenting" : "Ready to start") :
     thinking    ? "Thinking…"      :
     aiSpeaking  ? "AI speaking"    :
     speechActive && sessionStarted ? "Listening…" :
     sessionStarted ? "Your turn"   : "Ready to start";
 
   const currentQuestion = messages.filter((m) => m.role === "ai").at(-1)?.text ?? null;
-  const showYourTurn    = sessionStarted && !thinking && !aiSpeaking
-    && messages.length > 0 && messages[messages.length - 1].role === "ai";
   const setup = prepared?.context?.setup;
   const deckTitle = prepared?.context?.deck_title;
+  // Presenting the deck (vs. the Q&A rehearsal)
+  const isTalk = prepared?.context?.kind === "talk";
+  const talkSlides = prepared?.context?.slides ?? [];
+  const deckId = prepared?.context?.deck_id;
+  useEffect(() => { isTalkRef.current = isTalk; slideCountRef.current = talkSlides.length; }, [isTalk, talkSlides.length]);
+
+  // Context for speech recognition: what this session is about, then the AI's last line
+  useEffect(() => {
+    const lastAi = messages.filter((m) => m.role === "ai").at(-1)?.text ?? "";
+    const about = mode === "Interview" && setup ? `Interview for the ${setup.position} role${setup.company ? ` at ${setup.company}` : ""}.`
+      : deckTitle ? `Q&A on the presentation "${deckTitle}".` : currentTopic ? `Topic: ${currentTopic}.` : "";
+    sttContextRef.current = `${about} ${lastAi}`.trim();
+  }, [messages, mode, setup, deckTitle, currentTopic]);
+
+  // ── Whose turn is it? One plain answer for the turn banner ─────────────────
+  const partner = mode === "Interview" ? "Alex" : mode === "Presentation" ? "The moderator" : "Your partner";
+  const userSpeaking = interimText === "Hearing you…";
+  const transcribing = interimText === "Transcribing…";
+  type Turn = { tone: "you" | "ai" | "wait" | "off"; icon: typeof Mic; title: string; hint: string };
+  const turn: Turn | null =
+    !sessionStarted ? null :
+    aiSpeaking ? { tone: "ai", icon: Volume2, title: `${partner} is talking`, hint: "Listen. You can interrupt if you need to." } :
+    thinking ? { tone: "wait", icon: Loader2, title: `${partner} is thinking…`, hint: "Your answer was received. A reply is on its way." } :
+    userSpeaking ? { tone: "you", icon: Mic, title: "Listening… keep going", hint: "When you've finished, pause for about 2 seconds, or press “I'm done”." } :
+    transcribing || pendingSpeech ? { tone: "you", icon: Mic, title: "Got it. Writing down what you said…", hint: "Keep talking to add more, or press “I'm done” for the reply." } :
+    !sttAvailable ? { tone: "you", icon: Send, title: "Your turn: type your answer below", hint: "Voice input isn't available on the server right now." } :
+    !isRecording ? { tone: "off", icon: MicOff, title: "Your microphone is muted", hint: "Unmute it (bottom-left of the video) to answer by voice, or type below." } :
+    { tone: "you", icon: Mic, title: "Your turn: speak now", hint: "Talk naturally. Pause for about 2 seconds when you've finished." };
+  const TURN_STYLE: Record<Turn["tone"], React.CSSProperties> = {
+    you: { background: mc, color: "#fff" },
+    ai: { background: "var(--surface-3)", color: "var(--ink)" },
+    wait: { background: "var(--surface-2)", color: "var(--ink)" },
+    off: { background: "var(--surface-2)", color: "var(--ink)", border: "1px dashed var(--line-strong)" },
+  };
+  const turnBanner = turn && (
+    <div className={cn("flex-shrink-0 rounded-xl p-4 sm:p-5", turn.tone === "you" && "clay")} style={TURN_STYLE[turn.tone]}
+      role="status" aria-live="polite">
+      <div className="flex items-center gap-4">
+        <span className={cn("w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0",
+          turn.tone === "you" && userSpeaking && "animate-pulse")}
+          style={{ background: turn.tone === "you" ? "rgba(255,255,255,0.22)" : "var(--surface)" }}>
+          <turn.icon className={cn("w-6 h-6", turn.tone === "wait" && "animate-spin")} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-xl sm:text-2xl leading-tight">{turn.title}</p>
+          <p className="text-sm mt-0.5 opacity-80">{turn.hint}</p>
+          {/* Live mic level while it's the user's turn: shows the mic is really hearing them */}
+          {turn.tone === "you" && isRecording && sttAvailable && (
+            <span className="mt-2.5 block h-1.5 w-full max-w-[240px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.25)" }}>
+              <span className="block h-full rounded-full bg-white transition-[width] duration-100" style={{ width: `${Math.min(100, audioLevel * 260)}%` }} />
+            </span>
+          )}
+        </div>
+        {aiSpeaking && (
+          <button onClick={interruptAI} className="flex-shrink-0 h-10 px-4 rounded-md text-sm font-semibold"
+            style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--line-strong)" }}>
+            Interrupt
+          </button>
+        )}
+        {turn.tone === "you" && (userSpeaking || transcribing || pendingSpeech) && (
+          <button onClick={replyNow} className="flex-shrink-0 h-10 px-4 rounded-md text-sm font-semibold"
+            style={{ background: "#fff", color: "#0A0A0A" }}>
+            I&apos;m done
+          </button>
+        )}
+      </div>
+      <p className="hidden md:flex items-center gap-1.5 mt-3 text-[11px] opacity-70">
+        <Keyboard className="w-3.5 h-3.5" /> Space: I&apos;m done · Esc: interrupt · M: mute
+      </p>
+      {planProgress && (
+        <div className="mt-4 flex items-center gap-3">
+          <span className="text-xs font-semibold opacity-80 whitespace-nowrap">
+            Question {Math.max(1, Math.min(planProgress.asked, planProgress.total))} of {planProgress.total}
+          </span>
+          <span className="flex gap-1.5 flex-1">
+            {Array.from({ length: planProgress.total }, (_, i) => (
+              <span key={i} className="h-1.5 flex-1 rounded-full" style={{
+                background: i < planProgress.asked ? (turn.tone === "you" ? "#fff" : mc) : (turn.tone === "you" ? "rgba(255,255,255,0.3)" : "var(--line)"),
+              }} />
+            ))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Before starting: what will happen, in four steps, with the big start button ──
+  const startLabel = isTalk ? "Start presenting" : mode === "Interview" ? "Start interview" : mode === "Presentation" ? "Start Q&A" : "Start conversation";
+  const preparing = mode !== "Conversation" && !prepared;
+  const startGuide = (
+    <div className="h-full flex flex-col justify-center max-w-md mx-auto py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--muted)" }}>How this works</p>
+      <h2 className="font-display text-3xl mt-1" style={{ color: "var(--ink)" }}>
+        {isTalk ? "Present your deck" : mode === "Interview" ? "Your interview with Alex" : mode === "Presentation" ? "Your Q&A rehearsal" : "Just talk"}
+      </h2>
+      <ol className="mt-5 space-y-3.5">
+        {(isTalk ? [
+          [Video, "Allow your camera and microphone when the browser asks."],
+          [Presentation, "Press Start, then present as you would to a real audience: to the camera, not the slide."],
+          [Mic, "Move through your slides with → and ← (or the buttons). The app notes when each slide is on screen."],
+          [ListChecks, "Press End when you've finished. You'll see if what you said matched each slide, plus voice and body language."],
+        ] : [
+          [Video, "Allow your camera and microphone when the browser asks."],
+          [Volume2, `${partner} speaks first. Listen, then the big banner tells you when it's your turn.`],
+          [Mic, "Answer out loud. When you've finished, pause for about 2 seconds, or press “I'm done”."],
+          [ListChecks, "Press End when you're finished. Nothing is scored while you talk: your report comes after."],
+        ]).map(([Icon, text], i) => {
+          const I = Icon as typeof Mic;
+          return (
+            <li key={i} className="flex gap-3 items-start">
+              <span className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white" style={{ background: mc }}>
+                <I className="w-4 h-4" />
+              </span>
+              <span className="text-sm leading-relaxed pt-1" style={{ color: "var(--ink-2)" }}>{text as string}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <button onClick={startSession} disabled={preparing}
+        className="clay mt-7 h-14 rounded-lg text-base font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+        style={{ background: mc }}>
+        {preparing ? <><Loader2 className="w-5 h-5 animate-spin" /> {mode === "Presentation" ? "Loading your deck…" : "Getting your questions ready…"}</> : <><Mic className="w-5 h-5" /> {startLabel}</>}
+      </button>
+      {camError && <p className="text-sm mt-3" role="alert" style={{ color: "var(--bad)" }}>{camError}</p>}
+    </div>
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1378,16 +1539,20 @@ function SessionContent() {
   const stateColor =
     orbState === "listening" ? "#4ade80" : orbState === "speaking" ? "#93c5fd" :
     orbState === "thinking" ? "#fbbf24" : "rgba(255,255,255,0.55)";
+  // The same state as text on a themed card (the bright stateColor is for chips over video)
+  const stateInk =
+    orbState === "listening" ? "var(--ok)" : orbState === "speaking" ? "var(--accent-ink)" :
+    orbState === "thinking" ? "var(--warn)" : "var(--muted)";
   const chip = { background: "rgba(0,0,0,0.6)" } as const;
   const LIGHT_STATUS = {
-    good: { label: "Good", color: "#4ade80" },
-    fair: { label: "Could be better", color: "#fbbf24" },
-    poor: { label: "Needs fixing", color: "#f87171" },
+    good: { label: "Good", color: "var(--ok)" },
+    fair: { label: "Could be better", color: "var(--warn)" },
+    poor: { label: "Needs fixing", color: "var(--bad)" },
   } as const;
   const lightingPanel = (
     <div className="glass-card px-4 py-3 flex-shrink-0">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] text-white/40 font-semibold uppercase tracking-wider">Lighting &amp; contrast</p>
+        <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider">Lighting &amp; contrast</p>
         {lighting && (
           <span className="text-[11px] font-semibold" style={{ color: LIGHT_STATUS[lighting.status].color }}>
             {lighting.faceDetected ? LIGHT_STATUS[lighting.status].label : "Looking for your face"}
@@ -1395,7 +1560,7 @@ function SessionContent() {
         )}
       </div>
       {!lighting ? (
-        <p className="text-xs text-white/40">Checks your lighting once your camera is on.</p>
+        <p className="text-xs text-[var(--muted)]">Checks your lighting once your camera is on.</p>
       ) : (
         <>
           <dl className="grid grid-cols-4 gap-2 mb-2.5">
@@ -1406,14 +1571,14 @@ function SessionContent() {
               ["Stand-out", `${lighting.separation.toFixed(1)}:1`, lighting.separation >= 1.3],
             ] as const).map(([k, v, ok]) => (
               <div key={k}>
-                <dt className="text-[9px] uppercase tracking-wide text-white/35">{k}</dt>
-                <dd className="text-xs font-semibold" style={{ color: ok ? "rgba(255,255,255,0.85)" : "#fbbf24" }}>{v}</dd>
+                <dt className="text-[9px] uppercase tracking-wide text-[var(--muted)]">{k}</dt>
+                <dd className="text-xs font-semibold" style={{ color: ok ? "var(--ink)" : "var(--warn)" }}>{v}</dd>
               </div>
             ))}
           </dl>
           <ul className="space-y-1">
             {lighting.tips.slice(0, 2).map((t) => (
-              <li key={t} className="text-xs leading-relaxed text-white/65">{t}</li>
+              <li key={t} className="text-xs leading-relaxed text-[var(--ink-2)]">{t}</li>
             ))}
           </ul>
         </>
@@ -1422,7 +1587,7 @@ function SessionContent() {
   );
 
   const cameraStage = (
-    <div className="relative w-full flex-shrink-0 overflow-hidden bg-black"
+    <div className="clay relative w-full flex-shrink-0 overflow-hidden rounded-xl bg-black"
       style={{ aspectRatio: "16 / 9", border: "1px solid rgba(255,255,255,0.08)" }}>
       {/* Main view — how you look to your audience, no overlay (mirrored like a mirror) */}
       <video ref={videoRef} autoPlay muted playsInline
@@ -1431,7 +1596,10 @@ function SessionContent() {
       {!isCameraOn && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/35">
           <VideoOff className="w-8 h-8" />
-          <span className="text-xs">{sessionStarted ? "Camera is off" : "Your camera appears here when the session starts"}</span>
+          <span className="text-xs text-center max-w-sm px-4" role={camError ? "alert" : undefined}
+            style={camError ? { color: "#fbbf24" } : undefined}>
+            {camError ?? (sessionStarted ? "Camera is off" : "Your camera appears here when the session starts")}
+          </span>
         </div>
       )}
 
@@ -1447,9 +1615,9 @@ function SessionContent() {
       {/* Mic + camera controls */}
       <div className="absolute bottom-3 left-3 flex items-center gap-2">
         <button onClick={toggleMic} disabled={!sessionStarted} aria-label={isRecording ? "Mute microphone" : "Unmute microphone"}
-          className={cn("relative h-9 pl-3 pr-3.5 flex items-center gap-2 text-xs font-semibold text-white transition-colors",
+          className={cn("relative h-9 pl-3 pr-3.5 rounded-md flex items-center gap-2 text-xs font-semibold text-white transition-colors",
             !sessionStarted && "opacity-40 cursor-not-allowed")}
-          style={{ background: isRecording ? "rgba(156,74,64,0.92)" : "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}>
+          style={{ background: isRecording ? "rgba(194,52,44,0.92)" : "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}>
           {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-white/60" />}
           {/* Real input level */}
           <span className="w-10 h-1 bg-white/20 overflow-hidden">
@@ -1457,14 +1625,14 @@ function SessionContent() {
           </span>
         </button>
         <button onClick={toggleCamera} disabled={!sessionStarted} aria-label={isCameraOn ? "Turn camera off" : "Turn camera on"}
-          className={cn("h-9 w-9 flex items-center justify-center text-white transition-colors", !sessionStarted && "opacity-40 cursor-not-allowed")}
+          className={cn("h-9 w-9 rounded-md flex items-center justify-center text-white transition-colors", !sessionStarted && "opacity-40 cursor-not-allowed")}
           style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}>
           {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-white/60" />}
         </button>
       </div>
 
       {/* Tracking inset — the same camera with MediaPipe's face + pose landmarks */}
-      <div className="absolute bottom-3 right-3 bg-black overflow-hidden"
+      <div className="absolute bottom-3 right-3 bg-black overflow-hidden rounded-lg"
         style={{ width: "27%", minWidth: 150, aspectRatio: camAspect, border: "1px solid rgba(255,255,255,0.3)" }}>
         <video ref={trackVideoRef} autoPlay muted playsInline
           className={cn("absolute inset-0 w-full h-full object-fill", !isCameraOn && "hidden")} />
@@ -1480,8 +1648,71 @@ function SessionContent() {
     </div>
   );
 
+  const current = talkSlides.find((t) => t.index === slideIdx);
+  const talkBody = (
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-4 flex-1 min-h-0">
+      <div className="flex flex-col gap-3 min-w-0">
+        <div className="clay relative rounded-xl overflow-hidden bg-black aspect-video">
+          {deckId && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={presentationService.slideImageUrl(deckId, slideIdx)} alt={`Slide ${slideIdx}${current?.title ? `: ${current.title}` : ""}`}
+              className="absolute inset-0 w-full h-full object-contain" />
+          )}
+          {!sessionStarted && (
+            <div className="absolute inset-0 flex items-end justify-center p-6" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent 60%)" }}>
+              <button onClick={startSession} disabled={preparing}
+                className="clay h-14 px-8 rounded-lg text-base font-semibold text-white flex items-center gap-2 disabled:opacity-60" style={{ background: mc }}>
+                {preparing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Presentation className="w-5 h-5" />} {startLabel}
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => goToSlide(slideIdx - 1)} disabled={slideIdx <= 1} aria-label="Previous slide"
+            className="nav-pill h-11 px-4 rounded-full text-sm font-semibold disabled:opacity-40">← Back</button>
+          <p className="flex-1 text-center text-sm tabular-nums" style={{ color: "var(--ink-2)" }} aria-live="polite">
+            Slide <b style={{ color: "var(--ink)" }}>{slideIdx}</b> of {talkSlides.length}
+            {current?.title ? <span className="hidden sm:inline" style={{ color: "var(--muted)" }}> · {current.title}</span> : null}
+          </p>
+          <button onClick={() => goToSlide(slideIdx + 1)} disabled={slideIdx >= talkSlides.length} aria-label="Next slide"
+            className="h-11 px-5 rounded-full text-sm font-semibold text-white disabled:opacity-40" style={{ background: mc }}>Next →</button>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowCue((v) => !v)} aria-pressed={showCue} className="nav-pill px-3 py-1.5 rounded-full text-xs font-semibold">
+            {showCue ? "Hide my cue" : "Show my cue"}
+          </button>
+          {showCue && current?.key_point && (
+            <p className="text-sm" style={{ color: "var(--ink-2)" }}><span style={{ color: "var(--muted)" }}>This slide&apos;s point:</span> {current.key_point}</p>
+          )}
+        </div>
+        {/* Thumbnails: jump to any slide */}
+        <div className="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Slides">
+          {talkSlides.map((t) => (
+            <button key={t.index} role="listitem" onClick={() => goToSlide(t.index)} aria-current={t.index === slideIdx}
+              aria-label={`Go to slide ${t.index}${t.title ? `: ${t.title}` : ""}`}
+              className="flex-shrink-0 w-28 rounded-md overflow-hidden" style={{ outline: t.index === slideIdx ? `3px solid ${mc}` : "1px solid var(--line)", outlineOffset: t.index === slideIdx ? 1 : 0 }}>
+              {deckId && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={presentationService.slideImageUrl(deckId, t.index)} alt="" loading="lazy" className="w-full aspect-video object-contain" style={{ background: "var(--surface-2)" }} />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        {cameraStage}
+        {!sessionStarted ? <div className="glass-card p-4">{startGuide}</div> : lightingPanel}
+        {sessionStarted && (
+          <p className="text-xs leading-relaxed px-1" style={{ color: "var(--muted)" }}>
+            Talk to the camera, not the slide. → / ← or Page Down / Up change slides (a presentation clicker works too). M mutes.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="session-dark flex flex-col px-3 sm:px-6 py-4 min-h-[calc(100dvh-56px)]">
+    <div className="flex flex-col px-3 sm:px-6 py-4 min-h-[calc(100dvh-80px)]" style={{ background: "var(--bg)", color: "var(--ink)" }}>
 
       {/* ── Analyzing overlay ──────────────────────────────────────────── */}
       {isEnding && (
@@ -1491,12 +1722,12 @@ function SessionContent() {
         >
           <div
             className="flex flex-col items-center gap-4 p-8 rounded-2xl text-center"
-            style={{ background: "rgba(10,13,40,0.98)", border: "1px solid rgba(35,52,92,0.3)", boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}
+            style={{ background: "var(--surface)", border: "1px solid var(--line)", boxShadow: "var(--shadow-modal)" }}
           >
-            <Loader2 className="w-8 h-8 animate-spin text-blue-300" />
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--accent-ink)]" />
             <div>
-              <p className="text-sm font-bold text-white">Saving your session…</p>
-              <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+              <p className="text-sm font-bold" style={{ color: "var(--ink)" }}>Saving your session…</p>
+              <p className="text-xs mt-1" style={{ color: "var(--ink-2)" }}>
                 Uploading your recording. Your results page opens next and fills in as the analysis finishes.
               </p>
             </div>
@@ -1504,79 +1735,61 @@ function SessionContent() {
         </div>
       )}
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between pb-3 flex-shrink-0 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-bold px-3 py-1.5 rounded-full"
-            style={{ background: `${mc}20`, color: mc, border: `1px solid ${mc}30` }}>
-            {MODE_TITLES[mode]}
-          </span>
-          {planProgress && (
-            <span className="text-xs font-semibold text-white/60">
-              Question {Math.max(1, Math.min(planProgress.asked, planProgress.total))} of {planProgress.total}
-            </span>
-          )}
-          <span
-            title="Scores and corrections are held until you finish speaking — we never interrupt mid-sentence."
-            className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full cursor-help"
-            style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <EarOff className="w-3 h-3" /> Feedback after, not during
+      {/* ── Header: what this is, how long it's been, and the way out ──────── */}
+      <div className="flex items-center justify-between pb-4 flex-shrink-0 flex-wrap gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="clay text-sm font-semibold px-4 py-1.5 rounded-full text-white" style={{ background: mc }}>
+            {isTalk ? "Presentation" : MODE_TITLES[mode]}
           </span>
           {sessionStarted && (
-            <span className="flex items-center gap-2 font-mono text-sm font-semibold text-white/70">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"
-                style={{ boxShadow: "0 0 6px rgba(156,74,64,0.7)" }} />
+            <span className="flex items-center gap-2 font-mono text-sm font-semibold text-[var(--ink)]" aria-label="Time elapsed">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
               {fmt(duration)}
               <HeaderPulse level={audioLevel} active={isRecording} color={mc} />
             </span>
           )}
           {sessionStarted && mpStatus === "loading" && (
-            <span className="flex items-center gap-1.5 text-xs text-amber-400/80">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Initialising AI vision…
+            <span className="hidden sm:flex items-center gap-1.5 text-xs text-[var(--muted)]">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Starting body-language tracking…
             </span>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Voice */}
-          <button onClick={() => setVoiceEnabled((v) => !v)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all"
-            style={voiceEnabled
-              ? { borderColor: `${mc}50`, color: mc, background: `${mc}12` }
-              : { borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.35)" }}>
-            {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-            {voiceEnabled ? "Voice On" : "Voice Off"}
-          </button>
-
-          {/* Interrupt */}
-          {aiSpeaking && (
-            <button onClick={interruptAI}
-              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl text-white transition-all press-effect"
-              style={{ background: "rgba(156,74,64,0.85)", boxShadow: "0 0 16px rgba(156,74,64,0.4)" }}>
-              ✕ Interrupt
-            </button>
-          )}
-
+          {!isTalk && <button onClick={() => setVoiceEnabled((v) => !v)} aria-pressed={voiceEnabled}
+            title={voiceEnabled ? "The AI's replies are spoken aloud" : "The AI's replies are shown as text only"}
+            className="flex items-center gap-1.5 text-sm font-medium h-10 px-4 rounded-full transition-colors"
+            style={{ background: "var(--surface-3)", color: voiceEnabled ? "var(--ink)" : "var(--muted)" }}>
+            {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {voiceEnabled ? "Voice on" : "Voice off"}
+          </button>}
           {!sessionStarted ? (
-            <button onClick={startSession} disabled={mode !== "Conversation" && !prepared}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white transition-all press-effect"
-              style={{ background: mc }}>
-              {mode !== "Conversation" && !prepared ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-              {mode === "Interview" ? "Start interview" : mode === "Presentation" ? "Start Q&A" : "Start conversation"}
+            <button onClick={startSession} disabled={preparing}
+              className="flex items-center gap-2 h-10 px-5 rounded-md text-sm font-semibold text-white disabled:opacity-60"
+              style={{ background: "var(--accent)" }}>
+              {preparing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+              {startLabel}
             </button>
           ) : (
             <button onClick={endSession} disabled={isEnding}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all press-effect disabled:opacity-50"
-              style={{ background: "rgba(156,74,64,0.8)", border: "1px solid rgba(156,74,64,0.4)" }}>
+              className="flex items-center gap-2 h-10 px-5 rounded-md text-sm font-semibold text-white disabled:opacity-50"
+              style={{ background: "var(--color-error)" }}>
               {isEnding ? <Loader2 className="w-4 h-4 animate-spin" /> : <PhoneOff className="w-4 h-4" />}
-              End
+              End &amp; get feedback
             </button>
           )}
         </div>
       </div>
 
+      {drillFocus && (
+        <div className="clay mb-4 flex-shrink-0 rounded-xl px-4 py-3 flex items-center gap-3" style={{ background: "var(--peach)", color: "#0A0A0A" }}>
+          <span className="text-xs font-semibold uppercase tracking-[0.12em] opacity-70 whitespace-nowrap">Today&apos;s drill</span>
+          <span className="text-sm font-medium">{drillFocus}</span>
+        </div>
+      )}
+
       {/* ── Body ── */}
-      {mode === "Interview" ? (
+      {isTalk ? talkBody : mode === "Interview" ? (
 
         /* ── Interview Room ─────────────────────────────────────────────── */
         <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
@@ -1591,10 +1804,10 @@ function SessionContent() {
             {currentQuestion && (
               <div className="glass-card rounded-2xl p-4 flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-400" />
-                  <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider">Current Question</p>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--lavender)]" />
+                  <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider">Current Question</p>
                 </div>
-                <p className="text-sm text-white/85 leading-relaxed"
+                <p className="text-sm text-[var(--ink)] leading-relaxed"
                   style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" } as React.CSSProperties}>
                   {currentQuestion}
                 </p>
@@ -1602,19 +1815,21 @@ function SessionContent() {
             )}
           </div>
 
-          {/* RIGHT: Metrics + responses */}
+          {/* RIGHT: whose turn + interviewer + responses */}
           <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+            {turnBanner}
 
             {/* Interviewer tile */}
-            <div className="glass-card relative overflow-hidden flex-shrink-0" style={{ height: 210 }}>
+            {/* A teal Clay card in both themes: the avatar is drawn for a dark room */}
+            <div className="clay relative overflow-hidden flex-shrink-0 rounded-xl" style={{ height: 210, background: "var(--teal)" }}>
               <div className="absolute top-0 inset-x-0 px-4 py-2.5 flex items-center justify-between z-10"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <div className="flex items-center gap-2">
-                  <Briefcase className="w-3.5 h-3.5 text-white/50" />
+                  <Briefcase className="w-3.5 h-3.5 text-white/60" />
                   <p className="text-white text-xs font-semibold">Alex · Interviewer</p>
                 </div>
                 {aiSpeaking && (
-                  <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-300">
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-[#A4D4C5]">
                     <Volume2 className="w-3 h-3" /> Speaking
                   </span>
                 )}
@@ -1626,21 +1841,21 @@ function SessionContent() {
 
             {/* What this interview is about (from the setup) */}
             <div className="glass-card p-4 flex-shrink-0">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-2">Your interview</p>
+              <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider mb-2">Your interview</p>
               {setup ? (
                 <>
-                  <p className="text-sm font-semibold text-white/85">
+                  <p className="text-sm font-semibold text-[var(--ink)]">
                     {setup.position}{setup.company ? ` · ${setup.company}` : ""}
                   </p>
-                  <p className="text-xs text-white/45 mt-0.5 capitalize">
+                  <p className="text-xs text-[var(--muted)] mt-0.5 capitalize">
                     {setup.level} level · {setup.interview_type} questions
                     {prepared?.context?.resume_text ? " · using your resume" : ""}
                   </p>
                 </>
               ) : (
-                <p className="text-xs text-white/40">Loading your interview setup…</p>
+                <p className="text-xs text-[var(--muted)]">Loading your interview setup…</p>
               )}
-              <p className="text-[11px] text-white/40 mt-3 leading-relaxed">
+              <p className="text-[11px] text-[var(--muted)] mt-3 leading-relaxed">
                 Answer as you would in the real interview. Alex asks one question at a time and may ask a
                 follow-up if an answer is short. Feedback on every answer comes after you end.
               </p>
@@ -1648,18 +1863,11 @@ function SessionContent() {
 
             {/* Response transcript */}
             <div className="flex-1 glass-card rounded-2xl p-4 overflow-y-auto min-h-0">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-3">Your Responses</p>
-              {!sessionStarted || messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center px-4">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3"
-                    style={{ background: "rgba(35,52,92,0.15)", border: "1px solid rgba(35,52,92,0.25)" }}>
-                    <Activity className="w-5 h-5 text-blue-300" />
-                  </div>
-                  <p className="text-xs text-white/30 leading-relaxed">
-                    {sessionStarted
-                      ? "Alex is preparing your first question…"
-                      : "Press Start interview. Alex will introduce themself and ask the first question. Speak your answers aloud."}
-                  </p>
+              <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider mb-3">Your Responses</p>
+              {!sessionStarted ? startGuide : messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center px-4 gap-3">
+                  <Loader2 className="w-6 h-6 animate-spin" style={{ color: mcInk }} />
+                  <p className="text-sm" style={{ color: "var(--muted)" }}>Alex is getting the first question ready…</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1668,38 +1876,31 @@ function SessionContent() {
                       style={{ animation: "slide-up 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}>
                       {msg.role === "ai" && (
                         <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-[9px] font-bold text-white"
-                          style={{ background: "#5A5470", minWidth: 24 }}>A</div>
+                          style={{ background: "#6B4FC4", minWidth: 24 }}>A</div>
                       )}
-                      <div className="max-w-[85%] px-3 py-2 text-xs leading-relaxed"
-                        style={msg.role === "ai"
-                          ? { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.8)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px 12px 12px 3px" }
-                          : { background: "rgba(35,52,92,0.85)", color: "white", borderRadius: "12px 12px 3px 12px" }}>
-                        {msg.text}
-                      </div>
+                      {msg.role === "ai" ? (
+                        <div className="max-w-[85%] px-3 py-2 text-xs leading-relaxed"
+                          style={{ background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "12px 12px 12px 3px" }}>
+                          {msg.text}
+                        </div>
+                      ) : (
+                        <UserBubble text={msg.text} onFix={(t) => fixMessage(i, t)} className="px-3 py-2 text-xs leading-relaxed"
+                          style={{ background: "rgba(26,58,58,0.85)", color: "white", borderRadius: "12px 12px 3px 12px" }} />
+                      )}
                     </div>
                   ))}
 
                   {thinking && (
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-                        style={{ background: "#5A5470", minWidth: 24 }}>A</div>
+                        style={{ background: "#6B4FC4", minWidth: 24 }}>A</div>
                       <div className="px-3 py-2.5 flex items-center gap-1"
-                        style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "12px 12px 12px 3px" }}>
+                        style={{ background: "var(--surface-2)", border: "1px solid var(--line)", borderRadius: "12px 12px 12px 3px" }}>
                         {[0, 1, 2].map((i) => (
-                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-white/30 animate-bounce"
+                          <span key={i} className="w-1.5 h-1.5 rounded-full bg-[var(--faint)] animate-bounce"
                             style={{ animationDelay: `${i * 0.15}s` }} />
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {showYourTurn && (
-                    <div className="flex items-center gap-3 py-1">
-                      <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
-                      <span className="text-[10px] text-white/30 font-medium whitespace-nowrap">
-                        {speechActive ? "Speak your answer" : "Your turn"}
-                      </span>
-                      <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
                     </div>
                   )}
                   <div ref={chatEndRef} />
@@ -1710,11 +1911,11 @@ function SessionContent() {
             {/* Live transcript strip */}
             {(transcript || interimText) && sessionStarted && (
               <div className="flex-shrink-0 px-3 py-2 rounded-xl"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-0.5">Live Transcript</p>
-                <p className="text-xs text-white/55 line-clamp-1">
+                style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+                <p className="text-[10px] text-[var(--faint)] font-semibold uppercase tracking-wider mb-0.5">Live Transcript</p>
+                <p className="text-xs text-[var(--ink-2)] line-clamp-1">
                   {transcript}
-                  {interimText && <span className="text-white/30 italic"> {interimText}</span>}
+                  {interimText && <span className="text-[var(--faint)] italic"> {interimText}</span>}
                 </p>
               </div>
             )}
@@ -1733,15 +1934,15 @@ function SessionContent() {
                   speechActive      ? "Speaking captured — or type here…" :
                   "Speak your answer aloud, or type it here…"
                 }
-                className="flex-1 px-4 py-3 rounded-xl text-sm text-white/80 outline-none transition-all disabled:opacity-40 placeholder:text-white/25"
-                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
+                className="flex-1 px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
+                style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
                 onFocus={(e) => (e.target.style.borderColor = "rgba(96,165,250,0.5)")}
-                onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.08)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
               />
               <button onClick={sendMessage}
                 disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                 className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
-                style={{ background: "#23345C" }}>
+                style={{ background: "#1A3A3A" }}>
                 <Send className="w-4 h-4" />
               </button>
             </div>
@@ -1759,13 +1960,15 @@ function SessionContent() {
           {cameraStage}
 
           {/* AI partner status */}
+          {/* The partner as a living 3D orb: it pulses while the AI talks or thinks and
+              ripples with your voice while you speak */}
           <div className="glass-card px-4 py-3 flex items-center gap-4 flex-shrink-0">
-            <div className="w-12 h-12 flex items-center justify-center flex-shrink-0">
-              <div style={{ transform: "scale(0.3)" }}><AIOrb state={orbState} level={audioLevel} /></div>
+            <div className="w-20 h-20 flex-shrink-0 relative">
+              <VoiceOrb energyRef={orbEnergyRef} busy={aiSpeaking || thinking} className="absolute inset-0" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider">AI partner</p>
-              <p className="text-sm font-semibold" style={{ color: stateColor }}>{stateLabel}</p>
+              <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider">{partner}</p>
+              <p className="text-base font-semibold" style={{ color: stateInk }}>{stateLabel}</p>
             </div>
           </div>
 
@@ -1774,7 +1977,7 @@ function SessionContent() {
           {/* Mood — read from the same face tracking already running above */}
           {sessionStarted && (
             <div className="glass-card rounded-2xl p-3 flex-shrink-0">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-2">Presence &amp; Mood</p>
+              <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider mb-2">Presence &amp; Mood</p>
               <div className="flex flex-wrap gap-1.5">
                 {(Object.keys(MOOD_STATES) as MoodLabel[]).map((label) => {
                   const active = mood?.label === label;
@@ -1784,7 +1987,7 @@ function SessionContent() {
                       className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full transition-all duration-300"
                       style={active
                         ? { background: c, color: "#fff" }
-                        : { background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        : { background: "var(--surface-2)", color: "var(--muted)", border: "1px solid var(--line)" }}>
                       {active && <span className="w-1 h-1 rounded-full bg-white" />}
                       {label}{active ? ` · ${mood!.score}%` : ""}
                     </span>
@@ -1792,7 +1995,7 @@ function SessionContent() {
                 })}
               </div>
               {!faceDetected && (
-                <p className="text-[10px] text-white/30 mt-2">Face not detected — centre yourself in frame.</p>
+                <p className="text-[10px] text-[var(--faint)] mt-2">Face not detected — centre yourself in frame.</p>
               )}
             </div>
           )}
@@ -1801,52 +2004,44 @@ function SessionContent() {
           {mode === "Conversation" && (
             <div className="glass-card rounded-2xl p-3 flex-shrink-0">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider">Current Topic</p>
+                <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider">Current Topic</p>
                 <button onClick={shuffleTopic}
                   className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all press-effect"
-                  style={{ color: mc, background: `${mc}15`, border: `1px solid ${mc}25` }}>
+                  style={{ color: mcInk, background: `${mc}15`, border: `1px solid ${mc}25` }}>
                   <Shuffle className="w-3 h-3" /> Shuffle
                 </button>
               </div>
-              <p className="text-xs text-white/70 leading-relaxed line-clamp-3">{currentTopic}</p>
+              <p className="text-xs text-[var(--ink)] leading-relaxed line-clamp-3">{currentTopic}</p>
             </div>
           )}
 
           {/* Deck being rehearsed (Presentation Q&A) */}
           {mode === "Presentation" && (
             <div className="glass-card p-3 flex-shrink-0">
-              <p className="text-[10px] text-white/35 font-semibold uppercase tracking-wider mb-1">Q&amp;A on your deck</p>
-              <p className="text-sm font-semibold text-white/80 flex items-center gap-2">
-                <Presentation className="w-4 h-4 flex-shrink-0" style={{ color: mc }} />
+              <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider mb-1">Q&amp;A on your deck</p>
+              <p className="text-sm font-semibold text-[var(--ink)] flex items-center gap-2">
+                <Presentation className="w-4 h-4 flex-shrink-0" style={{ color: mcInk }} />
                 <span className="truncate">{deckTitle ?? "Loading…"}</span>
               </p>
-              <p className="text-[11px] text-white/40 mt-1.5 leading-relaxed">
+              <p className="text-[11px] text-[var(--muted)] mt-1.5 leading-relaxed">
                 The questions come from your deck&apos;s content. Answer directly first, then give your reason or evidence.
               </p>
             </div>
           )}
         </div>
 
-        {/* RIGHT: the conversation */}
+        {/* RIGHT: whose turn + the conversation */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 min-h-0">
+          {turnBanner}
 
           {/* ── CONVERSATION / INTERVIEW / PRESENTATION: chat ──────────── */}
           <>
               {/* Chat messages */}
               <div className="flex-1 glass-card rounded-2xl p-5 overflow-y-auto min-h-0">
-                {!sessionStarted || messages.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center px-8">
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                      style={{ background: `${mc}15`, border: `1px solid ${mc}25` }}>
-                      <Activity className="w-7 h-7" style={{ color: mc }} />
-                    </div>
-                    <p className="text-sm text-white/40 leading-relaxed">
-                      {sessionStarted
-                        ? "Your AI partner is getting ready…"
-                        : mode === "Presentation"
-                          ? "Press Start Q&A. The moderator will ask the audience's questions about your deck, one at a time."
-                          : "Press Start conversation and just talk naturally. Shuffle the topic any time."}
-                    </p>
+                {!sessionStarted ? startGuide : messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-8 gap-3">
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: mcInk }} />
+                    <p className="text-sm" style={{ color: "var(--muted)" }}>{partner} is getting ready…</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1859,13 +2054,15 @@ function SessionContent() {
                             <Activity className="w-3.5 h-3.5 text-white" />
                           </div>
                         )}
-                        <div className={cn("max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed",
-                          msg.role === "ai" ? "rounded-tl-sm" : "rounded-tr-sm")}
-                          style={msg.role === "ai"
-                            ? { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.85)", border: "1px solid rgba(255,255,255,0.08)" }
-                            : { background: `${mc}d0`, color: "white" }}>
-                          {msg.text}
-                        </div>
+                        {msg.role === "ai" ? (
+                          <div className="max-w-[80%] px-4 py-3 rounded-2xl rounded-tl-sm text-sm leading-relaxed"
+                            style={{ background: "var(--surface-2)", color: "var(--ink)", border: "1px solid var(--line)" }}>
+                            {msg.text}
+                          </div>
+                        ) : (
+                          <UserBubble text={msg.text} onFix={(t) => fixMessage(i, t)} className="px-4 py-3 rounded-2xl rounded-tr-sm text-sm leading-relaxed"
+                            style={{ background: `${mc}d0`, color: "white" }} />
+                        )}
                       </div>
                     ))}
 
@@ -1877,9 +2074,9 @@ function SessionContent() {
                           <Activity className="w-3.5 h-3.5 text-white" />
                         </div>
                         <div className="px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5"
-                          style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                          style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
                           {[0,1,2].map((i) => (
-                            <span key={i} className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce"
+                            <span key={i} className="w-1.5 h-1.5 rounded-full bg-[var(--faint)] animate-bounce"
                               style={{ animationDelay: `${i * 0.15}s` }} />
                           ))}
                         </div>
@@ -1895,7 +2092,7 @@ function SessionContent() {
                         </div>
                         <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl rounded-tl-sm"
                           style={{ background: `${mc}15`, border: `1px solid ${mc}25` }}>
-                          <span className="text-xs font-medium" style={{ color: mc }}>Speaking…</span>
+                          <span className="text-xs font-medium" style={{ color: mcInk }}>Speaking…</span>
                           <div className="flex items-end gap-[2px]">
                             {[3,5,8,5,3,6,8].map((h,i) => (
                               <span key={i} className="rounded-full" style={{
@@ -1907,17 +2104,6 @@ function SessionContent() {
                         </div>
                       </div>
                     )}
-
-                    {/* Your turn divider */}
-                    {showYourTurn && (
-                      <div className="flex items-center gap-3 py-1">
-                        <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
-                        <span className="text-[10px] text-white/30 font-medium whitespace-nowrap">
-                          {speechActive ? "Speak your answer" : "Your turn — speak or type"}
-                        </span>
-                        <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
-                      </div>
-                    )}
                     <div ref={chatEndRef} />
                   </div>
                 )}
@@ -1926,11 +2112,11 @@ function SessionContent() {
               {/* Interim transcript */}
               {(transcript || interimText) && sessionStarted && (
                 <div className="flex-shrink-0 px-4 py-2.5 rounded-xl"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p className="text-[10px] text-white/30 font-semibold uppercase tracking-wider mb-0.5">Transcript</p>
-                  <p className="text-xs text-white/60 line-clamp-2">
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+                  <p className="text-[10px] text-[var(--faint)] font-semibold uppercase tracking-wider mb-0.5">Transcript</p>
+                  <p className="text-xs text-[var(--ink-2)] line-clamp-2">
                     {transcript}
-                    {interimText && <span className="text-white/30 italic"> {interimText}</span>}
+                    {interimText && <span className="text-[var(--faint)] italic"> {interimText}</span>}
                   </p>
                 </div>
               )}
@@ -1949,13 +2135,13 @@ function SessionContent() {
                     speechActive ? "Speaking captured — or type here…" :
                     "Speak aloud, or type your response…"
                   }
-                  className="flex-1 px-4 py-3 rounded-xl text-sm text-white/80 outline-none transition-all disabled:opacity-40 placeholder:text-white/25"
+                  className="flex-1 px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
                   style={{
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "var(--surface-2)",
+                    border: "1px solid var(--line)",
                   }}
                   onFocus={(e) => (e.target.style.borderColor = `${mc}50`)}
-                  onBlur={(e) => (e.target.style.borderColor = "rgba(255,255,255,0.08)")}
+                  onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
                 />
                 <button onClick={sendMessage}
                   disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
@@ -1970,11 +2156,11 @@ function SessionContent() {
       )}
 
       {/* ── Bottom strip: what happens next (no live scores: feedback comes after) ── */}
-      <div className="flex-shrink-0 mt-3 glass-card px-4 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-white/45">
+      <div className="flex-shrink-0 mt-3 glass-card px-4 py-2.5 flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] text-[var(--muted)]">
         <span className="flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" />
           Analysed after you end: voice, language, body language, confidence{mode === "Conversation" ? "" : " and the content of every answer"}
         </span>
-        {wpm > 0 && <span>Pace so far: <b className="text-white/70">{wpm} wpm</b> (120–160 is comfortable)</span>}
+        {wpm > 0 && <span>Pace so far: <b className="text-[var(--ink)]">{wpm} wpm</b> (120–160 is comfortable)</span>}
       </div>
     </div>
   );
@@ -1985,7 +2171,7 @@ export default function SessionPage() {
     <Suspense fallback={
       <div className="flex items-center justify-center h-[calc(100vh-60px)]">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "#5C729B", borderTopColor: "transparent" }} />
+          style={{ borderColor: "#3E6FB0", borderTopColor: "transparent" }} />
       </div>
     }>
       <SessionContent />

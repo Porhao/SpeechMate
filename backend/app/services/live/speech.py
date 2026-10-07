@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 INTER_WORD_PAUSE_SEC = 0.25
 EDGE_SEC = 0.5  # silence at the very start/end is getting ready, not a pause
+# A gap this long is a turn change (the AI partner talking, or listening to a question),
+# not a hesitation: it counts neither as a pause nor as speaking time.
+TURN_GAP_SEC = 3.0
 
 
 @dataclass
@@ -58,21 +61,20 @@ def analyze_fluency(
 ) -> FluencyResult:
     """`silences` = ffmpeg silencedetect output (≥0.25 s), used when timestamps are too sparse."""
     word_count = _count_words(transcript)
-    speaking_rate = round(word_count / max(duration_sec / 60, 0.01), 1)
 
     ts = word_timestamps
     if ts and len(ts) >= max(2, word_count * 0.5):
-        pauses = [
-            ts[i + 1]["start"] - ts[i]["end"]
-            for i in range(len(ts) - 1)
-            if ts[i + 1]["start"] - ts[i]["end"] > INTER_WORD_PAUSE_SEC
-        ]
+        gaps = [ts[i + 1]["start"] - ts[i]["end"] for i in range(len(ts) - 1)]
         speech_time = sum(w["end"] - w["start"] for w in ts)
         source = "word_timestamps"
     else:
-        pauses = [e - s for s, e in inner_silences(silences, duration_sec)]
-        speech_time = duration_sec - sum(pauses)
+        gaps = [e - s for s, e in inner_silences(silences, duration_sec)]
+        speech_time = duration_sec - sum(gaps)
         source = "audio"
+    pauses = [g for g in gaps if INTER_WORD_PAUSE_SEC < g < TURN_GAP_SEC]
+    # Pace over the user's own talking time: in a conversation the AI's turns are silence here
+    turn_time = sum(g for g in gaps if g >= TURN_GAP_SEC)
+    speaking_rate = round(word_count / max((duration_sec - turn_time) / 60, 0.01), 1)
 
     articulation_rate = round(word_count / max(speech_time / 60, 0.01), 1)
     pause_frequency = len(pauses)
@@ -235,7 +237,7 @@ def detect_stuttering(
         })
 
     for s, e in inner_silences(silences, duration_sec):
-        if e - s >= BLOCK_MIN_SECONDS:
+        if BLOCK_MIN_SECONDS <= e - s < TURN_GAP_SEC:  # longer = a turn change (the AI talking), not a block
             events.append({"type": "Block", "start_time": round(s, 2), "end_time": round(e, 2), "word": ""})
 
     method = "transcript + audio silence"

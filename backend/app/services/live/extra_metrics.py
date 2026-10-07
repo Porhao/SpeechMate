@@ -276,7 +276,7 @@ def build_pillars(analysis: dict, prosody: ProsodyResult | None, lang_use: Langu
 
     if vi.get("confidence_score") is not None:
         conf.append(_metric("confidence", "Confidence", vi["confidence_score"], f"{vi['confidence_score']:.0f}/100",
-                            vi["confidence_score"], "70+", "voice + face + posture"))
+                            vi["confidence_score"], "70+", "11 cues: pace, pauses, repetitions, stutters, fillers, response time, face, posture, eye contact"))
     emo = det.get("emotion") or {}
     if emo.get("facial_tension") is not None:
         conf.append(_metric("expression", "Relaxed expression", emo["facial_tension"],

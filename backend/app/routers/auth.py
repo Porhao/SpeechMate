@@ -1,6 +1,6 @@
 """Account endpoints: register, login, token refresh, and the user's own profile."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,9 @@ from app.auth import (
     user_from_token,
     verify_password,
 )
+from app.config import settings
 from app.database import get_db
+from app.limits import client_ip, limiter
 from app.models.user import User
 from app.schemas.auth import (
     LoginRequest,
@@ -35,7 +37,8 @@ def _to_response(user: User) -> UserResponse:
 
 
 @router.post("/auth/register", status_code=201)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    limiter.hit(f"register:{client_ip(request)}", 10, 600)
     email = body.email.lower()
     if (await db.execute(select(User).where(User.email == email))).scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -50,23 +53,50 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     return {"message": "Registration successful. You can now sign in."}
 
 
+# The long-lived refresh token lives in an httpOnly cookie, out of reach of page scripts (XSS),
+# sent only to /api/auth. The short-lived access token (30 min) is returned in the body.
+REFRESH_COOKIE = "sm_refresh"
+COOKIE_PATH = "/api/auth"
+
+
+def _set_refresh_cookie(response: Response, user) -> None:
+    response.set_cookie(
+        REFRESH_COOKIE, create_refresh_token(user.id), max_age=settings.refresh_token_expire_days * 86400,
+        httponly=True, samesite="lax", secure=settings.cookie_secure, path=COOKIE_PATH,
+    )
+
+
 @router.post("/auth/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    user = (await db.execute(select(User).where(User.email == body.email.lower()))).scalar_one_or_none()
+async def login(body: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    email = body.email.lower()
+    # Per account (stops password guessing on one email) and per client
+    limiter.hit(f"login:{email}", 10, 300)
+    limiter.hit(f"login-ip:{client_ip(request)}", 30, 300)
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if not user or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
+    _set_refresh_cookie(response, user)
+    return TokenResponse(access_token=create_access_token(user.id))
 
 
 @router.post("/auth/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    user = await user_from_token(body.refresh_token, "refresh", db)
-    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
+async def refresh(
+    request: Request, response: Response, body: RefreshRequest | None = None, db: AsyncSession = Depends(get_db),
+):
+    """New access token from the refresh cookie (rotated on every use). A refresh token in the body
+    is still accepted, so browsers signed in before the cookie existed move over without a sign-in."""
+    token = request.cookies.get(REFRESH_COOKIE) or (body.refresh_token if body else None)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not signed in")
+    user = await user_from_token(token, "refresh", db)
+    _set_refresh_cookie(response, user)
+    return TokenResponse(access_token=create_access_token(user.id))
 
 
 @router.post("/auth/logout")
-async def logout():
-    """Tokens are stateless; the client discards them. Kept so clients have one logout call."""
+async def logout(response: Response):
+    """Clears the refresh cookie; the client drops its access token."""
+    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite="lax", secure=settings.cookie_secure)
     return {"message": "Logged out"}
 
 

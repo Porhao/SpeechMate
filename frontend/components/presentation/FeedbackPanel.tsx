@@ -20,7 +20,7 @@ function Dots({ score }: { score: number }) {
   return (
     <span className="inline-flex gap-0.5" aria-label={`${score} out of 5`}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <span key={i} className="w-2 h-2 rounded-full" style={{ background: i <= score ? "#23345C" : "var(--line)" }} />
+        <span key={i} className="w-2 h-2 rounded-full" style={{ background: i <= score ? "var(--accent-ink)" : "var(--line)" }} />
       ))}
     </span>
   );
@@ -61,9 +61,9 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
             </span>
           )}
           {([
-            ["Observation", o.observation, Eye, "#23345C"],
-            ["Impact", o.impact, Zap, "#8A5A22"],
-            ["Suggestion", o.suggestion, Lightbulb, "#3F6B4C"],
+            ["Observation", o.observation, Eye, "#1A3A3A"],
+            ["Impact", o.impact, Zap, "#A8620F"],
+            ["Suggestion", o.suggestion, Lightbulb, "#2F7A4F"],
           ] as const).map(([label, text, Icon, color]) => (
             <div key={label} className="flex gap-2.5">
               <Icon className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: inkOf(color) }} />
@@ -134,7 +134,7 @@ export default function FeedbackPanel({ run }: { run: PracticeRun }) {
 
       {aud && (
         <div className="glass-card rounded-xl p-4 space-y-2">
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: "#5A5470" }}>
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide" style={{ color: "#6B4FC4" }}>
             <Users className="w-3.5 h-3.5" /> Audience view · {aud.audience_profile}
           </p>
           {aud.overall_impression && <p className="text-sm italic" style={{ color: "var(--ink-3)" }}>&ldquo;{aud.overall_impression}&rdquo;</p>}

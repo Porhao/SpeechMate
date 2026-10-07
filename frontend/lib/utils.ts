@@ -15,12 +15,9 @@ export function tint(color: string, alphaHex: string): string {
 
 // Brand/series colours → a text colour that stays readable in both themes
 const INK: Record<string, string> = {
-  "#23345C": "var(--accent-ink)", "#17233E": "var(--accent-ink)",
-  "#3F6B4C": "var(--ok)", "#4D7A59": "var(--ok)",
-  "#8A5A22": "var(--warn)", "#9C6A28": "var(--warn)",
-  "#8C3B32": "var(--bad)", "#9C4A40": "var(--bad)",
-  "#5A5470": "var(--violet-ink)", "#79738C": "var(--violet-ink)", "#48435C": "var(--violet-ink)",
-  "#3C6E78": "var(--teal-ink)", "#5C729B": "var(--slate-ink)",
+  "#D6245F": "var(--pink-ink)", "#1A3A3A": "var(--accent-ink)", "#0A0A0A": "var(--accent-ink)",
+  "#2F7A4F": "var(--ok)", "#A8620F": "var(--warn)", "#C2342C": "var(--bad)",
+  "#6B4FC4": "var(--violet-ink)", "#1F6F6B": "var(--teal-ink)", "#3E6FB0": "var(--slate-ink)",
 };
 
 /** Use for TEXT drawn in a brand colour (fills keep the brand colour itself). */

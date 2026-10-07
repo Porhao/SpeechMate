@@ -22,10 +22,14 @@ from app.schemas.session import (
     SlidesProgress,
 )
 from app.schemas.slide import SlideScript, SlideScriptsResponse
+from app.limits import MB
 from app.services import malaysian_tts, tasks
 from app.services.media import SLIDE_GAP_SEC
 from app.services.pipeline import run_ideal_presentation_pipeline
 from app.services.storage import storage_service
+
+MAX_DECK_BYTES = 100 * MB         # image-heavy PowerPoints get big
+MAX_VOICE_SAMPLE_BYTES = 25 * MB
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +39,15 @@ voices_router = APIRouter(tags=["sessions"])
 
 @voices_router.get("/narrator-voices")
 async def narrator_voices():
-    """Voices for the presentation narration (local Malaysian TTS), and whether it's installed."""
+    """Voices for the presentation narration, and whether the local Malaysian TTS is installed.
+    Without a GPU the Malaysian TTS takes minutes per slide, so the fast Kokoro voice is the default there."""
+    gpu = malaysian_tts.is_available() and malaysian_tts.keep_loaded()
+    slow = "" if gpu else " (slow on this computer: several minutes per slide)"
     return {
         "available": malaysian_tts.is_available(),
-        "default": settings.malaysian_tts_voice,
-        "voices": [{"id": k, "label": v} for k, v in malaysian_tts.VOICES.items()],
+        "default": settings.malaysian_tts_voice if gpu else malaysian_tts.FAST_VOICE,
+        "voices": [{"id": malaysian_tts.FAST_VOICE, "label": "Fast voice (Kokoro, English): ready in about a minute"}]
+                  + [{"id": k, "label": f"Malaysian: {v}{slow}"} for k, v in malaysian_tts.VOICES.items()],
     }
 
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm", ".ogg", ".oga", ".flac", ".aac", ".mp4", ".mov"}
@@ -55,9 +63,13 @@ def audio_extension(filename: str | None) -> str:
     return ext
 
 
-async def get_session_or_404(db: AsyncSession, session_id: uuid.UUID) -> Session:
+async def get_session_or_404(db: AsyncSession, session_id: uuid.UUID, user: User | None) -> Session:
+    """The deck, if this caller may see it: a deck with an owner is only visible to that owner
+    (anyone else gets 404, as if it didn't exist). Decks uploaded while signed out have no owner
+    and are reachable by their unguessable id. Slide images are served by id alone (an <img> can't
+    send the Bearer token); see docs/project/Security.md."""
     session = (await db.execute(select(Session).where(Session.id == session_id))).scalar_one_or_none()
-    if not session:
+    if not session or (session.user_id is not None and (user is None or user.id != session.user_id)):
         raise HTTPException(status_code=404, detail="Session not found")
     return session
 
@@ -87,9 +99,9 @@ async def create_session(
     if deck_ext not in (".pptx", ".pdf"):
         raise HTTPException(status_code=400, detail="The deck must be a PowerPoint (.pptx) or PDF (.pdf) file")
 
-    if narrator_voice and narrator_voice not in malaysian_tts.VOICES:
+    if narrator_voice and narrator_voice not in {*malaysian_tts.VOICES, malaysian_tts.FAST_VOICE}:
         raise HTTPException(
-            status_code=400, detail=f"Unknown narrator_voice. Use one of: {', '.join(malaysian_tts.VOICES)}"
+            status_code=400, detail=f"Unknown narrator_voice. Use one of: {', '.join([malaysian_tts.FAST_VOICE, *malaysian_tts.VOICES])}"
         )
 
     voice_ext = None
@@ -97,13 +109,13 @@ async def create_session(
         voice_ext = audio_extension(voice_sample.filename)
 
     session_id = uuid.uuid4()
-    pptx_path = await storage_service.save_upload(str(session_id), f"original{deck_ext}", await pptx.read())
+    pptx_path = await storage_service.save_upload_limited(str(session_id), f"original{deck_ext}", pptx, MAX_DECK_BYTES, "The deck")
 
     voice_path = None
     if voice_ext:
         # Keep the real extension; the pipeline converts it to WAV
-        voice_path = await storage_service.save_upload(
-            str(session_id), f"voice_sample_upload{voice_ext}", await voice_sample.read()
+        voice_path = await storage_service.save_upload_limited(
+            str(session_id), f"voice_sample_upload{voice_ext}", voice_sample, MAX_VOICE_SAMPLE_BYTES, "The voice sample"
         )
 
     session = Session(
@@ -142,9 +154,9 @@ async def list_sessions(user: User | None = Depends(get_optional_user), db: Asyn
 
 
 @router.get("/{session_id}", response_model=SessionStatusResponse)
-async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """Poll session status and per-slide progress."""
-    session = await get_session_or_404(db, session_id)
+    session = await get_session_or_404(db, session_id, user)
 
     slides_progress = None
     if session.slide_count:
@@ -175,9 +187,9 @@ async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/{session_id}/retry", response_model=SessionCreateResponse, status_code=202)
-async def retry_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def retry_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """Re-run the Ideal Presentation Agent for a failed (or completed) session."""
-    session = await get_session_or_404(db, session_id)
+    session = await get_session_or_404(db, session_id, user)
     if session.status in SESSION_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail=f"Session is still running ({session.status})")
     session.status = "queued"
@@ -188,9 +200,9 @@ async def retry_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db
 
 
 @router.delete("/{session_id}", status_code=204)
-async def delete_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def delete_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """Delete a session, its practice runs and all stored files."""
-    session = await get_session_or_404(db, session_id)
+    session = await get_session_or_404(db, session_id, user)
     if session.status in SESSION_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="Wait for the pipeline to finish before deleting")
     await db.delete(session)
@@ -199,9 +211,9 @@ async def delete_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_d
 
 
 @router.get("/{session_id}/scripts", response_model=SlideScriptsResponse)
-async def get_session_scripts(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_session_scripts(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """Per-slide narration scripts, with each slide's start time in the ideal video."""
-    await get_session_or_404(db, session_id)
+    await get_session_or_404(db, session_id, user)
     slides = await get_slides(db, session_id)
 
     out, cursor = [], 0.0
@@ -222,9 +234,9 @@ async def get_session_scripts(session_id: uuid.UUID, db: AsyncSession = Depends(
 
 
 @router.get("/{session_id}/video")
-async def get_session_video(session_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+async def get_session_video(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User | None = Depends(get_optional_user)):
     """The final narrated ideal-presentation video (MP4)."""
-    session = await get_session_or_404(db, session_id)
+    session = await get_session_or_404(db, session_id, user)
     if session.status != "complete" or not session.video_storage_path:
         raise HTTPException(status_code=409, detail=f"Video not ready (status: {session.status})")
 

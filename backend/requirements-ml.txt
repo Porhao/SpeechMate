@@ -8,8 +8,10 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 # CPU-only PyTorch, for Wav2Vec2 pronunciation / code-switching ASR / the ViT emotion model / TTS
-torch==2.4.1
-torchaudio==2.4.1
+# ≥ 2.6: transformers refuses torch.load of .bin weights on older torch (CVE-2025-32434),
+# and the code-switching model ships only pytorch_model.bin, so routing silently failed on 2.4
+torch==2.6.0
+torchaudio==2.6.0
 # ≥ 4.51 for Qwen3 (Malaysian-TTS-0.6B is a Qwen3 model); 4.53.3 is what it was saved with
 transformers==4.53.3
 

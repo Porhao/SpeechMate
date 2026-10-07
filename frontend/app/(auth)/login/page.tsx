@@ -15,7 +15,7 @@ const SHOW_DEMO = process.env.NEXT_PUBLIC_SHOW_DEMO_LOGIN !== "false";
 
 const inputClass =
   "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] text-sm outline-none " +
-  "focus:border-[#23345C] focus:ring-4 focus:ring-[#23345C]/10 transition-all placeholder:text-[var(--faint)]";
+  "focus:border-[var(--accent-ink)] focus:ring-4 focus:ring-[var(--accent-ink)]/10 transition-all placeholder:text-[var(--faint)]";
 
 function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
   const { login, loading, error } = useAuth();
@@ -37,7 +37,7 @@ function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
       <p className="text-sm text-[var(--muted)] mt-1.5 mb-8">Welcome back. Pick up your practice where you left off.</p>
 
       {error && (
-        <div role="alert" className="text-sm px-4 py-3 rounded-xl mb-6" style={{ background: "rgba(140,59,50,0.06)", border: "1px solid rgba(140,59,50,0.22)", color: "var(--bad)" }}>
+        <div role="alert" className="text-sm px-4 py-3 rounded-xl mb-6" style={{ background: "rgba(194,52,44,0.06)", border: "1px solid rgba(194,52,44,0.22)", color: "var(--bad)" }}>
           {error}
         </div>
       )}
@@ -89,7 +89,7 @@ function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
             type="button"
             onClick={() => { setEmail(DEMO.email); setPassword(DEMO.password); pulse(); }}
             className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            style={{ color: "var(--accent-ink)", border: "1px solid #23345C33", background: "var(--surface)" }}
+            style={{ color: "var(--accent-ink)", border: "1px solid var(--line-strong)", background: "var(--surface)" }}
           >
             Fill in
           </button>

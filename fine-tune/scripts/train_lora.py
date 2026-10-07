@@ -1,12 +1,13 @@
 """LoRA fine-tune of a Whisper model on data/train.csv, scored on data/dev.csv (plan §6).
 
     python scripts/train_lora.py openai/whisper-small 200   # F4 smoke test: 200 steps
-    python scripts/train_lora.py <base model>              # F5 real run: 3 epochs
+    LR=1e-4 python scripts/train_lora.py <base model>      # F5 real run: 3 epochs, best epoch kept
 
 CSV columns: file_name,transcript,language,speaker,source; audio in data/clips/ (16 kHz mono, <= 30 s).
 Each clip gets its own language token (en/ms), no prompt, and timestamp tokens; dev decoding
 auto-detects the language and uses timestamp mode, the way the app (faster-whisper) runs.
 """
+import os
 import re
 import sys
 import time
@@ -28,6 +29,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MODEL = sys.argv[1] if len(sys.argv) > 1 else "openai/whisper-small"
 STEPS = int(sys.argv[2]) if len(sys.argv) > 2 else 0   # > 0: smoke test, else epochs
 QUANT = None   # None (bf16), "8bit" or "4bit" (needs bitsandbytes): only if bf16 runs out of memory (plan §9)
+LR = float(os.environ.get("LR", "3e-4"))   # 1e-4 for an already-tuned base like Mesolitica (plan §6.2)
 OUT = ROOT / "out" / "adapter"
 
 processor = WhisperProcessor.from_pretrained(MODEL, task="transcribe")
@@ -127,7 +129,7 @@ args = Seq2SeqTrainingArguments(
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
     per_device_eval_batch_size=4,
-    learning_rate=3e-4,
+    learning_rate=LR,
     warmup_steps=min(50, STEPS // 10) if STEPS else 50,
     max_steps=STEPS or -1,
     num_train_epochs=3,
@@ -137,6 +139,10 @@ args = Seq2SeqTrainingArguments(
     eval_strategy="steps" if STEPS else "epoch",
     eval_steps=STEPS // 2 if STEPS else None,
     save_strategy="no" if STEPS else "epoch",
+    load_best_model_at_end=not STEPS,           # keep the epoch with the lowest dev WER
+    metric_for_best_model="wer",
+    greater_is_better=False,
+    save_total_limit=2,
     predict_with_generate=True,
     generation_max_length=225,
     logging_steps=10,

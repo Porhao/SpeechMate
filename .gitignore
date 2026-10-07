@@ -123,3 +123,5 @@ next-env.d.ts
 # Logs
 # =========================================================================
 *.log
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

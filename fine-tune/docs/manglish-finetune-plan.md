@@ -65,6 +65,8 @@ Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcrib
 | **Your own recordings** (you, friends, target users) | Train, dev and test | Best match to real use. Needs **informed consent** from every speaker and **ethics approval** first. |
 | **Tap-to-correct logs** from SpeechMate | Train (later rounds) | Store audio only with explicit opt-in. Delete on request. |
 | **Semisupervised Manglish set** (about 107 h, CC BY 4.0, Mesolitica, listed on Malaya-Speech docs) | Extra training, after filtering (§4.6) | Transcripts are **model-written**. Never use as test data. Keep attribution. |
+| **Synth-Manglish** (`emhaihsan/Synth-Manglish`, 2,457 clips, about 7 h, CC BY 4.0) | Training (in use, `scripts/prepare_public.py`) | Synthetic TTS voices, so it adds Manglish vocabulary and code-switching but not real accents or fillers. Keep attribution. |
+| **FLEURS** `ms_my` / `en_us` (CC BY 4.0) | Guard data (in use) | Real Malay and English speakers. The test split stays reserved for the STT benchmark. |
 | IMDA National Speech Corpus (Singapore Open Data Licence) | Optional accented-English replay | Singaporean, not Malaysian. |
 | MagicHub ASR-MalCSC (CC BY-NC-ND 4.0) | **Avoid for fine-tuning** | "No derivatives" may forbid it; it is also non-commercial. Fine for evaluation only if you are comfortable with the terms. |
 

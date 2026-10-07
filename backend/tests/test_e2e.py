@@ -1,4 +1,4 @@
-"""End-to-end API test: upload → ideal video → practice → OIS feedback → chat.
+"""End-to-end API test: upload a deck → it's prepared → present it in a live talk session.
 
 Runs fully offline (no AI keys). Needs ffmpeg. If LibreOffice isn't
 installed, slide rendering is replaced by a Pillow renderer so every other
@@ -69,115 +69,74 @@ async def client(monkeypatch):
         yield c
 
 
-async def test_full_dual_agent_loop(client: httpx.AsyncClient, tmp_path: Path):
+async def test_deck_then_presenting_it(client: httpx.AsyncClient, tmp_path: Path):
+    """Upload → the deck is prepared (slides + insights + Q&A plan, no example video) → the user
+    presents it in a live "talk" session → the analysis judges the talk slide by slide."""
     deck = build_sample_deck(tmp_path / "deck.pptx")
 
-    # Validation
     r = await client.post("/api/sessions", files={"pptx": ("deck.txt", b"x")})
     assert r.status_code == 400
 
-    # ── Ideal Presentation Agent ─────────────────────────────────────────
-    r = await client.post(
-        "/api/sessions",
-        files={"pptx": ("deck.pptx", deck.read_bytes())},
-        data={"requirement_prompt": "first-year students"},
-    )
+    r = await client.post("/api/sessions", files={"pptx": ("deck.pptx", deck.read_bytes())},
+                          data={"requirement_prompt": "first-year students"})
     assert r.status_code == 201, r.text
     sid = r.json()["session_id"]
-
-    # Practice before the ideal video exists must be rejected
-    r = await client.post(f"/api/sessions/{sid}/practice", files={"audio": ("a.wav", b"x")})
-    assert r.status_code == 409
-
     await tasks.wait_for_all(timeout=300)
 
     session = (await client.get(f"/api/sessions/{sid}")).json()
     assert session["status"] == "complete", session
-    assert session["video_ready"] is True
     assert session["slide_count"] == 3
-    assert session["slides_progress"] == {"rendered": 3, "scripted": 3, "synthesized": 3, "total": 3}
-    assert session["voice_cloning_used"] is False
-    assert any("slide text" in w for w in session["warnings"])  # offline script fallback noted
-
-    scripts = (await client.get(f"/api/sessions/{sid}/scripts")).json()["slides"]
-    assert [s["slide_index"] for s in scripts] == [1, 2, 3]
-    assert all(s["script_text"] and s["script_source"] == "fallback" for s in scripts)
-    assert scripts[1]["script_text"].count("Plan and Prioritize") == 1
-    assert scripts[0]["start_sec"] == 0
-    assert scripts[1]["start_sec"] == pytest.approx(scripts[0]["duration_sec"], abs=0.01)
-
-    video = await client.get(f"/api/sessions/{sid}/video")
-    assert video.status_code == 200
-    assert video.headers["content-type"] == "video/mp4"
-    assert video.content[4:8] == b"ftyp"
-
+    assert session["video_ready"] is False                       # no example narration any more
+    assert session["insights"]["qa_plan"]["questions"]           # Q&A ready to start instantly
     assert (await client.get(f"/api/sessions/{sid}/slides/2/image")).status_code == 200
-    slide_audio = await client.get(f"/api/sessions/{sid}/slides/1/audio")
-    assert slide_audio.status_code == 200
 
-    # ── Coach Agent ──────────────────────────────────────────────────────
-    r = await client.post(
-        f"/api/sessions/{sid}/practice",
-        files={"audio": ("slide1.wav", slide_audio.content)},
-        data={"recording_granularity": "per_slide", "slide_index": "9"},
-    )
-    assert r.status_code == 400
-
-    # A silent recording is rejected with a helpful message
-    r = await client.post(
-        f"/api/sessions/{sid}/practice", files={"audio": ("silent.wav", _tone_wav([(4, False)]))}
-    )
-    silent_id = r.json()["practice_id"]
-    await tasks.wait_for_all(timeout=120)
-    silent = (await client.get(f"/api/sessions/{sid}/practice/{silent_id}")).json()
-    assert silent["status"] == "failed" and "No speech" in silent["error_detail"]
-
-    take = _tone_wav([(0.5, False), (6, True), (3, False), (6, True), (0.5, False)])
-    r = await client.post(f"/api/sessions/{sid}/practice", files={"audio": ("take.wav", take)})
+    # ── Present it ───────────────────────────────────────────────────────
+    r = await client.post("/api/auth/register", json={"full_name": "Aisyah", "email": "a@example.com", "password": "correct-horse"})
+    token = (await client.post("/api/auth/login", json={"email": "a@example.com", "password": "correct-horse"})).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    r = await client.post("/api/live", headers=headers,
+                          json={"session_type": "Presentation", "deck_id": sid, "presentation_mode": "talk"})
     assert r.status_code == 201, r.text
-    pid = r.json()["practice_id"]
+    live = r.json()
+    ctx = live["context"]
+    assert ctx["kind"] == "talk" and "plan" not in ctx
+    assert [s["index"] for s in ctx["slides"]] == [1, 2, 3] and all(s["key_point"] for s in ctx["slides"])
+
+    lid = live["id"]
+    times = [{"slide_index": 1, "t_sec": 0}, {"slide_index": 2, "t_sec": 6}]  # slide 3 never shown
+    r = await client.post(f"/api/live/{lid}/end", headers=headers,
+                          json={"duration_sec": 12, "turns": [], "client_metrics": {"slide_times": times}})
+    assert r.status_code == 200, r.text
+    take = _tone_wav([(0.5, False), (5, True), (1, False), (5, True), (0.5, False)])
+    assert (await client.post(f"/api/live/{lid}/recording", headers=headers, files={"file": ("take.wav", take)})).status_code == 200
+    assert (await client.post(f"/api/live/{lid}/analyze", headers=headers)).status_code == 202
     await tasks.wait_for_all(timeout=120)
 
-    practice = (await client.get(f"/api/sessions/{sid}/practice/{pid}")).json()
-    assert practice["status"] == "complete", practice
-    m = practice["metrics"]
-    assert m["has_transcript"] is False
-    assert m["duration_sec"] == pytest.approx(16.0, abs=0.2)
-    assert m["pause_count"] == 1 and m["long_pauses"][0]["duration_sec"] == pytest.approx(3.0, abs=0.3)
-    assert practice["feedback"]["encouragement"]
-    assert 1 <= len(practice["feedback"]["observations"]) <= 3
-    assert any("paused" in o["observation"] for o in practice["feedback"]["observations"])
-    assert practice["audience_feedback"]["clarity_score"] >= 1
-    assert any("OPENAI_API_KEY" in w for w in practice["warnings"])
+    a = (await client.get(f"/api/live/{lid}", headers=headers)).json()
+    assert a["status"] == "complete", a
+    fb = a["analysis"]["content_feedback"]
+    assert fb["kind"] == "slides"
+    by = {r["slide_index"]: r for r in fb["slides"]}
+    assert by[1]["seconds"] == 6.0 and by[2]["seconds"] == 6.0
+    assert by[3]["status"] == "skipped"
+    # Offline there's no speech recognition, so the shown slides have no words to judge
+    assert by[1]["status"] == "silent"
 
-    # Per-slide practice compares against that slide only
-    r = await client.post(
-        f"/api/sessions/{sid}/practice",
-        files={"audio": ("slide1.wav", _tone_wav([(8, True)]))},
-        data={"recording_granularity": "per_slide", "slide_index": "1"},
-    )
-    pid2 = r.json()["practice_id"]
-    await tasks.wait_for_all(timeout=120)
-    p2 = (await client.get(f"/api/sessions/{sid}/practice/{pid2}")).json()
-    assert p2["status"] == "complete"
-    assert p2["metrics"]["ideal_duration_sec"] < m["ideal_duration_sec"]
 
-    listing = (await client.get(f"/api/sessions/{sid}/practice")).json()
-    assert [p["practice_id"] for p in listing] == [silent_id, pid, pid2]
+async def test_a_deck_is_private_to_its_owner(client: httpx.AsyncClient, tmp_path: Path):
+    deck = build_sample_deck(tmp_path / "deck.pptx")
+    tokens = []
+    for email in ("owner@example.com", "other@example.com"):
+        await client.post("/api/auth/register", json={"full_name": "U", "email": email, "password": "correct-horse"})
+        tokens.append((await client.post("/api/auth/login", json={"email": email, "password": "correct-horse"})).json()["access_token"])
+    owner, other = ({"Authorization": f"Bearer {t}"} for t in tokens)
+    sid = (await client.post("/api/sessions", headers=owner, files={"pptx": ("deck.pptx", deck.read_bytes())})).json()["session_id"]
 
-    # ── Chat ─────────────────────────────────────────────────────────────
-    r = await client.post(f"/api/sessions/{sid}/practice/{pid}/chat", json={"message": "How do I improve?"})
-    assert r.status_code == 200
-    assert r.json()["role"] == "assistant" and r.json()["content"]
-    history = (await client.get(f"/api/sessions/{sid}/practice/{pid}/chat")).json()["messages"]
-    assert [msg["role"] for msg in history] == ["user", "assistant"]
-
-    # ── Retry + delete ───────────────────────────────────────────────────
-    r = await client.post(f"/api/sessions/{sid}/retry")
-    assert r.status_code == 202
+    assert (await client.get(f"/api/sessions/{sid}", headers=owner)).status_code == 200
+    assert (await client.get(f"/api/sessions/{sid}", headers=other)).status_code == 404   # as if it didn't exist
+    assert (await client.get(f"/api/sessions/{sid}")).status_code == 404                  # signed out
+    assert (await client.delete(f"/api/sessions/{sid}", headers=other)).status_code == 404
+    assert (await client.post("/api/live", headers=other, json={"session_type": "Presentation", "deck_id": sid,
+                                                                "presentation_mode": "talk"})).status_code == 404
     await tasks.wait_for_all(timeout=300)
-    assert (await client.get(f"/api/sessions/{sid}")).json()["status"] == "complete"
-
-    assert (await client.delete(f"/api/sessions/{sid}")).status_code == 204
-    assert (await client.get(f"/api/sessions/{sid}")).status_code == 404
-    assert not (storage_service.base_path / sid).exists()
+    assert (await client.get(f"/api/sessions/{sid}", headers=owner)).status_code == 200    # still there

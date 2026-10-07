@@ -7,8 +7,10 @@ import logging
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi import BackgroundTasks
+
+from app.limits import MB, rate_limit, read_limited
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,7 +93,7 @@ def _llm():
     return client
 
 
-@router.post("/chat/message")
+@router.post("/chat/message", dependencies=[Depends(rate_limit("chat", 30))])
 async def partner_reply(
     body: ConversationRequest,
     user: User | None = Depends(get_optional_user),
@@ -145,7 +147,7 @@ def _local_live_tts() -> bool:
     return False
 
 
-@router.post("/tts/speak")
+@router.post("/tts/speak", dependencies=[Depends(rate_limit("tts", 60))])
 async def speak(body: TTSRequest, background: BackgroundTasks):
     """Speech for the AI partner's replies, in order: a local Kokoro-style server (TTS_BASE_URL),
     OpenAI TTS, the local Malaysian TTS (when enabled), else 503 (the frontend then uses the
@@ -185,22 +187,23 @@ def _stream_speech(client, model: str, voice: str, text: str) -> StreamingRespon
 MAX_STT_BYTES = 15 * 1024 * 1024
 
 
-def _local_stt(path: Path) -> str:
+def _local_stt(path: Path, context: str | None = None) -> str:
     from app.services.live.asr import whisper_language, whisper_segments
 
-    segments, _ = whisper_segments(path, whisper_language())
+    segments, _ = whisper_segments(path, whisper_language(), context=context)
     return " ".join(t for seg in segments if (t := seg.text.strip())).strip()
 
 
-@router.post("/stt")
-async def speech_to_text(file: UploadFile = File(..., description="One spoken turn (WAV/WebM)")):
+@router.post("/stt", dependencies=[Depends(rate_limit("stt", 60))])
+async def speech_to_text(
+    file: UploadFile = File(..., description="One spoken turn (WAV/WebM)"),
+    context: str | None = Form(None, max_length=1000, description="What the turn answers (the AI's last line, the role…): helps topic words"),
+):
     """Transcribe one conversation turn for the live AI partner: local faster-whisper, else the
     OpenAI API, else 503 (the frontend then falls back to the browser's speech recognition)."""
     from app.services.live._ml import available
 
-    data = await file.read()
-    if len(data) > MAX_STT_BYTES:
-        raise HTTPException(status_code=413, detail="Recording too long for one turn")
+    data = await read_limited(file, MAX_STT_BYTES, "One spoken turn")
     suffix = Path(file.filename or "turn.wav").suffix or ".wav"
     fd, name = tempfile.mkstemp(suffix=suffix)
     path = Path(name)
@@ -208,7 +211,7 @@ async def speech_to_text(file: UploadFile = File(..., description="One spoken tu
         with open(fd, "wb") as f:
             f.write(data)
         if available("faster_whisper"):
-            return {"text": await asyncio.to_thread(_local_stt, path), "engine": "faster-whisper"}
+            return {"text": await asyncio.to_thread(_local_stt, path, context), "engine": "faster-whisper"}
         client = get_openai_client()
         if client is None:
             raise HTTPException(status_code=503, detail="No speech recognition available")

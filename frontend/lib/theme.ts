@@ -38,5 +38,19 @@ export function subscribeTheme(onChange: () => void) {
   return () => { listeners.delete(onChange); mq.removeEventListener("change", onSystem); };
 }
 
-/** Inline <head> script: apply the saved theme before first paint (no flash). */
-export const THEME_BOOT_SCRIPT = `(function(){try{var p=localStorage.getItem("${KEY}");var d=p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";}catch(e){}})();`;
+// Text size: "large" scales every rem-based size by 112.5% (<html data-text="large">, globals.css)
+export type TextSize = "normal" | "large";
+const TEXT_KEY = "speechmate-text";
+
+export function getTextSize(): TextSize {
+  try { return localStorage.getItem(TEXT_KEY) === "large" ? "large" : "normal"; } catch { return "normal"; }
+}
+
+export function setTextSize(size: TextSize) {
+  try { localStorage.setItem(TEXT_KEY, size); } catch { /* private mode: still applies for this page */ }
+  document.documentElement.dataset.text = size;
+  listeners.forEach((l) => l());
+}
+
+/** Inline <head> script: apply the saved theme and text size before first paint (no flash). */
+export const THEME_BOOT_SCRIPT = `(function(){try{var p=localStorage.getItem("${KEY}");var d=p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";document.documentElement.dataset.text=localStorage.getItem("${TEXT_KEY}")==="large"?"large":"normal";}catch(e){}})();`;

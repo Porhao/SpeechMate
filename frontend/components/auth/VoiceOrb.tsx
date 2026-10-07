@@ -3,7 +3,7 @@
 // A softly morphing 3D "voice orb" for the sign-in screens (three.js).
 //
 // - The sphere's surface is displaced on the GPU by animated 3D simplex noise,
-//   shaded ink-navy → violet with a warm rim light to match the app's palette.
+//   shaded violet → pink with a warm peach rim light (Clay palette) to match the app's palette.
 // - Two thin waveform rings orbit it, their radius modulated like a speech envelope.
 // - `energyRef` (0–1) makes it react: the form bumps it on every keystroke so the orb
 //   "listens" as you type; `busy` keeps it pulsing while you're being signed in.
@@ -127,9 +127,9 @@ export default function VoiceOrb({ energyRef, busy = false, className }: VoiceOr
     const uniforms = {
       uTime: { value: 0 },
       uAmp: { value: 0.16 },
-      uDeep: { value: new THREE.Color("#34497A") },
-      uMid: { value: new THREE.Color("#8F89A8") },
-      uRim: { value: new THREE.Color("#F0D3AE") },
+      uDeep: { value: new THREE.Color("#6B4FC4") },
+      uMid: { value: new THREE.Color("#FF7FA8") },
+      uRim: { value: new THREE.Color("#FFD2B0") },
     };
     const orbMaterial = new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms });
     group.add(new THREE.Mesh(orbGeometry, orbMaterial));
@@ -143,8 +143,8 @@ export default function VoiceOrb({ energyRef, busy = false, className }: VoiceOr
       group.add(line);
       return { line, geometry, material };
     };
-    const ringA = makeRing("#23345C", 0.38);
-    const ringB = makeRing("#8A5A22", 0.28);
+    const ringA = makeRing("#FF4D8B", 0.45);
+    const ringB = makeRing("#E8B94A", 0.4);
     ringA.line.rotation.x = Math.PI / 2.3;
     ringB.line.rotation.x = Math.PI / 1.85;
     ringB.line.rotation.y = 0.5;
@@ -241,7 +241,7 @@ export default function VoiceOrb({ energyRef, busy = false, className }: VoiceOr
         <div className="w-full h-full flex items-center justify-center">
           <div
             className="w-1/2 aspect-square rounded-full"
-            style={{ background: "radial-gradient(circle at 35% 30%, #7A7490, #23345C 70%)", boxShadow: "0 0 80px rgba(227,185,138,0.35)" }}
+            style={{ background: "radial-gradient(circle at 35% 30%, #FF7FA8, #6B4FC4 70%)", boxShadow: "0 0 80px rgba(255,176,132,0.35)" }}
           />
         </div>
       )}

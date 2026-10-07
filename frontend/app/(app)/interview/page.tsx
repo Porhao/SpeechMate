@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { FileText, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 import { interviewService, liveService } from "@/services/live";
 import { authService } from "@/services/auth";
+import ClayArt from "@/components/three/ClayArt";
 import { Button, Card, Field, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import type { InterviewSetup, PracticePlan } from "@/types";
 
@@ -33,7 +34,7 @@ function Choice<T extends string>({ value, options, onChange }: {
         const active = o.id === value;
         return (
           <button key={o.id} type="button" onClick={() => onChange(o.id)} aria-pressed={active}
-            className="text-left px-3 py-2.5 text-sm transition-colors"
+            className="text-left px-3 py-2.5 rounded-md text-sm transition-colors"
             style={{
               background: active ? "var(--surface-2)" : "var(--surface)",
               border: `1px solid ${active ? "var(--accent-ink)" : "var(--line-strong)"}`,
@@ -90,7 +91,7 @@ export default function InterviewSetupPage() {
   };
 
   const start = async () => {
-    if (!authService.isSignedIn()) { router.push("/login"); return; }
+    if (!authService.isSignedIn()) { router.push("/login?next=/interview"); return; }
     setStarting(true); setError(null);
     try {
       const s = await liveService.start({ session_type: "Interview", interview: clean(), plan: plan ?? undefined });
@@ -103,7 +104,7 @@ export default function InterviewSetupPage() {
 
   return (
     <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto">
-      <PageHeader eyebrow="Mock interview" title="Tell us about the interview">
+      <PageHeader eyebrow="Mock interview" title="Tell us about the interview" art={<ClayArt variant="interview" className="h-[260px]" />}>
         The interviewer prepares questions for this role, your level and your background. Add your resume and
         they&apos;ll ask about your real experience. You&apos;ll get feedback on every answer afterwards.
       </PageHeader>
@@ -142,7 +143,7 @@ export default function InterviewSetupPage() {
                 Resume <span className="text-xs font-normal" style={{ color: "var(--muted)" }}>optional · PDF, DOCX or TXT</span>
               </p>
               {setup.resume_text ? (
-                <div className="flex items-start gap-3 p-3" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+                <div className="flex items-start gap-3 p-3 rounded-md" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
                   <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--accent-ink)" }} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>{resumeName}</p>
@@ -153,7 +154,7 @@ export default function InterviewSetupPage() {
                 </div>
               ) : (
                 <button type="button" onClick={() => fileRef.current?.click()} disabled={resumeBusy}
-                  className="w-full flex items-center justify-center gap-2 py-5 text-sm"
+                  className="w-full flex items-center justify-center gap-2 py-5 rounded-lg text-sm"
                   style={{ border: "1px dashed var(--line-strong)", color: "var(--ink-2)", background: "var(--surface)" }}>
                   {resumeBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                   {resumeBusy ? "Reading your resume…" : "Upload resume"}

@@ -46,6 +46,14 @@ def test_fluency_from_word_timestamps():
     assert f.speaking_rate == 60.0
 
 
+def test_fluency_ignores_turn_gaps_in_a_conversation():
+    # Two answers of 4 words, with the AI talking for 10 s in between
+    words = [{"word": "w", "start": t, "end": t + 0.4} for t in (0.0, 0.5, 1.0, 1.5, 12.0, 12.5, 13.0, 13.5)]
+    f = speech.analyze_fluency("a b c d e f g h", 14.0, words, silences=[])
+    assert f.pause_frequency == 0          # the 10 s turn change is not a hesitation
+    assert f.speaking_rate == 123.1        # 8 words over 3.9 s of talking, not 34 wpm over 14 s
+
+
 def test_fluency_falls_back_to_audio_silences():
     f = speech.analyze_fluency("a b c d e f", 10.0, [], silences=[(0.0, 0.4), (4.0, 5.0), (9.8, 10.0)])
     assert f.pause_source == "audio"
@@ -73,6 +81,9 @@ def test_stuttering_repetition_and_block(tmp_path):
     assert r.block_count == 1
     assert r.stuttering_score == 16.0
     assert r.severity == "Mild"
+    # A 10 s silence is the AI's turn in a conversation, not a block
+    assert speech.detect_stuttering("we should start", [], [(2.0, 12.0)], duration_sec=15.0,
+                                    wav_16k=tmp_path / "missing.wav").block_count == 0
 
 
 def test_scores_renormalise_over_available_metrics():
@@ -82,10 +93,35 @@ def test_scores_renormalise_over_available_metrics():
     assert only_speech.overall_score == 80.0
     assert only_speech.scored_on == ["Fluency"]
     assert scoring.compute_communication_score({"Fluency": None}).overall_score is None
-    assert scoring.estimate_confidence(
-        speaking_rate=None, pause_frequency=None, fluency_score=None, emotion_confidence=None,
-        facial_tension=None, posture_score=90, body_stability=70,
-    ).confidence_score == 80.0
+    body = scoring.estimate_confidence(posture_score=90, body_stability=70, eye_contact_score=80)
+    assert body.confidence_score == 81.2                    # (90 x 0.11 + 70 x 0.07 + 80 x 0.14) / 0.32
+    assert body.speech_confidence is None and body.coverage == 0.32
+    # Too little evidence (here 5%: only the response time) gives no score rather than a made-up one
+    assert scoring.estimate_confidence(response_latency_sec=2.0) is None
+
+
+def test_confidence_is_per_minute_not_per_session():
+    # The same habits over 1 and over 5 minutes of talking must score the same
+    habit = dict(speaking_rate=140, pause_frequency=8, repetition_count=2, block_count=1)
+    short = scoring.estimate_confidence(talk_minutes=1, **habit)
+    long = scoring.estimate_confidence(talk_minutes=5, **{k: v * 5 if k != "speaking_rate" else v for k, v in habit.items()})
+    assert short.confidence_score == long.confidence_score
+
+
+def test_confidence_uses_every_cue_and_explains_itself():
+    c = scoring.estimate_confidence(
+        speaking_rate=80, talk_minutes=2, pause_frequency=60, repetition_count=6, block_count=2,
+        fillers_per_minute=6, response_latency_sec=4, emotion_confidence=40, facial_tension=60,
+        posture_score=50, body_stability=50, eye_contact_score=30,
+    )
+    assert c.coverage == 1.0 and len(c.cues) == 11
+    by = {q["key"]: q["score"] for q in c.cues}
+    assert by["pace"] == 40.0                                # 40 wpm too slow x 1.5
+    assert by["repetitions"] == 55.0                         # 3 a minute x 15
+    assert c.label == "Low" and c.confidence_score < 50
+    calm = scoring.estimate_confidence(speaking_rate=140, talk_minutes=2, pause_frequency=8, repetition_count=0,
+                                       block_count=0, fillers_per_minute=1, eye_contact_score=85, posture_score=85)
+    assert calm.label == "High"
 
 
 def _candidates(**over):
@@ -195,12 +231,47 @@ async def test_auth_and_profile(client: httpx.AsyncClient):
     assert r.json()["skill_level"] == "Advanced"
     assert r.json()["challenges"] == ["Eye Contact"]
 
+    # The refresh token is an httpOnly cookie for /api/auth only, never in the body
     login = await client.post("/api/auth/login", json={"email": "aisyah@example.com", "password": "correct-horse"})
-    r = await client.post("/api/auth/refresh", json={"refresh_token": login.json()["refresh_token"]})
-    assert r.status_code == 200
+    assert login.json().get("refresh_token") is None
+    cookie = login.headers["set-cookie"]
+    assert "sm_refresh=" in cookie and "HttpOnly" in cookie and "Path=/api/auth" in cookie
+    r = await client.post("/api/auth/refresh")
+    assert r.status_code == 200 and r.json()["access_token"]
+    # Logging out clears it
+    await client.post("/api/auth/logout")
+    client.cookies.clear()
+    assert (await client.post("/api/auth/refresh")).status_code == 401
     # An access token can't be used as a refresh token
     r = await client.post("/api/auth/refresh", json={"refresh_token": login.json()["access_token"]})
     assert r.status_code == 401
+
+
+async def test_login_is_rate_limited_per_account(client: httpx.AsyncClient):
+    await client.post("/api/auth/register", json={"full_name": "B", "email": "b@example.com", "password": "correct-horse"})
+    for _ in range(10):
+        assert (await client.post("/api/auth/login", json={"email": "b@example.com", "password": "nope-nope"})).status_code == 401
+    r = await client.post("/api/auth/login", json={"email": "b@example.com", "password": "correct-horse"})
+    assert r.status_code == 429 and int(r.headers["retry-after"]) > 0
+
+
+async def test_uploads_are_capped_and_partial_files_removed(tmp_path):
+    import io
+
+    from fastapi import HTTPException, UploadFile
+
+    from app.limits import read_limited, save_limited
+
+    big = lambda: UploadFile(io.BytesIO(b"x" * 3000), filename="big.webm")  # noqa: E731
+    with pytest.raises(HTTPException) as e:
+        await read_limited(big(), 2048, "The resume")
+    assert e.value.status_code == 413
+    dest = tmp_path / "rec.webm"
+    with pytest.raises(HTTPException):
+        await save_limited(big(), dest, 2048, "The recording")
+    assert not dest.exists()
+    await save_limited(UploadFile(io.BytesIO(b"ok"), filename="ok.webm"), dest, 2048, "The recording")
+    assert dest.read_bytes() == b"ok"
 
 
 async def test_conversation_endpoints_without_key(client: httpx.AsyncClient):

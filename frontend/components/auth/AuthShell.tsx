@@ -19,7 +19,7 @@ const VoiceOrb = dynamic(() => import("./VoiceOrb"), {
 
 // Only one orb is mounted (desktop panel or mobile header), so there's one WebGL context
 const DESKTOP_QUERY = "(min-width: 1024px)";
-function useIsDesktop(): boolean | null {
+export function useIsDesktop(): boolean | null {
   return useSyncExternalStore(
     (onChange) => {
       const mq = window.matchMedia(DESKTOP_QUERY);
@@ -41,10 +41,10 @@ export function useOrbPulse() {
 function Wordmark({ light = false }: { light?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "var(--accent)" }}>
+      <div className="clay w-9 h-9 rounded-sm flex items-center justify-center" style={{ background: "var(--pink)" }}>
         <Mic2 className="w-[18px] h-[18px] text-white" />
       </div>
-      <span className="font-semibold text-[17px] tracking-tight" style={{ color: light ? "var(--bg)" : "var(--ink)" }}>
+      <span className="font-display text-[19px]" style={{ color: light ? "var(--bg)" : "var(--ink)" }}>
         SpeechMate
       </span>
     </div>
@@ -86,7 +86,7 @@ export default function AuthShell({ children, busy = false }: { children: ReactN
             >
               <span
                 className="w-1.5 h-1.5 rounded-full"
-                style={{ background: busy ? "#8A5A22" : listening ? "#3F6B4C" : "var(--faint)" }}
+                style={{ background: busy ? "#A8620F" : listening ? "#2F7A4F" : "var(--faint)" }}
               />
               {status}
             </div>

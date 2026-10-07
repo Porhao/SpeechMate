@@ -45,6 +45,9 @@ VOICES: dict[str, str] = {
     "DisfluencySpeech": "Conversational (natural disfluencies)",
 }
 
+# Narrator choice meaning "skip the Malaysian TTS, use the fast local voice (Kokoro)"
+FAST_VOICE = "fast"
+
 # The model and codec aren't thread-safe; one synthesis at a time
 _lock = threading.Lock()
 

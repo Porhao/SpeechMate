@@ -41,8 +41,9 @@ async def client():
 
 async def test_narrator_voices_endpoint(client: httpx.AsyncClient):
     r = (await client.get("/api/narrator-voices")).json()
-    assert r["default"] == "husein"
-    assert {v["id"] for v in r["voices"]} >= {"husein", "idayu", "haqkiem"}
+    # No GPU (and here not even installed): the fast Kokoro voice is the default, Malaysian voices still listed
+    assert r["default"] == "fast"
+    assert {v["id"] for v in r["voices"]} >= {"fast", "husein", "idayu", "haqkiem"}
     assert r["available"] is False  # USE_LOCAL_ML=false in tests
 
 

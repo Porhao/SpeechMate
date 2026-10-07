@@ -50,6 +50,14 @@ class StorageService:
             await f.write(content)
         return self.relative(file_path)
 
+    async def save_upload_limited(self, session_id: str, filename: str, file, max_bytes: int, what: str) -> str:
+        """Stream an UploadFile to storage with a size cap (413 above it); returns the relative path."""
+        from app.limits import save_limited
+
+        file_path = self._session_dir(session_id) / filename
+        await save_limited(file, file_path, max_bytes, what)
+        return self.relative(file_path)
+
     def relative(self, path: Path) -> str:
         """Convert an absolute path under the storage root to a storage-relative path."""
         return path.relative_to(self.base_path).as_posix()

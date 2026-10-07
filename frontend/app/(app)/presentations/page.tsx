@@ -4,16 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Upload, FileText, Mic, Square, RotateCcw, Trash2, Loader2, ChevronRight,
-  AlertTriangle, CheckCircle2, XCircle, ArrowRight, X,
+  Upload, FileText, RotateCcw, Trash2, Loader2, ChevronRight,
+  AlertTriangle, CheckCircle2, XCircle, ArrowRight,
 } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
-import { useRecorder } from "@/hooks/useRecorder";
-import type { BackendHealth, DeckListItem, NarratorVoices } from "@/types";
-import { formatDate, formatDuration } from "@/utils/format";
+import type { BackendHealth, DeckListItem } from "@/types";
+import { formatDate } from "@/utils/format";
 import { tint, inkOf } from "@/lib/utils";
+import { PageHeader } from "@/components/ui/kit";
+import ClayArt from "@/components/three/ClayArt";
 
-const ACCENT = "#8A5A22";
+const ACCENT = "#A8620F";
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
@@ -27,7 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function StatusPill({ status }: { status: string }) {
-  const color = status === "complete" ? "#3F6B4C" : status === "failed" ? "#8C3B32" : "#23345C";
+  const color = status === "complete" ? "#2F7A4F" : status === "failed" ? "#C2342C" : "#1A3A3A";
   const Icon = status === "complete" ? CheckCircle2 : status === "failed" ? XCircle : Loader2;
   return (
     <span
@@ -44,22 +45,16 @@ export default function PresentationsPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckListItem[] | null>(null);
   const [health, setHealth] = useState<BackendHealth | null>(null);
-  const [voices, setVoices] = useState<NarratorVoices | null>(null);
-  const [narrator, setNarrator] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [pptx, setPptx] = useState<File | null>(null);
-  const [voiceFile, setVoiceFile] = useState<File | null>(null);
-  const [voiceMode, setVoiceMode] = useState<"none" | "record" | "upload">("none");
   const [requirement, setRequirement] = useState("");
   const [dragging, setDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const rec = useRecorder();
   const pptxInput = useRef<HTMLInputElement>(null);
-  const voiceInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -75,9 +70,6 @@ export default function PresentationsPage() {
       .then(setDecks)
       .catch((e: Error) => setLoadError(e.message));
     presentationService.health().then(setHealth).catch(() => null);
-    presentationService.narratorVoices()
-      .then((v) => { setVoices(v); setNarrator(v.default); })
-      .catch(() => null);
   }, []);
 
   // Keep the list fresh while any deck is still generating.
@@ -97,14 +89,12 @@ export default function PresentationsPage() {
     setPptx(file);
   };
 
-  const voiceSample = voiceMode === "record" ? rec.blob : voiceMode === "upload" ? voiceFile : null;
-
   const submit = async () => {
     if (!pptx || submitting) return;
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const { session_id } = await presentationService.create(pptx, voiceSample, requirement, narrator || undefined);
+      const { session_id } = await presentationService.create(pptx, null, requirement);
       router.push(`/presentations/${session_id}`);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Upload failed.");
@@ -126,20 +116,18 @@ export default function PresentationsPage() {
 
   return (
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1100px] mx-auto space-y-6">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--muted)" }}>Presentation practice</p>
-        <h1 className="font-display text-3xl" style={{ color: "var(--ink)" }}>Practise your talk and your Q&amp;A</h1>
-        <ol className="text-sm mt-3 space-y-1 max-w-2xl" style={{ color: "var(--ink-2)" }}>
-          <li><b>1.</b> Upload your slides (.pptx or .pdf). The AI reads them first: summary, structure, each slide&apos;s key point.</li>
-          <li><b>2.</b> Watch a narrated example, then rehearse the whole deck or one slide and get coached on what to improve.</li>
+      <PageHeader eyebrow="Presentation practice" title="Practise your talk and your Q&A" art={<ClayArt variant="present" className="h-[260px]" />}>
+        <ol className="space-y-1.5">
+          <li><b>1.</b> Upload your slides (.pptx or .pdf). The AI reads them: summary, structure and each slide&apos;s key point (about a minute).</li>
+          <li><b>2.</b> Present it on camera, moving through your slides yourself. The AI checks that what you say on each slide matches what the slide is about, plus your voice and body language.</li>
           <li><b>3.</b> Rehearse the Q&amp;A: answer audience questions drawn from your own deck, with feedback on every answer.</li>
         </ol>
-      </div>
+      </PageHeader>
 
       {noAI && (
         <div
           className="flex items-start gap-3 text-sm px-4 py-3 rounded-xl"
-          style={{ background: "rgba(138,90,34,0.07)", border: "1px solid rgba(138,90,34,0.25)", color: "#6B4419" }}
+          style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--warn)" }}
         >
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>
@@ -192,87 +180,6 @@ export default function PresentationsPage() {
           )}
         </div>
 
-        {/* Narrator voice (local Malaysian TTS) */}
-        {voices?.available && (
-          <div>
-            <label htmlFor="narrator" className="text-sm font-medium" style={{ color: "var(--ink)" }}>Narrator voice</label>
-            <p className="text-xs mt-0.5 mb-2" style={{ color: "var(--muted)" }}>
-              Open-source Malaysian TTS (Mesolitica). It handles Malay, English and code-switching, and runs on this server.
-            </p>
-            <select
-              id="narrator"
-              value={narrator}
-              onChange={(e) => setNarrator(e.target.value)}
-              className="text-sm px-3 py-2 rounded-lg outline-none"
-              style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
-            >
-              {voices.voices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-            </select>
-          </div>
-        )}
-
-        {/* Voice sample (cloning — optional, needs ElevenLabs) */}
-        <div>
-          <p className="text-sm font-medium mb-1" style={{ color: "var(--ink)" }}>Voice sample <span style={{ color: "var(--faint)" }}>(optional)</span></p>
-          <p className="text-xs mb-3" style={{ color: "var(--muted)" }}>
-            Only used for cloning your own voice, which needs an ElevenLabs key on the backend. Without one, the
-            narrator voice above is used. For cloning, record 30–60 seconds of clear speech in a quiet room.
-          </p>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {(["none", "record", "upload"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setVoiceMode(m)}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={voiceMode === m
-                  ? { background: ACCENT, color: "white" }
-                  : { background: "var(--surface-2)", color: "var(--ink-2)", border: "1px solid var(--line)" }}
-              >
-                {m === "none" ? "Skip" : m === "record" ? "Record now" : "Upload file"}
-              </button>
-            ))}
-          </div>
-
-          {voiceMode === "record" && (
-            <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-              <p className="text-xs italic" style={{ color: "var(--muted)" }}>
-                Read aloud: &ldquo;Good morning everyone. Today I&rsquo;d like to walk you through an idea I&rsquo;ve been
-                working on, why it matters, and what I think we should do next. Please stop me with questions at any point.&rdquo;
-              </p>
-              <div className="flex items-center gap-3 flex-wrap">
-                {!rec.recording ? (
-                  <button onClick={rec.start} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-white" style={{ background: "#8C3B32" }}>
-                    <Mic className="w-3.5 h-3.5" /> {rec.blob ? "Re-record" : "Start recording"}
-                  </button>
-                ) : (
-                  <button onClick={rec.stop} className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg text-white" style={{ background: "#17181C" }}>
-                    <Square className="w-3.5 h-3.5" /> Stop · {formatDuration(rec.seconds)}
-                  </button>
-                )}
-                {rec.url && !rec.recording && <audio src={rec.url} controls className="h-9 max-w-full" />}
-              </div>
-              {rec.error && <p className="text-xs" style={{ color: "var(--bad)" }}>{rec.error}</p>}
-            </div>
-          )}
-
-          {voiceMode === "upload" && (
-            <div className="flex items-center gap-3">
-              <input ref={voiceInput} type="file" accept="audio/*,.m4a,.webm,.ogg,.flac" className="hidden"
-                onChange={(e) => setVoiceFile(e.target.files?.[0] ?? null)} />
-              <button onClick={() => voiceInput.current?.click()} className="text-xs font-medium px-3 py-2 rounded-lg"
-                style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}>
-                Choose audio file
-              </button>
-              {voiceFile && (
-                <span className="flex items-center gap-1 text-xs" style={{ color: "var(--ink-2)" }}>
-                  {voiceFile.name}
-                  <button onClick={() => setVoiceFile(null)} aria-label="Remove voice file"><X className="w-3 h-3" /></button>
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* Requirement */}
         <div>
           <label htmlFor="requirement" className="text-sm font-medium" style={{ color: "var(--ink)" }}>
@@ -293,12 +200,12 @@ export default function PresentationsPage() {
 
         <button
           onClick={submit}
-          disabled={!pptx || submitting || rec.recording}
+          disabled={!pptx || submitting}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-40"
           style={{ background: ACCENT }}
         >
           {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-          {submitting ? "Uploading…" : "Generate example presentation"}
+          {submitting ? "Uploading…" : "Upload and prepare"}
         </button>
       </div>
 

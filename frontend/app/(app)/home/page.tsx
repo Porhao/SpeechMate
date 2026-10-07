@@ -7,26 +7,27 @@ import Link from "next/link";
 import { ArrowRight, Briefcase, ChevronRight, MessageCircle, Presentation } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { useMyStats } from "@/hooks/useMyStats";
-import { Card } from "@/components/ui/kit";
+import { Card, TiltCard } from "@/components/ui/kit";
+import ClayArt from "@/components/three/ClayArt";
 import type { LiveSession } from "@/types";
 
 const FUNCTIONS = [
   {
-    href: "/conversation", icon: MessageCircle, color: "#23345C", kicker: "Everyday speaking",
+    href: "/conversation", icon: MessageCircle, bg: "var(--pink)", fg: "#fff", kicker: "Everyday speaking",
     title: "Daily conversation",
     desc: "Chat naturally with an AI partner about everyday topics.",
     steps: ["Pick a topic", "Talk for 3–5 minutes", "Get your voice, language, body-language and confidence report"],
     cta: "Start a conversation",
   },
   {
-    href: "/interview", icon: Briefcase, color: "#5A5470", kicker: "Job ready",
+    href: "/interview", icon: Briefcase, bg: "var(--teal)", fg: "#fff", kicker: "Job ready",
     title: "Mock interview",
     desc: "A realistic interview with questions curated for your role and resume.",
     steps: ["Enter the position and your background (+ resume)", "Answer the interviewer's questions", "Get feedback on every answer, with a stronger version"],
     cta: "Set up an interview",
   },
   {
-    href: "/presentations", icon: Presentation, color: "#8A5A22", kicker: "Slides & Q&A",
+    href: "/presentations", icon: Presentation, bg: "var(--lavender)", fg: "#0A0A0A", kicker: "Slides & Q&A",
     title: "Presentation practice",
     desc: "Upload your deck; the AI studies it, coaches your delivery and runs your Q&A.",
     steps: ["Upload .pptx or .pdf: get a summary and insights", "Rehearse the talk, slide by slide", "Answer audience questions drawn from your deck"],
@@ -49,50 +50,58 @@ export default function HomePage() {
   const focus = latestDone?.analysis?.recommendations.exercises[0];
 
   return (
-    <div className="px-4 sm:px-6 py-8 sm:py-10 max-w-[1200px] mx-auto">
-      <div className="mb-8">
-        <h1 className="font-display text-3xl sm:text-4xl leading-tight" style={{ color: "var(--ink)" }}>
-          {firstName ? `Hello, ${firstName}.` : "Hello."} What would you like to practise?
-        </h1>
-        <p className="mt-2 text-[15px]" style={{ color: "var(--ink-2)" }}>
-          Speak with the AI, then get a clear, simple report. Nothing interrupts you while you talk.
-        </p>
+    <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[1280px] mx-auto">
+      {/* Hero: headline left, 3D orb right (7/5) */}
+      <div className="grid lg:grid-cols-[7fr_5fr] items-center gap-6 mb-10 lg:mb-14">
+        <div>
+          <p className="inline-block text-[13px] font-medium px-3 py-1 rounded-full mb-5" style={{ background: "var(--surface-3)", color: "var(--ink-2)" }}>
+            {firstName ? `Hello, ${firstName}` : "Welcome back"}
+          </p>
+          <h1 className="font-display text-[40px] sm:text-[56px] lg:text-[64px] leading-[1.02]" style={{ color: "var(--ink)" }}>
+            What would you like to practise today?
+          </h1>
+          <p className="mt-5 text-base sm:text-lg max-w-xl" style={{ color: "var(--ink-2)" }}>
+            Speak with the AI, then get a clear, simple report. Nothing interrupts you while you talk.
+          </p>
+        </div>
+        {/* 3D clay microphone, speech bubbles and shapes (click to squash) */}
+        <ClayArt variant="mic" className="h-[360px]" />
       </div>
 
-      {/* The three functions */}
-      <div className="grid md:grid-cols-3 gap-4 mb-8">
-        {FUNCTIONS.map(({ href, icon: Icon, color, kicker, title, desc, steps, cta }) => (
-          <Link key={href} href={href} className="group flex flex-col transition-transform hover:-translate-y-0.5"
-            style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
-            <div className="p-5 text-white" style={{ background: color }}>
-              <Icon className="w-6 h-6 text-white/85" strokeWidth={1.6} />
-              <p className="text-[11px] uppercase tracking-wide text-white/60 mt-4">{kicker}</p>
-              <h2 className="font-display text-2xl leading-tight">{title}</h2>
-              <p className="text-sm text-white/75 mt-1.5 leading-relaxed">{desc}</p>
-            </div>
-            <ol className="p-5 space-y-2.5 flex-1">
+      {/* The three functions: saturated clay cards that lean towards the pointer */}
+      <div className="grid md:grid-cols-3 gap-5 mb-10">
+        {FUNCTIONS.map(({ href, icon: Icon, bg, fg, kicker, title, desc, steps, cta }) => (
+          <TiltCard key={href} href={href} className="group flex flex-col rounded-xl p-6 sm:p-7" style={{ background: bg, color: fg }}>
+            <span className="tilt-pop w-12 h-12 rounded-lg flex items-center justify-center clay" style={{ background: "rgba(255,255,255,0.22)" }}>
+              <Icon className="w-6 h-6" strokeWidth={1.8} />
+            </span>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] mt-6 opacity-75">{kicker}</p>
+            <h2 className="font-display text-[28px] leading-tight mt-1">{title}</h2>
+            <p className="text-sm mt-2 leading-relaxed opacity-85">{desc}</p>
+            {/* Product fragment: the three steps on a small white panel */}
+            <ol className="tilt-pop mt-6 p-4 rounded-lg space-y-2.5 flex-1" style={{ background: "#FFFAF0", color: "#3A3A3A" }}>
               {steps.map((s, i) => (
-                <li key={s} className="flex gap-3 text-sm" style={{ color: "var(--ink-2)" }}>
-                  <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center text-[11px] font-bold" style={{ background: "var(--surface-2)", color: "var(--ink)" }}>{i + 1}</span>
+                <li key={s} className="flex gap-3 text-sm">
+                  <span className="w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold" style={{ background: bg, color: fg }}>{i + 1}</span>
                   {s}
                 </li>
               ))}
             </ol>
-            <span className="mx-5 mb-5 pt-3 flex items-center justify-between text-sm font-semibold" style={{ borderTop: "1px solid var(--line-2)", color: "var(--accent-ink)" }}>
-              {cta} <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+            <span className="mt-5 flex items-center justify-between text-sm font-semibold">
+              {cta} <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </span>
-          </Link>
+          </TiltCard>
         ))}
       </div>
 
       {/* Where you are */}
-      <div className="grid lg:grid-cols-[1fr_1fr] gap-4">
+      <div className="grid lg:grid-cols-2 gap-5">
         <Card title="Your next focus">
           {focus ? (
             <>
               <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{focus.title}</p>
               {focus.evidence && <p className="text-sm mt-1" style={{ color: "var(--ink-2)" }}>{focus.evidence}</p>}
-              <p className="text-sm mt-3 p-3" style={{ background: "var(--surface-2)", color: "var(--ink-3)" }}>
+              <p className="text-sm mt-3 p-3 rounded-md" style={{ background: "var(--surface-3)", color: "var(--ink-3)" }}>
                 <b>Try:</b> {focus.description}
               </p>
               <Link href={`/results/${latestDone!.id}`} className="inline-flex items-center gap-1 text-xs font-semibold mt-3" style={{ color: "var(--accent-ink)" }}>
@@ -110,12 +119,12 @@ export default function HomePage() {
           <Link href="/progress" className="text-xs font-semibold" style={{ color: "var(--accent-ink)" }}>See progress</Link>
         )}>
           {stats && stats.recent.length > 0 ? (
-            <ul className="divide-y" style={{ borderColor: "var(--line-2)" }}>
+            <ul className="divide-y divide-[var(--line-2)]">
               {stats.recent.slice(0, 4).map((s) => (
                 <li key={s.id}>
                   <Link href={`/results/${s.id}`} className="flex items-center gap-3 py-2.5">
                     <span className="w-9 font-display text-lg tabular-nums" style={{ color: score(s) != null ? "var(--ink)" : "var(--faint)" }}>{score(s) ?? "—"}</span>
-                    <span className="flex-1 text-sm truncate" style={{ color: "var(--ink-2)" }}>{TYPE_LABEL[s.session_type] ?? s.session_type}</span>
+                    <span className="flex-1 text-sm truncate" style={{ color: "var(--ink-2)" }}>{s.context?.kind === "talk" ? "Presentation" : TYPE_LABEL[s.session_type] ?? s.session_type}</span>
                     <span className="text-xs" style={{ color: "var(--muted)" }}>{new Date(s.created_at).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}</span>
                   </Link>
                 </li>

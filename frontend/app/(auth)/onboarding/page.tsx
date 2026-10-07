@@ -37,38 +37,38 @@ const SKILL_LEVELS = [
     value: "Beginner",
     label: "Beginner",
     desc: "I struggle with speaking confidence, fluency, or pronunciation",
-    color: "#4D7A59",
+    color: "#2F7A4F",
     bg: "#EDF1EB",
   },
   {
     value: "Intermediate",
     label: "Intermediate",
     desc: "I can communicate but want to sound more polished and professional",
-    color: "#9C6A28",
+    color: "#A8620F",
     bg: "#F3EEE3",
   },
   {
     value: "Advanced",
     label: "Advanced",
     desc: "I speak well but want to refine specific skills (eye contact, pace, etc.)",
-    color: "#9C4A40",
+    color: "#C2342C",
     bg: "#F2E7E4",
   },
 ] as const;
 
 const CHALLENGES = [
   { value: "Filler Words",   icon: Mic,      color: "var(--accent-ink)" },
-  { value: "Pronunciation",  icon: Volume2,   color: "#5A5470" },
-  { value: "Eye Contact",    icon: Eye,       color: "#4D7A59" },
-  { value: "Speaking Pace",  icon: Activity,  color: "#9C6A28" },
-  { value: "Confidence",     icon: Brain,     color: "#9C4A40" },
-  { value: "Posture",        icon: Zap,       color: "#3C6E78" },
+  { value: "Pronunciation",  icon: Volume2,   color: "#6B4FC4" },
+  { value: "Eye Contact",    icon: Eye,       color: "#2F7A4F" },
+  { value: "Speaking Pace",  icon: Activity,  color: "#A8620F" },
+  { value: "Confidence",     icon: Brain,     color: "#C2342C" },
+  { value: "Posture",        icon: Zap,       color: "#1F6F6B" },
 ] as const;
 
 const PRACTICE_TYPES = [
-  { value: "Conversation",  label: "Daily Conversation",     icon: MessageCircle, color: "#23345C", desc: "Everyday speaking with an AI partner" },
-  { value: "Interview",     label: "Mock Interview",          icon: Briefcase,     color: "#5A5470", desc: "Questions curated for your role and resume" },
-  { value: "Presentation",  label: "Presentation Practice",   icon: Presentation,  color: "#9C6A28", desc: "Deck insights, rehearsal and Q&A" },
+  { value: "Conversation",  label: "Daily Conversation",     icon: MessageCircle, color: "#1A3A3A", desc: "Everyday speaking with an AI partner" },
+  { value: "Interview",     label: "Mock Interview",          icon: Briefcase,     color: "#6B4FC4", desc: "Questions curated for your role and resume" },
+  { value: "Presentation",  label: "Presentation Practice",   icon: Presentation,  color: "#A8620F", desc: "Deck insights, rehearsal and Q&A" },
 ] as const;
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ function StepDot({ step, current }: { step: number; current: number; total: numb
         done
           ? "bg-[var(--accent)] text-white"
           : active
-          ? "bg-[var(--accent)] text-white ring-4 ring-[#23345C]/20"
+          ? "bg-[var(--accent)] text-white ring-4 ring-[var(--accent-ink)]/20"
           : "bg-[var(--line)] text-[var(--faint)]"
       }`}
     >
@@ -165,7 +165,7 @@ export default function OnboardingPage() {
                     key={value}
                     onClick={() => setGoal(value)}
                     className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all ${
-                      active ? "border-[#23345C] bg-[#E8E9EF]" : "border-[var(--line)] hover:bg-[var(--surface-2)]"
+                      active ? "border-[var(--accent-ink)] bg-[var(--surface-2)]" : "border-[var(--line)] hover:bg-[var(--surface-2)]"
                     }`}
                   >
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? "bg-[var(--accent)]" : "bg-[var(--surface-2)]"}`}>
@@ -313,7 +313,7 @@ export default function OnboardingPage() {
             <button
               disabled={!canNext}
               onClick={() => setStep((s) => s + 1)}
-              className="flex items-center gap-1.5 bg-[var(--accent)] hover:bg-[#17233E] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all press-effect"
+              className="flex items-center gap-1.5 bg-[var(--accent)] hover:bg-[#0A0A0A] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all press-effect"
             >
               Continue <ChevronRight className="w-4 h-4" />
             </button>
@@ -321,7 +321,7 @@ export default function OnboardingPage() {
             <button
               disabled={!canNext}
               onClick={handleFinish}
-              className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[#17233E] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all"
+              className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[#0A0A0A] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all"
             >
               <CheckCircle2 className="w-4 h-4" /> Start Practicing!
             </button>

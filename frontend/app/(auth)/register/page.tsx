@@ -58,7 +58,7 @@ export default function RegisterPage() {
   };
 
   const inputClass =
-    "w-full px-4 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] text-[var(--ink)] text-sm outline-none focus:border-[#23345C] focus:ring-2 focus:ring-[#23345C]/10 transition-all placeholder:text-[var(--faint)]";
+    "w-full px-4 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] text-[var(--ink)] text-sm outline-none focus:border-[var(--accent-ink)] focus:ring-2 focus:ring-[var(--accent-ink)]/10 transition-all placeholder:text-[var(--faint)]";
 
   return (
     <AuthShell busy={loading}>
@@ -179,7 +179,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[var(--accent)] hover:bg-[#17233E] disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-colors mt-2 press-effect"
+              className="w-full bg-[var(--accent)] hover:bg-[#0A0A0A] disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm py-3 rounded-xl transition-colors mt-2 press-effect"
             >
               {loading ? "Creating account…" : "Create account"}
             </button>

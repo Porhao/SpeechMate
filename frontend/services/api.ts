@@ -11,20 +11,19 @@ function authHeader(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// Access tokens are short-lived: on a 401, swap the refresh token for a new
-// pair once and retry the request.
+// Access tokens are short-lived (30 min): on a 401, get a new one once and retry the request.
+// The refresh token is an httpOnly cookie the browser sends to /auth/* (page scripts can't
+// read it). A refresh token left in localStorage by an older version is used once, then deleted.
 async function refreshTokens(): Promise<boolean> {
-  const refresh_token = localStorage.getItem("refresh_token");
-  if (!refresh_token) return false;
+  const legacy = localStorage.getItem("refresh_token");
   const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token }),
+    credentials: "include",
+    ...(legacy ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: legacy }) } : {}),
   }).catch(() => null);
+  localStorage.removeItem("refresh_token");
   if (!res?.ok) return false;
-  const tokens = await res.json();
-  localStorage.setItem("access_token", tokens.access_token);
-  localStorage.setItem("refresh_token", tokens.refresh_token);
+  localStorage.setItem("access_token", (await res.json()).access_token);
   return true;
 }
 
@@ -34,6 +33,8 @@ async function request<T>(path: string, options: RequestInit = {}, retried = fal
   try {
     res = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      // The refresh cookie only exists for /auth/*; everything else uses the Bearer token
+      credentials: path.startsWith("/auth/") ? "include" : "same-origin",
       headers: {
         ...(isForm ? {} : { "Content-Type": "application/json" }),
         ...authHeader(),

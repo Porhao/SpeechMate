@@ -21,16 +21,16 @@ export const authService = {
     api.post<{ message: string }>("/auth/register", data),
 
   login: async (data: LoginPayload): Promise<AuthTokens> => {
-    const tokens = await api.post<AuthTokens>("/auth/login", data);
+    const tokens = await api.post<AuthTokens>("/auth/login", data);  // also sets the httpOnly refresh cookie
     localStorage.setItem("access_token", tokens.access_token);
-    localStorage.setItem("refresh_token", tokens.refresh_token);
+    localStorage.removeItem("refresh_token");  // left over from versions before the cookie
     return tokens;
   },
 
   logout: () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
-    return api.post("/auth/logout", {}).catch(() => null);
+    return api.post("/auth/logout", {}).catch(() => null);  // clears the refresh cookie
   },
 
   me: () => api.get<User>("/users/profile"),

@@ -41,8 +41,10 @@ class LiveStartRequest(BaseModel):
     # Interview: the setup, plus the plan the user previewed (built here if omitted)
     interview: InterviewSetup | None = None
     plan: PracticePlan | None = None
-    # Presentation: the deck to rehearse Q&A on (its insights curate the questions)
+    # Presentation: the deck. "talk" = the user presents it (slides they control; what they say is
+    # checked against each slide); "qa" = the audience Q&A rehearsal (questions from the insights)
     deck_id: uuid.UUID | None = None
+    presentation_mode: Literal["talk", "qa"] = "qa"
 
 
 class Turn(BaseModel):

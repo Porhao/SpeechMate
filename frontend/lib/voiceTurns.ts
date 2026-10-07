@@ -5,12 +5,15 @@
 // simple energy-based voice activity detector (adaptive to the room's noise
 // floor), keeps ~0.35 s of audio from just before speech started so the first
 // word isn't clipped, and hands the turn to `transcribe` as a 16 kHz mono WAV —
-// the backend runs faster-whisper on it.
+// the backend runs faster-whisper on it. The 48 → 16 kHz step uses the browser's
+// own filtered resampler: plain decimation folds hiss onto s/sh/f sounds.
 
 const TARGET_RATE = 16000;
 const FRAME_SIZE = 2048;             // ≈ 43 ms at 48 kHz
 const PREROLL_SEC = 0.35;
-const END_SILENCE_SEC = 1.0;         // this much quiet ends the turn
+// This much quiet ends the turn. Learners pause mid-sentence to find words, so be patient:
+// at 1.0 s the AI was answering half-finished thoughts.
+const END_SILENCE_SEC = 1.6;
 const MIN_SPEECH_SEC = 0.35;         // shorter blips (a cough, a click) are ignored
 const MAX_TURN_SEC = 30;
 const START_FRAMES = 3;              // consecutive loud frames needed to start a turn
@@ -40,11 +43,16 @@ export class VoiceTurnListener {
   private turnSec = 0;
   private speechSec = 0;
   private queue: Promise<void> = Promise.resolve();  // keeps turns in the order they were spoken
+  private inFlight = 0;                               // turns sent but not yet transcribed
 
   constructor(
     private readonly transcribe: (wav: Blob) => Promise<string>,
     private readonly cb: VoiceTurnCallbacks,
   ) {}
+
+  /** True while the user is mid-turn or a finished turn is still being transcribed:
+   *  more words may be on their way, so it isn't the AI's turn yet. */
+  get isBusy() { return this.speaking || this.inFlight > 0; }
 
   start(stream: MediaStream) {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -106,13 +114,18 @@ export class VoiceTurnListener {
     this.turn = []; this.turnSec = 0; this.speechSec = 0; this.loudRun = 0; this.quietSec = 0;
     if (speechSec < MIN_SPEECH_SEC || !this.ctx) return;
 
-    const wav = encodeWav(resample(concat(frames), this.ctx.sampleRate, TARGET_RATE), TARGET_RATE);
+    const samples = concat(frames);
+    const rate = this.ctx.sampleRate;
     this.cb.onTranscribing();
+    this.inFlight++;
     this.queue = this.queue.then(async () => {
       try {
+        const wav = encodeWav(await resample(samples, rate, TARGET_RATE), TARGET_RATE);
         const text = (await this.transcribe(wav)).trim();
+        this.inFlight--;
         if (!this.stopped) this.cb.onText(text);  // "" = nothing intelligible was said
       } catch (e) {
+        this.inFlight--;
         if (!this.stopped) this.cb.onError(e instanceof Error ? e : new Error(String(e)));
       }
     });
@@ -135,8 +148,25 @@ function concat(frames: Float32Array[]): Float32Array {
   return out;
 }
 
-/** Linear-interpolation resample (48 kHz → 16 kHz for Whisper). */
-function resample(input: Float32Array, from: number, to: number): Float32Array {
+/** 48 kHz → 16 kHz for Whisper, through the browser's resampler (it low-pass filters first). */
+async function resample(input: Float32Array, from: number, to: number): Promise<Float32Array> {
+  if (from === to || typeof OfflineAudioContext === "undefined") return resampleLinear(input, from, to);
+  try {
+    const offline = new OfflineAudioContext(1, Math.max(1, Math.ceil((input.length * to) / from)), to);
+    const buffer = offline.createBuffer(1, input.length, from);
+    buffer.copyToChannel(input as Float32Array<ArrayBuffer>, 0);
+    const src = offline.createBufferSource();
+    src.buffer = buffer;
+    src.connect(offline.destination);
+    src.start();
+    return (await offline.startRendering()).getChannelData(0);
+  } catch {
+    return resampleLinear(input, from, to);
+  }
+}
+
+/** Fallback: linear interpolation (no anti-alias filter). */
+function resampleLinear(input: Float32Array, from: number, to: number): Float32Array {
   if (from === to) return input;
   const ratio = from / to;
   const out = new Float32Array(Math.floor(input.length / ratio));

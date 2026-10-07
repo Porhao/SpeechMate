@@ -33,3 +33,15 @@ if not shutil.which(os.environ.get("FFMPEG_BIN", "ffmpeg")):
         pass
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Rate-limit windows are process-wide; every test starts with none used."""
+    from app.limits import limiter
+
+    limiter.reset()
+    yield
