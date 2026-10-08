@@ -289,6 +289,52 @@ function HeaderPulse({ level, active, color = "#3E6FB0" }: { level: number; acti
   );
 }
 
+// ── Voice beam — a wash of the mode colour inside the input bar ──────────────
+// Rises from the bottom edge with the user's real mic level while they can speak, and sweeps
+// side to side while the partner thinks. Stays inside the box (no blur, no halo: Design_system.md),
+// and is hidden under reduced motion (globals.css).
+function VoiceBeam({ level, listening, thinking, color }: { level: number; listening: boolean; thinking: boolean; color: string }) {
+  const rise = thinking ? 0.5 : listening ? Math.min(1, 0.18 + level * 4) : 0;
+  return (
+    <span aria-hidden className="voice-beam pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+      <span className={`absolute inset-y-0 -inset-x-1/4 ${thinking ? "voice-beam-sweep" : ""}`}>
+        <span className="absolute inset-0 origin-bottom transition-[transform,opacity] duration-150 ease-out"
+          style={{
+            opacity: rise ? 1 : 0,
+            transform: `scaleY(${rise})`,
+            background: `radial-gradient(45% 100% at 50% 100%, color-mix(in srgb, ${color} 40%, transparent), transparent 75%)`,
+          }} />
+      </span>
+    </span>
+  );
+}
+
+// ── Live transcript — the user's words, phrase by phrase as they are transcribed ──
+// A two-line window pinned to the newest words: older lines slide up under a fade, and the
+// newest phrase fades in. The status ("Hearing you…", "Transcribing…") sits in the label.
+function LiveTranscript({ transcript, newest, status, color }: {
+  transcript: string; newest: { text: string; key: number } | null; status: string; color: string;
+}) {
+  const fresh = newest && transcript.endsWith(newest.text) ? newest : null;
+  const older = fresh ? transcript.slice(0, -fresh.text.length).trimEnd() : transcript;
+  return (
+    <div className="flex-shrink-0 px-4 py-2.5 rounded-xl" aria-live="polite"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+      <p className="flex items-center gap-1.5 text-[10px] text-[var(--faint)] font-semibold uppercase tracking-wider mb-1">
+        {status === "Hearing you…" && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />}
+        Live transcript
+        {status && <span className="normal-case tracking-normal font-normal italic">· {status}</span>}
+      </p>
+      <div className="live-transcript-window text-sm leading-snug text-[var(--ink-2)]">
+        <p>
+          {older}
+          {fresh && <span key={fresh.key} className="live-phrase-in text-[var(--ink)]">{older ? " " : ""}{fresh.text}</span>}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Interviewer Avatar ────────────────────────────────────────────────────────
 function InterviewerAvatar({ state }: { state: OrbState }) {
   const s = {
@@ -470,6 +516,7 @@ function SessionContent() {
   // AI reply text is ready and its voice is loading: shown as "thinking" until audio really plays
   const [voicePending,   setVoicePending]   = useState(false);
   const [interimText,    setInterimText]    = useState("");
+  const [newestPhrase,   setNewestPhrase]   = useState<{ text: string; key: number } | null>(null);
   // Presentation talk: the slide on screen, and when each slide was put up (seconds into the recording)
   const [slideIdx, setSlideIdx] = useState(1);
   const [showCue, setShowCue] = useState(false);
@@ -1001,8 +1048,11 @@ function SessionContent() {
         setInterimText("Hearing you…");
       },
       onTranscribing: () => setInterimText("Transcribing…"),
-      // The listener already waited ~1.6 s of silence before sending the turn
-      onText: (text) => { setInterimText(""); if (text) onFinal(text, 0.85, 1200); },
+      // A phrase (the user may still be talking) or the end of a turn (~1.6 s of silence)
+      onText: (text) => {
+        setInterimText(listener.isSpeaking ? "Hearing you…" : "");
+        if (text) { setNewestPhrase({ text: text.trim(), key: Date.now() }); onFinal(text, 0.85, 1200); }
+      },
       onError: () => {
         // Backend STT unavailable: the user types for the rest of the session
         listener.stop();
@@ -1908,20 +1958,14 @@ function SessionContent() {
               )}
             </div>
 
-            {/* Live transcript strip */}
+            {/* Live transcript */}
             {(transcript || interimText) && sessionStarted && (
-              <div className="flex-shrink-0 px-3 py-2 rounded-xl"
-                style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                <p className="text-[10px] text-[var(--faint)] font-semibold uppercase tracking-wider mb-0.5">Live Transcript</p>
-                <p className="text-xs text-[var(--ink-2)] line-clamp-1">
-                  {transcript}
-                  {interimText && <span className="text-[var(--faint)] italic"> {interimText}</span>}
-                </p>
-              </div>
+              <LiveTranscript transcript={transcript} newest={newestPhrase} status={interimText} color={mc} />
             )}
 
             {/* Input */}
             <div className="flex-shrink-0 flex gap-2">
+              <div className="relative flex-1">
               <input type="text" value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
@@ -1934,11 +1978,13 @@ function SessionContent() {
                   speechActive      ? "Speaking captured — or type here…" :
                   "Speak your answer aloud, or type it here…"
                 }
-                className="flex-1 px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
+                className="w-full px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
                 style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
                 onFocus={(e) => (e.target.style.borderColor = "rgba(96,165,250,0.5)")}
                 onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
               />
+              <VoiceBeam level={audioLevel} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc} />
+              </div>
               <button onClick={sendMessage}
                 disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                 className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
@@ -2109,20 +2155,14 @@ function SessionContent() {
                 )}
               </div>
 
-              {/* Interim transcript */}
+              {/* Live transcript */}
               {(transcript || interimText) && sessionStarted && (
-                <div className="flex-shrink-0 px-4 py-2.5 rounded-xl"
-                  style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-                  <p className="text-[10px] text-[var(--faint)] font-semibold uppercase tracking-wider mb-0.5">Transcript</p>
-                  <p className="text-xs text-[var(--ink-2)] line-clamp-2">
-                    {transcript}
-                    {interimText && <span className="text-[var(--faint)] italic"> {interimText}</span>}
-                  </p>
-                </div>
+                <LiveTranscript transcript={transcript} newest={newestPhrase} status={interimText} color={mc} />
               )}
 
               {/* Input */}
               <div className="flex-shrink-0 flex gap-3">
+                <div className="relative flex-1">
                 <input type="text" value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
@@ -2135,7 +2175,7 @@ function SessionContent() {
                     speechActive ? "Speaking captured — or type here…" :
                     "Speak aloud, or type your response…"
                   }
-                  className="flex-1 px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
+                  className="w-full px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
                   style={{
                     background: "var(--surface-2)",
                     border: "1px solid var(--line)",
@@ -2143,6 +2183,8 @@ function SessionContent() {
                   onFocus={(e) => (e.target.style.borderColor = `${mc}50`)}
                   onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
                 />
+                <VoiceBeam level={audioLevel} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc} />
+                </div>
                 <button onClick={sendMessage}
                   disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                   className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"

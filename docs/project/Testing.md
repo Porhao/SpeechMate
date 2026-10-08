@@ -42,6 +42,10 @@ ctx.route("http://localhost:3000/**", lambda r: r.fulfill(response=r.fetch(url=r
 
 Use `--use-fake-device-for-media-stream` for camera/mic. Abort `POST /api/live` in tests so no real sessions are created in the demo account.
 
+## Live transcript (voice turns)
+
+`cd frontend && node --experimental-transform-types lib/voiceTurns.selftest.ts` checks that a long answer is sent to speech recognition phrase by phrase (at the short pauses), in order, and that a turn still ends after ~1.6 s of silence. Headless Chrome's fake microphone garbles real speech while the camera tracking runs, so test live transcription by hand in a normal browser.
+
 ## Fine-tune data
 
 `fine-tune/scripts/prepare_own.py --selftest` checks the recording-to-dataset conversion (formats, silence, rejects, idempotent re-runs).

@@ -4,11 +4,15 @@ Run with .venv-app from a folder without backend/.env:
 
     cd /tmp && WHISPER_CPU_THREADS=8 <repo>/fine-tune/.venv-app/bin/python <repo>/fine-tune/scripts/eval_finetune.py
 
-Configs (all CT2 int8 on CPU, auto-detected language, VAD, as the app runs):
-    shipped     out/ct2_base, the app's verbatim prompt   (= today's SpeechMate)
-    ft          out/ct2, no prompt                         (as trained)
-    ft_prompt   out/ct2, the app's prompt                  (if dropped in without a code change)
-Writes eval/paper/finetune_results.csv and prints WER per group.
+Configs (auto-detected language, VAD, the app's decoding settings):
+    shipped      out/ct2_base, CPU int8, the app's verbatim prompt   (= today's SpeechMate)
+    ft           out/ct2, CPU int8, no prompt                         (as trained)
+    ft_prompt    out/ct2, CPU int8, the app's prompt                  (if dropped in unchanged)
+    voicestudio  Whisper large-v3 (Systran/faster-whisper-large-v3), GPU float16, no prompt:
+                 VoiceStudio's Faster-Whisper engine; its WhisperX default uses the same weights.
+                 Needs the CUDA libs on LD_LIBRARY_PATH (e.g. from .venv's nvidia/*/lib).
+Writes eval/paper/finetune_results.csv (resumes: only missing clip/config cells are run)
+and prints WER per group.
 """
 import csv
 import re
@@ -22,25 +26,41 @@ from app.config import settings  # noqa: E402
 from app.services.live import asr  # noqa: E402
 
 EVAL = ROOT / "eval" / "paper"
-CONFIGS = [("shipped", ROOT / "out" / "ct2_base", True), ("ft", ROOT / "out" / "ct2", False),
-           ("ft_prompt", ROOT / "out" / "ct2", True)]
+CONFIGS = [("shipped", ROOT / "out" / "ct2_base", True, "cpu"), ("ft", ROOT / "out" / "ct2", False, "cpu"),
+           ("ft_prompt", ROOT / "out" / "ct2", True, "cpu"), ("voicestudio", "large-v3", False, "cuda")]
 APP_PROMPT = asr.VERBATIM_PROMPT
+RESULTS = EVAL / "finetune_results.csv"
 manifest = list(csv.DictReader(open(EVAL / "manifest.csv", encoding="utf-8")))
 out = {r["clip_id"]: dict(r) for r in manifest}
+if RESULTS.exists():   # resume: keep cells already transcribed
+    for r in csv.DictReader(open(RESULTS, encoding="utf-8")):
+        if r["clip_id"] in out:
+            out[r["clip_id"]].update({c[0]: r[c[0]] for c in CONFIGS if r.get(c[0])})
+app_loader = asr._whisper_model
 
-for name, model_dir, prompt in CONFIGS:
-    settings.whisper_model_size = str(model_dir)
-    asr._whisper_model.cache_clear()
+for name, model, prompt, device in CONFIGS:
+    todo = [r for r in manifest if name not in out[r["clip_id"]]]
+    if not todo:
+        continue
+    app_loader.cache_clear()
+    if device == "cpu":
+        settings.whisper_model_size = str(model)
+        asr._whisper_model = app_loader
+    else:
+        from faster_whisper import WhisperModel
+        gpu_model = WhisperModel(model, device="cuda", compute_type="float16")
+        asr._whisper_model = lambda: gpu_model
     asr.VERBATIM_PROMPT = APP_PROMPT if prompt else None   # whisper_segments reads the module global
     t = time.time()
-    for i, r in enumerate(manifest, 1):
+    for i, r in enumerate(todo, 1):
         segments, _ = asr.whisper_segments(EVAL / "clips" / f"{r['clip_id']}.wav", None)
         out[r["clip_id"]][name] = " ".join(s.text.strip() for s in segments).strip()
         if i % 100 == 0:
-            print(f"{name}: {i} clips, {(time.time() - t) / i:.1f} s/clip", flush=True)
+            print(f"{name}: {i}/{len(todo)} clips, {(time.time() - t) / i:.1f} s/clip", flush=True)
+    asr._whisper_model = app_loader
 
 fields = ["clip_id", "corpus", "group", "reference"] + [c[0] for c in CONFIGS]
-with open(EVAL / "finetune_results.csv", "w", newline="", encoding="utf-8") as fh:
+with open(RESULTS, "w", newline="", encoding="utf-8") as fh:
     w = csv.DictWriter(fh, fieldnames=fields)
     w.writeheader()
     w.writerows(out.values())
@@ -59,7 +79,7 @@ def edits(r, h):
     return d[len(h)]
 
 
-for group in ("english", "mixed"):
+for group in ("english", "malay", "mixed"):
     g = [r for r in out.values() if r["group"] == group]
     n = sum(len(norm(r["reference"])) for r in g)
     print(group, " | ".join(f"{c[0]} {sum(edits(norm(r['reference']), norm(r[c[0]])) for r in g) / n:.1%}" for c in CONFIGS))

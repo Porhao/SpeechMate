@@ -7,6 +7,11 @@
 // word isn't clipped, and hands the turn to `transcribe` as a 16 kHz mono WAV —
 // the backend runs faster-whisper on it. The 48 → 16 kHz step uses the browser's
 // own filtered resampler: plain decimation folds hiss onto s/sh/f sounds.
+//
+// Live transcript: a long turn is sent phrase by phrase, cut at the short pauses between
+// phrases, so its words appear while the user is still talking. Every Whisper call costs
+// about the same (it always encodes a 30 s window), so a phrase needs a few seconds of
+// speech first: shorter pieces would queue up behind each other and delay the reply.
 
 const TARGET_RATE = 16000;
 const FRAME_SIZE = 2048;             // ≈ 43 ms at 48 kHz
@@ -15,6 +20,8 @@ const PREROLL_SEC = 0.35;
 // at 1.0 s the AI was answering half-finished thoughts.
 const END_SILENCE_SEC = 1.6;
 const MIN_SPEECH_SEC = 0.35;         // shorter blips (a cough, a click) are ignored
+const PHRASE_PAUSE_SEC = 0.5;        // a pause this long inside a turn ends a phrase…
+const MIN_PHRASE_SPEECH_SEC = 3;     // …once the phrase holds this much speech (keeps pace with the backend)
 const MAX_TURN_SEC = 30;
 const START_FRAMES = 3;              // consecutive loud frames needed to start a turn
 const MIN_THRESHOLD = 0.012;         // RMS floor, so a silent room isn't "speech"
@@ -22,8 +29,8 @@ const NOISE_MULTIPLIER = 3;
 
 export interface VoiceTurnCallbacks {
   onSpeechStart: () => void;
-  onTranscribing: () => void;
-  onText: (text: string) => void;       // may be "" when the turn held no words
+  onTranscribing: () => void;           // the turn ended; its last words are being transcribed
+  onText: (text: string) => void;       // one phrase or a whole short turn; may be "" (no words)
   onError: (error: Error) => void;
 }
 
@@ -53,6 +60,8 @@ export class VoiceTurnListener {
   /** True while the user is mid-turn or a finished turn is still being transcribed:
    *  more words may be on their way, so it isn't the AI's turn yet. */
   get isBusy() { return this.speaking || this.inFlight > 0; }
+  /** True while the user is mid-turn (a phrase's text may arrive while they keep talking). */
+  get isSpeaking() { return this.speaking; }
 
   start(stream: MediaStream) {
     const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -100,6 +109,12 @@ export class VoiceTurnListener {
       if (rms > threshold * 0.7) { this.quietSec = 0; this.speechSec += frameSec; }
       else this.quietSec += frameSec;
       if (this.quietSec >= END_SILENCE_SEC || this.turnSec >= MAX_TURN_SEC) this.endTurn();
+      else if (this.quietSec >= PHRASE_PAUSE_SEC && this.speechSec >= MIN_PHRASE_SPEECH_SEC) {
+        // A pause between phrases: send what's been said so far and keep listening
+        const frames = this.turn;
+        this.turn = []; this.speechSec = 0;
+        this.send(frames);
+      }
     };
 
     this.source.connect(this.node);
@@ -112,11 +127,16 @@ export class VoiceTurnListener {
     const speechSec = this.speechSec;
     this.speaking = false;
     this.turn = []; this.turnSec = 0; this.speechSec = 0; this.loudRun = 0; this.quietSec = 0;
-    if (speechSec < MIN_SPEECH_SEC || !this.ctx) return;
+    if (speechSec < MIN_SPEECH_SEC) return;
+    this.cb.onTranscribing();
+    this.send(frames);
+  }
 
+  /** Transcribe one phrase or turn, in the order spoken. */
+  private send(frames: Float32Array[]) {
+    if (!this.ctx) return;
     const samples = concat(frames);
     const rate = this.ctx.sampleRate;
-    this.cb.onTranscribing();
     this.inFlight++;
     this.queue = this.queue.then(async () => {
       try {

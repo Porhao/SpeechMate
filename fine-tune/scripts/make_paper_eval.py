@@ -1,6 +1,7 @@
 """Evaluation set for the paper's routing WER comparison -> eval/paper/.
 
     english  200 FLEURS en_us *test* clips: real speakers, human transcripts (CC BY 4.0)
+    malay    100 FLEURS ms_my *test* clips: real Malaysian speakers (CC BY 4.0)
     mixed    200 Synth-Manglish clips from the 3 voices held out of training, minus the
              dev clips (synthetic TTS voices; CC BY 4.0). Only clips with both English and
              Malay words (by the app's lexicon).
@@ -26,6 +27,7 @@ OUT = ROOT / "eval" / "paper"
 CLIPS = OUT / "clips"
 CLIPS.mkdir(parents=True, exist_ok=True)
 N = 200
+N_MALAY = 100
 HELD_OUT = {"nurin", "rizal", "johari"}   # = prepare_public.DEV_VOICES
 dev_files = {r["file_name"] for r in csv.DictReader(open(ROOT / "data" / "dev.csv", encoding="utf-8"))}
 
@@ -54,6 +56,24 @@ for batch in f.iter_batches(batch_size=32, columns=["id", "audio", "raw_transcri
     if len(seen) >= N:
         break
 print("english:", len(seen), flush=True)
+
+# Malay-only: FLEURS ms_my test, one clip per sentence (real Malaysian speakers)
+f = pq.ParquetFile(HfFileSystem().open("datasets/google/fleurs@refs%2Fconvert%2Fparquet/ms_my/test/0000.parquet"))
+seen = set()
+for batch in f.iter_batches(batch_size=32, columns=["id", "audio", "raw_transcription"]):
+    for r in batch.to_pylist():
+        if len(seen) >= N_MALAY or r["id"] in seen:
+            continue
+        audio = decode(r["audio"]["bytes"])
+        if len(audio) > 30 * 16000:
+            continue
+        seen.add(r["id"])
+        cid = f"ms_{len(seen):03d}"
+        sf.write(CLIPS / f"{cid}.wav", audio, 16000)
+        rows.append({"clip_id": cid, "corpus": "FLEURS ms_my test", "group": "malay", "reference": r["raw_transcription"]})
+    if len(seen) >= N_MALAY:
+        break
+print("malay:", len(seen), flush=True)
 
 # Mixed: Synth-Manglish held-out voices, not used in dev
 n = 0
