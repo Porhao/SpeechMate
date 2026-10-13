@@ -10,10 +10,6 @@ fi
 
 # Start the bundled local AI servers the backend is configured to use
 PROFILE=()
-if grep -qE '^LLM_BASE_URL=http://ollama:11434' backend/.env; then
-  PROFILE+=(--profile ollama)
-  echo "Local LLM: starting Ollama (models download on first run — follow with: docker compose logs -f ollama-pull)"
-fi
 if grep -qE '^TTS_BASE_URL=http://kokoro:8880' backend/.env; then
   PROFILE+=(--profile tts)
   echo "Local TTS: starting Kokoro (natural voice for the live AI partner)"

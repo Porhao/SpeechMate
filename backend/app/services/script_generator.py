@@ -129,7 +129,7 @@ class ScriptGenerator:
 
         async def call() -> str:
             resp = await client.chat.completions.create(
-                model=settings.vlm_model, messages=messages, temperature=0.6
+                model=settings.llm_model, messages=messages, temperature=0.6
             )
             content = resp.choices[0].message.content or ""
             if not content.strip():
@@ -156,7 +156,7 @@ class ScriptGenerator:
             except Exception as e:  # noqa: BLE001 — keep the first draft
                 logger.warning("Rewrite failed for slide %d, keeping first draft: %s", slide_index, e)
 
-        return ScriptResult(text=text, word_count=words, source="vlm", model=settings.vlm_model)
+        return ScriptResult(text=text, word_count=words, source="vlm", model=settings.llm_model)
 
 
 script_generator = ScriptGenerator()

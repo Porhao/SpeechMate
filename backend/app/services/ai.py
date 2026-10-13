@@ -65,24 +65,6 @@ def get_tts_client() -> AsyncOpenAI | None:
     return _tts_client
 
 
-async def unload_local_model(model: str) -> None:
-    """Ask an Ollama server to drop `model` from memory now instead of after its idle timeout.
-
-    Used on small machines between pipeline stages (e.g. free the vision model
-    before the TTS model loads). A no-op for OpenAI or non-Ollama servers.
-    """
-    base = settings.llm_base_url
-    if not base or not base.rstrip("/").endswith("/v1"):
-        return
-    import httpx
-
-    try:
-        async with httpx.AsyncClient(timeout=10) as http:
-            await http.post(f"{base.rstrip('/')[:-3]}/api/generate", json={"model": model, "keep_alive": 0})
-    except Exception as e:  # noqa: BLE001 — best effort
-        logger.debug("Could not unload %s: %s", model, e)
-
-
 def get_openai_client() -> AsyncOpenAI | None:
     """Shared OpenAI client (used directly for speech: TTS and Whisper), or None without an API key."""
     global _openai_client

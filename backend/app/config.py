@@ -51,7 +51,6 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_api_key: str = ""
     llm_timeout_sec: float = 300.0  # local models on CPU can be slow
-    vlm_model: str = "gpt-4o-mini"
     llm_model: str = "gpt-4o-mini"
     tts_model: str = "gpt-4o-mini-tts"
     tts_voice: str = "alloy"

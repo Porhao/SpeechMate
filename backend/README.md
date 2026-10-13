@@ -104,11 +104,11 @@ If a binary isn't on your `PATH`, point to it with `FFMPEG_BIN`, `LIBREOFFICE_BI
 
 ## API keys and fallbacks
 
-All keys are optional. The AI layer is local-first: an LLM served by Ollama (`LLM_BASE_URL`), plus local speech, vision and TTS models (`requirements-ml.txt`). "LLM" below means whichever you've configured: a local model via `LLM_BASE_URL`, or OpenAI via `OPENAI_API_KEY`. Here is what each stage uses and what happens without it:
+All keys are optional. The AI layer is local-first: a cloud LLM (Gemini via `LLM_BASE_URL`), plus local speech, vision and TTS models (`requirements-ml.txt`). "LLM" below means whichever you've configured: a local model via `LLM_BASE_URL`, or OpenAI via `OPENAI_API_KEY`. Here is what each stage uses and what happens without it:
 
 | Stage | With keys | Without keys (fallback) |
 |---|---|---|
-| Slide → script | the vision model (`VLM_MODEL`, e.g. Ollama `qwen2.5vl`) reads each slide image, with the previous slide's script as context for transitions | A template script built from the slide's own text |
+| Slide → script | the LLM (`LLM_MODEL`, e.g. Gemini, which reads images) reads each slide image, with the previous slide's script as context for transitions | A template script built from the slide's own text |
 | Script → voice | **local Malaysian TTS** (`mesolitica/Malaysian-TTS-0.6B-v1`) in the deck's narrator voice. Only with `ELEVENLABS_API_KEY` + a voice sample: your cloned voice. | OpenAI TTS (if keyed) → espeak-ng (offline) → silence |
 | Practice → transcript | `OPENAI_API_KEY`: Whisper, prompted to keep "um/uh" verbatim | Skipped. Only audio metrics (duration, pauses) are used. |
 | Coach OIS feedback | LLM, JSON-validated, re-prompted once if invalid or over 150 words | Rule-based OIS from the metrics |
@@ -124,7 +124,7 @@ Every fallback is recorded in the `warnings` field of the session, practice or l
 **Notes**
 - ElevenLabs voice cloning requires a plan that includes *Instant Voice Cloning*. The free tier returns an error, and the pipeline then falls back to a standard voice. The temporary cloned voice is deleted after each generation.
 - For best cloning results, record 30–60 seconds of clear speech in a quiet room. Any common format (wav, mp3, m4a, webm, ogg) works; uploads are converted to WAV.
-- **Local LLM (Ollama):** set `LLM_BASE_URL=http://ollama:11434/v1` (the root compose's bundled Ollama) or `http://host.docker.internal:11434/v1` (an Ollama on your machine), plus `LLM_MODEL` / `VLM_MODEL` to Ollama tags, e.g. `qwen2.5:3b` / `qwen2.5vl:3b`, or `7b` with ≥16 GB RAM. Only text and vision calls go there; speech keeps using OpenAI or the local models. `LLM_TIMEOUT_SEC` (default 300) allows for slow CPU inference. JSON-mode coach feedback works with Qwen2.5 as-is.
+- **LLM (Gemini):** set `LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/`, `LLM_API_KEY` (from aistudio.google.com) and `LLM_MODEL` (e.g. `gemini-3.5-flash-lite`). The same model handles text and slide images; speech uses `OPENAI_*` (Groq). `LLM_TIMEOUT_SEC` (default 300).
 - **Malaysian TTS:** Malay, English and code-switched speech, 7 fixed voices (`GET /api/narrator-voices`; default `MALAYSIAN_TTS_VOICE`). It does **not** clone voices. The text is spelled out (numbers → words) and chunked (~10 s per generation). CPU works but is slow (minutes per slide); it's used for the live partner's voice only on a GPU (`LIVE_TTS_LOCAL=auto`) unless forced.
 - `OPENAI_BASE_URL` lets you point the OpenAI client at any OpenAI-compatible endpoint. For example, you can use Qwen2.5-VL / Qwen2.5 through DashScope to match the paper's models (set `VLM_MODEL` / `LLM_MODEL` to match).
 

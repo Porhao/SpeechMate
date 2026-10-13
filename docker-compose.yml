@@ -1,6 +1,6 @@
 # SpeechMate — full stack: Postgres + FastAPI backend + Next.js frontend
-# (+ optional local AI servers: Ollama LLM, profile "ollama"; Kokoro TTS, profile "tts").
-#   ./start.sh            (or: docker compose up --build -d; add --profile ollama for the local LLM)
+# (+ optional Kokoro TTS for the AI partner's voice, profile "tts"). The LLM is Gemini (cloud).
+#   ./start.sh            (or: docker compose --profile tts up --build -d)
 # Frontend: http://localhost:3000 · API: http://localhost:8000 (docs at /docs)
 name: speechmate
 
@@ -46,66 +46,17 @@ services:
       - model_cache:/models
     ports:
       - "8000:8000"
-    # Lets LLM_BASE_URL=http://host.docker.internal:11434/v1 reach an Ollama running on your own machine
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── Optional local LLM (docker compose --profile ollama …; ./start.sh does this
-  # automatically when backend/.env has LLM_BASE_URL=http://ollama:11434/v1) ──
-  ollama:
-    image: ollama/ollama:latest
-    profiles: ["ollama"]
-    environment:
-      # Keep only one model in memory at a time (text or vision), unloading it after 5 idle minutes
-      - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_KEEP_ALIVE=5m
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
-    restart: unless-stopped
-    # NVIDIA GPU (much faster than CPU): uncomment, and install the NVIDIA Container Toolkit
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
-  # ── Optional natural-sounding local TTS for the live AI partner (Kokoro-82M, Apache-2.0;
-  # ./start.sh starts it when backend/.env has TTS_BASE_URL=http://kokoro:8880/v1) ──
   kokoro:
     image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
     profiles: ["tts"]
     ports:
       - "8880:8880"
     restart: unless-stopped
-
-  # One-shot: downloads the LLM_MODEL / VLM_MODEL named in backend/.env (skips ones already present)
-  ollama-pull:
-    image: ollama/ollama:latest
-    profiles: ["ollama"]
-    env_file:
-      - path: ./backend/.env
-        required: false
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        until ollama list >/dev/null 2>&1; do sleep 1; done
-        for m in "$$LLM_MODEL" "$$VLM_MODEL"; do
-          case "$$m" in ""|gpt-*) continue ;; esac
-          echo "Pulling $$m…" && ollama pull "$$m"
-        done
-    depends_on:
-      - ollama
-    restart: "no"
 
   frontend:
     build:
@@ -123,4 +74,3 @@ volumes:
   postgres_data:
   storage_data:
   model_cache:
-  ollama_models:

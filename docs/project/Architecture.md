@@ -13,9 +13,9 @@ flowchart LR
     FE[frontend :3000<br/>next start]
     API[backend :8000<br/>FastAPI · SQLAlchemy async]
     DB[(Postgres 16)]
-    OL[Ollama :11434<br/>qwen2.5:3b · qwen2.5vl:3b]
+    OL[Gemini API<br/>gemini-3.5-flash-lite]
     KO[Kokoro-FastAPI :8880<br/>TTS]
-    VOL[(model_cache volume<br/>/models: Whisper CT2, HF models)]
+    VOL[(model_cache volume<br/>/models: HF models)]
     ST[(storage/<br/>recordings · decks · audio)]
   end
   UI -- REST + JWT --> API
@@ -78,7 +78,7 @@ render slides → **insights** (LLM: summary, key point per slide) → **Q&A pla
 
 ## Deployment
 
-`docker compose --profile ollama --profile tts up -d --build` from the repo root. Code is **copied into the images** (no bind mounts): rebuild to deploy. Models live in the `model_cache` volume (`/models`). See agents.md for the workflow.
+`docker compose --profile tts up -d --build` from the repo root. Code is **copied into the images** (no bind mounts): rebuild to deploy. Models live in the `model_cache` volume (`/models`). See agents.md for the workflow.
 
 ## Known constraints
 

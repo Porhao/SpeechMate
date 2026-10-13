@@ -16,7 +16,7 @@ Read this before changing anything. It's the rules and the workflow that are eas
 
 | Task | How |
 |---|---|
-| Run everything | `docker compose --profile ollama --profile tts up -d --build` (repo root; `backend/` has its own compose file, don't use it) |
+| Run everything | `docker compose --profile tts up -d --build` (repo root; `backend/` has its own compose file, don't use it) |
 | Deploy a change | Code is copied into images, no bind mounts: `docker compose up -d --build --no-deps frontend` (or `backend`); without `--no-deps` compose may restart the backend too |
 | Backend tests | Copy the working tree into the container and run pytest (exact commands in Testing.md) |
 | Frontend checks | `npx tsc --noEmit && npx eslint .` in `frontend/` |

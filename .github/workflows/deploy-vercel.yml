@@ -1,0 +1,110 @@
+name: Production Deployment to Vercel
+
+# Two Vercel projects from this repo: the Next.js frontend (Root Directory: frontend)
+# and the FastAPI backend (Root Directory: backend). Postgres is Supabase.
+# Setup checklist: docs/project/deploy-vercel.md
+
+on:
+  workflow_dispatch: # Run manually from the Actions tab
+
+concurrency:
+  group: "vercel-prod-deployment-${{ github.ref }}"
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+
+jobs:
+  Migrate-Database:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      # Alembic, not `supabase db push`: the schema lives in backend/alembic/versions.
+      # Use Supabase's session pooler or direct connection (port 5432), not the
+      # transaction pooler (6543): asyncpg's prepared statements break on it.
+      - name: Run Alembic Migrations
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  Deploy-Backend:
+    needs: Migrate-Database
+    # Off until the backend is ported to Vercel (see the checklist); set the
+    # repository variable DEPLOY_BACKEND=true to turn it on
+    if: vars.DEPLOY_BACKEND == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  Deploy-Frontend:
+    needs: [Migrate-Database, Deploy-Backend]
+    # Runs even while the backend job is switched off (skipped)
+    if: ${{ !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Cache Next.js & Vercel Build Assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/.next/cache
+            .vercel/cache
+          key: ${{ runner.os }}-vercel-${{ hashFiles('frontend/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vercel-${{ hashFiles('frontend/package-lock.json') }}-
+            ${{ runner.os }}-vercel-
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      # Brings down the project's env vars, including NEXT_PUBLIC_API_URL
+      # (baked into the browser bundle at build time)
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy Project Artifacts to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}

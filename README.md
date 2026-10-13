@@ -31,7 +31,7 @@ Nothing is scored while you speak. After each session one simple results page sh
    - Anything that couldn't be measured is listed as such, never estimated.
 4. **Never interrupts.** All feedback comes after you finish (Cognitive Load Theory).
 5. **Gaze Tunneling.** The correlation between looking away and stumbling: "you look away right when you lose your words".
-6. **Local and private.** The LLM, voice and video analysis run on your machine (Ollama, Kokoro, MediaPipe). Speech recognition is the one cloud call (Groq), so recorded audio leaves the machine.
+6. **Local and private.** Voice and video analysis run on your machine (Kokoro, MediaPipe). The LLM (Gemini) and speech recognition (Groq) are cloud calls, so transcripts, slide images and recorded audio leave the machine.
 
 The full list of AI functions, metrics, formulas and evaluation targets is in **[`docs/AI_MATRIX.md`](docs/AI_MATRIX.md)**. It is also in the app under **How it's measured**.
 
@@ -61,7 +61,7 @@ SpeechMate/
 ├── frontend/             Next.js 16 web app
 ├── backend/              FastAPI API + AI pipelines (see backend/README.md for the full API)
 ├── docs/                 AI matrix, benchmarks, sample deck, interim report and paper
-├── docker-compose.yml    Postgres + backend + frontend (+ Ollama, Kokoro)
+├── docker-compose.yml    Postgres + backend + frontend (+ Kokoro)
 └── start.sh              one-command start
 ```
 
@@ -71,8 +71,8 @@ SpeechMate/
 
 | Job | Model |
 |---|---|
-| Text: partner, plans, insights, feedback | Ollama `qwen2.5:3b` |
-| Vision: slide scripts | Ollama `qwen2.5vl:3b` |
+| Text: partner, plans, insights, feedback | Gemini `gemini-3.5-flash-lite` |
+| Vision: slide scripts | the same Gemini model (reads slide images) |
 | Speech recognition | Whisper large-v3 via Groq's OpenAI-compatible API (auto language, verbatim Manglish prompt, word timestamps) |
 | AI partner's voice | Kokoro-82M |
 | Narration | Mesolitica Malaysian-TTS-0.6B-v1 |
@@ -109,7 +109,7 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 | Variable | Why |
 |---|---|
 | `SECRET_KEY` | Signs login tokens. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `LLM_BASE_URL`, `LLM_MODEL`, `VLM_MODEL` | The local LLM. `http://ollama:11434/v1` runs the bundled Ollama and downloads the models. `http://host.docker.internal:11434/v1` uses your own Ollama |
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | The LLM: Gemini's OpenAI-compatible endpoint `https://generativelanguage.googleapis.com/v1beta/openai/`, a key from aistudio.google.com, and a model such as `gemini-3.5-flash-lite` |
 | `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | The AI partner's voice. `http://kokoro:8880/v1` runs the bundled Kokoro; voices include `af_heart`, `am_michael`, `bf_emma` |
 | `OPENAI_BASE_URL`, `TRANSCRIPTION_MODEL` | Speech recognition (cloud): Groq is `https://api.groq.com/openai/v1` with `whisper-large-v3`, key in `OPENAI_API_KEY` |
 | `STT_LANGUAGE` | Empty = auto-detect (recommended); `ms` / `en` forces a language |
@@ -117,12 +117,11 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 | `OPENAI_API_KEY` | Speech recognition key (Groq `gsk_…`); also cloud LLM / TTS if no local ones are set |
 | `ELEVENLABS_API_KEY` | *Optional:* narrate the example in **your own cloned voice** |
 
-**Model size vs. RAM:** `qwen2.5:3b` and `qwen2.5vl:3b` fit an 8 GB machine. With 16 GB or more, the `7b` models give noticeably better questions and feedback. On WSL, give Docker more memory in `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=12GB`). An NVIDIA GPU makes everything much faster: uncomment the GPU block in `docker-compose.yml`.
 
 ### 2. Start
 
 ```bash
-./start.sh                     # or: docker compose --profile ollama --profile tts up --build -d
+./start.sh                     # or: docker compose --profile tts up --build -d
 ```
 
 | | |
@@ -134,7 +133,6 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 The first build takes a while. Model weights download on first use and are cached in Docker volumes:
 - speech/vision models: about 2.5 GB;
 - Malaysian TTS: about 2.5 GB;
-- Ollama models: about 5 GB, in the background (`docker compose logs -f ollama-pull`).
 
 Database migrations run automatically.
 
@@ -155,8 +153,8 @@ Database migrations run automatically.
 
 ```bash
 docker compose logs -f backend                               # follow backend logs
-docker compose --profile ollama --profile tts down           # stop (data kept in Docker volumes)
-docker compose --profile ollama --profile tts down -v        # stop and delete all data and cached models
+docker compose --profile tts down           # stop (data kept in Docker volumes)
+docker compose --profile tts down -v        # stop and delete all data and cached models
 ```
 
 ---
