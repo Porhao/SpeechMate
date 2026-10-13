@@ -17,14 +17,8 @@ from app.services.ai import count_words, get_llm_client, with_retries
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an expert presentation speaker writing the spoken narration for ONE slide of a presentation.
-
-Rules:
-- Write {min_words}-{max_words} words of natural, coherent spoken English for this slide only.
-- Explain the slide's core message the way a confident, engaging presenter would. Do not read bullet points verbatim and do not describe the layout ("this slide shows...").
-- If previous narration is given, open with a smooth transition from it without repeating it. The first slide should open the talk; the last slide should close it.
-- Follow the presenter's requirements (audience, purpose, tone) if given.
-- Output only the narration text: no headings, lists, quotes, stage directions, emojis or markdown."""
+# Edit the wording in the text file; {min_words} / {max_words} are filled from settings
+SYSTEM_PROMPT = (Path(__file__).parent.parent / "prompts" / "slide_narration.txt").read_text(encoding="utf-8")
 
 
 @dataclass

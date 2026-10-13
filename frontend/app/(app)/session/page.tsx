@@ -304,6 +304,31 @@ function VoiceBeam({ stream, listening, thinking, color, children }: {
   );
 }
 
+// ── Volume meter — how loud the user is, live, against a comfortable band ──────
+// ponytail: thresholds on the browser's average spectrum level (0–1), set by ear on a laptop mic;
+// calibrate per mic, or map to the analysis' loudness metric if the two need to agree.
+const VOL_FULL = 0.4, VOL_QUIET = 0.03, VOL_LOUD = 0.3;
+function VolumeMeter({ level, muted, speaking }: { level: number; muted: boolean; speaking: boolean }) {
+  const [label, color] =
+    muted ? ["Muted", "var(--muted)"] :
+    !speaking ? ["Waiting for you", "var(--muted)"] :
+    level < VOL_QUIET ? ["Too quiet", "var(--warn)"] :
+    level > VOL_LOUD ? ["Very loud", "var(--warn)"] : ["Good", "var(--ok)"];
+  const pct = (v: number) => `${Math.min(100, (v / VOL_FULL) * 100)}%`;
+  return (
+    <span className="flex items-center gap-2" role="status" aria-label={`Your volume: ${label}`}>
+      Volume
+      <span className="relative w-32 h-2 rounded-full overflow-hidden" style={{ background: "var(--line)" }}>
+        {/* the comfortable band */}
+        <span className="absolute inset-y-0" style={{ left: pct(VOL_QUIET), width: `calc(${pct(VOL_LOUD)} - ${pct(VOL_QUIET)})`, background: "color-mix(in srgb, var(--ok) 25%, transparent)" }} />
+        <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-100"
+          style={{ width: muted ? 0 : pct(level), background: color }} />
+      </span>
+      <b style={{ color }}>{label}</b>
+    </span>
+  );
+}
+
 // ── Live transcript — the user's words, phrase by phrase as they are transcribed ──
 // A two-line window pinned to the newest words: older lines slide up under a fade, and the
 // newest phrase fades in. The status ("Hearing you…", "Transcribing…") sits in the label.
@@ -1227,7 +1252,10 @@ function SessionContent() {
         return;
       }
       if (!sessionStarted) return;
-      if (e.key === " " && (pendingUserSpeechRef.current || voiceListenerRef.current?.isBusy)) { e.preventDefault(); replyNow(); }
+      if (e.key === " ") {  // always ours here: otherwise it scrolls the page or re-clicks the focused button
+        e.preventDefault();
+        if (pendingUserSpeechRef.current || voiceListenerRef.current?.isBusy) replyNow();
+      }
       else if (e.key === "Escape" && aiSpeakingRef.current) { e.preventDefault(); interruptAI(); }
       else if (e.key.toLowerCase() === "m") { e.preventDefault(); toggleMic(); }
     };
@@ -1505,9 +1533,13 @@ function SessionContent() {
     </div>
   );
 
-  // On lg the camera takes whatever height the cards leave and stays 16:9 inside it
-  // (container query units), so the whole session fits the viewport without scrolling.
-  const CAM_FIT = "lg:flex-1 lg:min-h-[160px] lg:grid lg:place-items-center lg:[container-type:size] lg:[&>*]:w-[min(100cqw,calc(100cqh*16/9))]";
+  // On lg the camera's height comes from the viewport alone (never from the cards, whose text
+  // changes every few frames while a face is tracked: that resized the camera and flickered).
+  // It stays 16:9 inside that box (container query units); the cards below take what's left
+  // and scroll inside it if their text runs long. ponytail: 470px = header + strip + ~2 card rows,
+  // retune if those grow.
+  const CAM_FIT = "lg:h-[calc(100dvh-470px)] lg:min-h-[160px] lg:flex-shrink-0 lg:grid lg:place-items-center lg:[container-type:size] lg:[&>*]:w-[min(100cqw,calc(100cqh*16/9))]";
+  const CARDS_FIT = "grid lg:grid-cols-2 gap-3 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:content-start";
   const cameraStage = (
     <div className="clay relative w-full flex-shrink-0 overflow-hidden rounded-xl bg-black"
       style={{ aspectRatio: "16 / 9", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1720,7 +1752,7 @@ function SessionContent() {
           <div className="flex flex-col gap-3 w-full lg:w-[60%] lg:flex-shrink-0 lg:min-h-0">
 
             <div className={CAM_FIT}>{cameraStage}</div>
-            <div className="grid lg:grid-cols-2 gap-3">
+            <div className={CARDS_FIT}>
             {lightingPanel}
 
             {/* Current question card */}
@@ -1881,7 +1913,7 @@ function SessionContent() {
 
           <div className={CAM_FIT}>{cameraStage}</div>
 
-          <div className="grid lg:grid-cols-2 gap-3">
+          <div className={CARDS_FIT}>
 
           {/* AI partner status */}
           {/* The partner as a living 3D orb: it pulses while the AI talks or thinks and
@@ -1916,9 +1948,8 @@ function SessionContent() {
                   );
                 })}
               </div>
-              {!faceDetected && (
-                <p className="text-[10px] text-[var(--faint)] mt-2">Face not detected — centre yourself in frame.</p>
-              )}
+              {/* always laid out, only hidden, so the card keeps its height as detection flickers */}
+              <p className={cn("text-[10px] text-[var(--faint)] mt-2", faceDetected && "invisible")}>Face not detected — centre yourself in frame.</p>
             </div>
           )}
 
@@ -2078,6 +2109,7 @@ function SessionContent() {
         <span className="flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" />
           Analysed after you end: voice, language, body language, confidence{mode === "Conversation" ? "" : " and the content of every answer"}
         </span>
+        {sessionStarted && <VolumeMeter level={audioLevel} muted={!isRecording} speaking={userSpeaking} />}
         {wpm > 0 && <span>Pace so far: <b className="text-[var(--ink)]">{wpm} wpm</b> (120–160 is comfortable)</span>}
       </div>
     </div>

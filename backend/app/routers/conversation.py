@@ -46,16 +46,8 @@ Speak like a real person in a relaxed voice conversation:
 
 # The live-session AI partner, one persona per practice mode
 PARTNER_PROMPTS: dict[str, str] = {
-    "Conversation": """\
-You are SpeechMate, a warm and encouraging English communication coach.
-You are having a SPOKEN conversation with a Malaysian student practising English.
-
-Rules:
-- Keep every reply SHORT — 2 to 3 sentences maximum.
-- DIRECTLY answer or react to what the user just said, then ask ONE natural follow-up question.
-- If you spot a grammar or pronunciation issue, mention it briefly and gently.
-- Never give long monologues. Keep the energy conversational and upbeat.
-- Do NOT repeat the user's words back at length.""",
+    # Edit the wording in the text file
+    "Conversation": (Path(__file__).parent.parent / "prompts" / "conversation_partner.txt").read_text(encoding="utf-8").strip(),
     "Interview": """\
 You are a professional interviewer conducting a mock job interview for a Malaysian student.
 
