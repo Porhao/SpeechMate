@@ -54,7 +54,7 @@ Use `--use-fake-device-for-media-stream` for camera/mic. Abort `POST /api/live` 
 
 | Component | Method | Doc |
 |---|---|---|
-| Speech recognition | WER by language (`backend/scripts/benchmark/bench_stt.py`, `--real` for own recordings) | `docs/benchmarks/` |
+| Speech recognition | WER by language (benchmark script removed with the local model: `docs/project/local-stt-removal.md`) | `docs/benchmarks/` |
 | Confidence | Spearman vs. 2–3 blind raters | `backend/docs/confidence-model.md` |
 | Feedback quality | UAT Likert: specific, actionable, accurate | `docs/AI_MATRIX.md` |
 

@@ -461,7 +461,7 @@ function SessionContent() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const animRef    = useRef<number>(0);
-  // Speech-to-text for the user's turns is the backend's (local faster-whisper, else OpenAI).
+  // Speech-to-text for the user's turns is the backend's (cloud Whisper, e.g. Groq).
   // No browser fallback: Chrome's recogniser sends audio to Google and is English-only
   // (docs/manglish-transcription-spec.md). Without a backend model the user types instead.
   const [sttAvailable,   setSttAvailable]   = useState(true);
@@ -932,7 +932,7 @@ function SessionContent() {
     const unavailable = () => {
       sttAvailableRef.current = false; setSttAvailable(false); setInterimText("");
     };
-    // Backend transcription (faster-whisper) of each spoken turn
+    // Backend transcription (cloud Whisper) of each spoken turn
     if (!sttAvailableRef.current || !streamRef.current) return;
     const listener: VoiceTurnListener = new VoiceTurnListener((wav) => conversationService.transcribe(wav, sttContextRef.current), {
       onSpeechStart: () => {
@@ -1102,7 +1102,7 @@ function SessionContent() {
       startCamera(),
     ]);
     // Transcribe the user's turns on the backend when it has a speech model
-    const stt = Boolean(health && (health.local_ml?.faster_whisper || health.providers?.openai));
+    const stt = Boolean(health && (health.providers?.openai));
     sttAvailableRef.current = stt; setSttAvailable(stt);
     backendSessionIdRef.current = backendSession?.id ?? null;
     if (backendSession) startLiveSession(backendSession, mode as SessionType);

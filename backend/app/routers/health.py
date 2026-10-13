@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from app.config import settings
 from app.services.ai import llm_provider
-from app.services.live._ml import available, local_stt
+from app.services.live._ml import available
 
 router = APIRouter(tags=["health"])
 
@@ -25,7 +25,6 @@ async def health_check():
         },
         # Optional local models for live-session analysis (requirements-ml.txt)
         "local_ml": {
-            "faster_whisper": local_stt(),
             "wav2vec2": available("transformers", "torch"),
             "librosa": available("librosa"),
             "mediapipe": available("cv2", "mediapipe"),

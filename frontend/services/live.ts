@@ -64,7 +64,7 @@ export const conversationService = {
     api.post<{ reply: string; progress?: { asked: number; followups: number }; total_questions?: number }>(
       "/chat/message", { messages, mode, topic, live_id: liveId }),
 
-  /** Transcribe one spoken turn on the backend (local faster-whisper). 503 = not available. */
+  /** Transcribe one spoken turn on the backend (cloud Whisper). 503 = not available. */
   /** `context` (the AI's last line, the role or deck…) helps the model hear topic words right. */
   transcribe: async (audio: Blob, context?: string): Promise<string> => {
     const form = new FormData();

@@ -21,8 +21,8 @@ const PILLARS: { id: Pillar | "all"; label: string }[] = [
 
 const LIVE: Row[] = [
   { metric: "Transcript", meaning: "What you said, word for word (fillers kept)", pillar: "language", refs: [1, 2],
-    method: "Mesolitica Malaysian Whisper large-v3-turbo via faster-whisper (int8, 8 CPU threads, beam 5, automatic language detection, voice-activity filter). During a session each turn is resampled to 16 kHz by the browser's filtered resampler and sent with what it answers (the AI's last line, the role or deck) so topic words are heard right. Fallback: OpenAI Whisper.",
-    unit: "text + word timings", range: "Benchmark: 6.1% WER (Malay 6.4%, Malaysian English 4.0%, Manglish 17.0%)", source: "live/asr.py",
+    method: "Whisper large-v3 on Groq (OpenAI-compatible API, automatic language detection, a verbatim Manglish prompt so fillers and code-switched words are kept). During a session each turn is resampled to 16 kHz by the browser's filtered resampler and sent with what it answers (the AI's last line, the role or deck) so topic words are heard right.",
+    unit: "text + word timings", range: "Not yet benchmarked on Groq", source: "live/asr.py",
     example: "Asked “What tools did you use?”, Whisper is told the question, so “Power BI” is less likely to come out as “power be eye”." },
   { metric: "Speaking rate", meaning: "How fast you talk", pillar: "voice", refs: [3, 4],
     method: "Words ÷ your own talking time × 60. Silences of 3 s or more are turn changes (the AI talking), so they don't count as your time.",
@@ -239,10 +239,8 @@ type AIRow = { fn: string; used: string; model: string; input: string; output: s
 
 // Every AI function in the system: what runs it, and how its quality is checked
 const AI_FUNCTIONS: AIRow[] = [
-  { fn: "Speech recognition", used: "All three", model: "Mesolitica Malaysian Whisper large-v3-turbo (faster-whisper, CPU int8)",
-    input: "16 kHz audio", output: "Transcript + word timings", fallback: "OpenAI Whisper → typed input (live turns)", quality: "WER by language (benchmarked 6.1%)" },
-  { fn: "Code-switch re-check", used: "All three", model: "Mesolitica wav2vec2-xls-r-300m-mixed",
-    input: "Audio not confidently English", output: "Malay / mixed transcript", fallback: "Whisper transcript + warning", quality: "WER on mixed speech" },
+  { fn: "Speech recognition", used: "All three", model: "Whisper large-v3 (Groq API)",
+    input: "16 kHz audio", output: "Transcript + word timings", fallback: "Typed input (live turns)", quality: "WER by language (not yet benchmarked)" },
   { fn: "AI partner (conversation)", used: "Conversation", model: "Ollama qwen2.5:3b",
     input: "Last 12 turns + topic", output: "2–3 spoken sentences", fallback: "Scripted prompts", quality: "UAT naturalness rating" },
   { fn: "Interview question plan", used: "Interview", model: "Ollama qwen2.5:3b (JSON, validated)",

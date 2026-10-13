@@ -20,7 +20,7 @@ Nothing is scored while you speak. After each session one simple results page sh
 
 ## 🌟 What makes it different
 
-1. **Accent-fair.** Malaysian-English pronunciation counts as regional variation, not error. Manglish particles (*lah, kan*) aren't counted as filler words. Speech recognition uses Mesolitica's Malaysian Whisper (6.1% WER on our benchmark, vs 51.3% for standard Whisper).
+1. **Accent-fair.** Malaysian-English pronunciation counts as regional variation, not error. Manglish particles (*lah, kan*) aren't counted as filler words. Speech recognition uses Whisper large-v3 on Groq with auto language detection and a Manglish prompt, so code-switched words are kept as spoken.
 2. **Curated, not generic.**
    - Interview questions come from your role and resume.
    - Q&A questions come from your slides.
@@ -31,7 +31,7 @@ Nothing is scored while you speak. After each session one simple results page sh
    - Anything that couldn't be measured is listed as such, never estimated.
 4. **Never interrupts.** All feedback comes after you finish (Cognitive Load Theory).
 5. **Gaze Tunneling.** The correlation between looking away and stumbling: "you look away right when you lose your words".
-6. **Local and private.** Everything runs on your machine (Ollama, faster-whisper, Kokoro, MediaPipe). Cloud APIs are optional.
+6. **Local and private.** The LLM, voice and video analysis run on your machine (Ollama, Kokoro, MediaPipe). Speech recognition is the one cloud call (Groq), so recorded audio leaves the machine.
 
 The full list of AI functions, metrics, formulas and evaluation targets is in **[`docs/AI_MATRIX.md`](docs/AI_MATRIX.md)**. It is also in the app under **How it's measured**.
 
@@ -73,7 +73,7 @@ SpeechMate/
 |---|---|
 | Text: partner, plans, insights, feedback | Ollama `qwen2.5:3b` |
 | Vision: slide scripts | Ollama `qwen2.5vl:3b` |
-| Speech recognition | Mesolitica Malaysian Whisper large-v3-turbo (faster-whisper, auto language) + `wav2vec2-xls-r-300m-mixed` for code-switching |
+| Speech recognition | Whisper large-v3 via Groq's OpenAI-compatible API (auto language, verbatim Manglish prompt, word timestamps) |
 | AI partner's voice | Kokoro-82M |
 | Narration | Mesolitica Malaysian-TTS-0.6B-v1 |
 | Pronunciation | Wav2Vec2 |
@@ -111,10 +111,10 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 | `SECRET_KEY` | Signs login tokens. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `LLM_BASE_URL`, `LLM_MODEL`, `VLM_MODEL` | The local LLM. `http://ollama:11434/v1` runs the bundled Ollama and downloads the models. `http://host.docker.internal:11434/v1` uses your own Ollama |
 | `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | The AI partner's voice. `http://kokoro:8880/v1` runs the bundled Kokoro; voices include `af_heart`, `am_michael`, `bf_emma` |
-| `WHISPER_MODEL_SIZE`, `WHISPER_CPU_THREADS` | Speech recognition: the converted Malaysian Whisper path (`backend/scripts/convert_whisper.sh`) and CPU threads (8 was fastest) |
+| `OPENAI_BASE_URL`, `TRANSCRIPTION_MODEL` | Speech recognition (cloud): Groq is `https://api.groq.com/openai/v1` with `whisper-large-v3`, key in `OPENAI_API_KEY` |
 | `STT_LANGUAGE` | Empty = auto-detect (recommended); `ms` / `en` forces a language |
 | `MALAYSIAN_TTS_VOICE` | Default narrator voice (`husein`, `idayu`, …); can also be chosen per deck |
-| `OPENAI_API_KEY` | *Optional:* cloud LLM, TTS and Whisper |
+| `OPENAI_API_KEY` | Speech recognition key (Groq `gsk_…`); also cloud LLM / TTS if no local ones are set |
 | `ELEVENLABS_API_KEY` | *Optional:* narrate the example in **your own cloned voice** |
 
 **Model size vs. RAM:** `qwen2.5:3b` and `qwen2.5vl:3b` fit an 8 GB machine. With 16 GB or more, the `7b` models give noticeably better questions and feedback. On WSL, give Docker more memory in `%UserProfile%\.wslconfig` (`[wsl2]` → `memory=12GB`). An NVIDIA GPU makes everything much faster: uncomment the GPU block in `docker-compose.yml`.

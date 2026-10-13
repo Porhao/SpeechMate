@@ -168,22 +168,13 @@ def _stream_speech(client, model: str, voice: str, text: str) -> StreamingRespon
 MAX_STT_BYTES = 15 * 1024 * 1024
 
 
-def _local_stt(path: Path, context: str | None = None) -> str:
-    from app.services.live.asr import whisper_language, whisper_segments
-
-    segments, _ = whisper_segments(path, whisper_language(), context=context)
-    return " ".join(t for seg in segments if (t := seg.text.strip())).strip()
-
-
 @router.post("/stt", dependencies=[Depends(rate_limit("stt", 60))])
 async def speech_to_text(
     file: UploadFile = File(..., description="One spoken turn (WAV/WebM)"),
     context: str | None = Form(None, max_length=1000, description="What the turn answers (the AI's last line, the role…): helps topic words"),
 ):
-    """Transcribe one conversation turn for the live AI partner: local faster-whisper, else the
-    OpenAI API, else 503 (the frontend then falls back to the browser's speech recognition)."""
-    from app.services.live._ml import local_stt
-
+    """Transcribe one conversation turn for the live AI partner with the OpenAI-compatible API
+    (e.g. Groq), else 503 (the frontend then lets the user type)."""
     data = await read_limited(file, MAX_STT_BYTES, "One spoken turn")
     suffix = Path(file.filename or "turn.wav").suffix or ".wav"
     fd, name = tempfile.mkstemp(suffix=suffix)
@@ -191,15 +182,13 @@ async def speech_to_text(
     try:
         with open(fd, "wb") as f:
             f.write(data)
-        if local_stt():
-            return {"text": await asyncio.to_thread(_local_stt, path, context), "engine": "faster-whisper"}
         client = get_openai_client()
         if client is None:
             raise HTTPException(status_code=503, detail="No speech recognition available")
-        from app.services.live.asr import whisper_language
+        from app.services.live.asr import stt_language
 
         # Auto-detect unless STT_LANGUAGE forces one: a forced token makes Whisper translate code-switched speech
-        extra = {"language": lang} if (lang := whisper_language(None)) else {}
+        extra = {"language": lang} if (lang := stt_language()) else {}
         with path.open("rb") as f:
             resp = await client.audio.transcriptions.create(
                 model=settings.transcription_model, file=f, prompt=VERBATIM_PROMPT, **extra

@@ -67,20 +67,8 @@ class Settings(BaseSettings):
     # Live-session analysis: local models (installed from requirements-ml.txt).
     # Each one is skipped, with a warning, when its packages aren't installed.
     use_local_ml: bool = True
-    # Speech-to-text in the cloud instead of the local Whisper: True sends every transcription
-    # (live turns, session analysis, rehearsals) to the OpenAI-compatible API (OPENAI_API_KEY,
-    # OPENAI_BASE_URL, TRANSCRIPTION_MODEL). The audio then leaves this machine.
-    cloud_stt: bool = False
-    # A size (tiny/base/small/medium/large-v3), a faster-whisper repo id, or the folder of a
-    # converted model, e.g. /models/ct2/malaysian-whisper-small-v3 (scripts/convert_whisper.sh)
-    whisper_model_size: str = "small"
-    # CPU threads for Whisper; 0 = faster-whisper's default (4). 8 was fastest on a 24-core
-    # machine (docs/benchmarks/stt-benchmark-2026-09-30.md); more threads start to contend.
-    whisper_cpu_threads: int = 0
-    # Language token for transcription. Empty = the model's own default: auto-detect for
-    # Mesolitica's Malaysian Whisper (forcing "ms" makes it translate English into Malay),
-    # "en" for standard Whisper (whose auto-detect sometimes hears Malaysian English as
-    # Malay and translates it). "auto" = always detect; or force a code like "ms" / "en".
+    # Language token for transcription. Empty or "auto" = auto-detect (keeps Manglish as spoken);
+    # or force a code like "ms" / "en" (a forced token makes Whisper translate other languages).
     stt_language: str = ""
 
     # Natural-sounding local TTS server with an OpenAI-compatible API, e.g. Kokoro-FastAPI

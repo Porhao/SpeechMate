@@ -5,7 +5,7 @@
 // simple energy-based voice activity detector (adaptive to the room's noise
 // floor), keeps ~0.35 s of audio from just before speech started so the first
 // word isn't clipped, and hands the turn to `transcribe` as a 16 kHz mono WAV —
-// the backend runs faster-whisper on it. The 48 → 16 kHz step uses the browser's
+// the backend sends it to cloud Whisper. The 48 → 16 kHz step uses the browser's
 // own filtered resampler: plain decimation folds hiss onto s/sh/f sounds.
 //
 // Live transcript: a long turn is sent phrase by phrase, cut at the short pauses between

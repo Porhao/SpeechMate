@@ -24,7 +24,7 @@ WORKDIR /app
 COPY requirements.txt requirements-ml.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Local models for live-session analysis (faster-whisper, Wav2Vec2, MediaPipe…).
+# Local models for live-session analysis (Wav2Vec2, MediaPipe…).
 # Adds ~2 GB; build with --build-arg INSTALL_ML=false for a slim image.
 ARG INSTALL_ML=true
 RUN if [ "$INSTALL_ML" = "true" ]; then pip install --no-cache-dir -r requirements-ml.txt; fi

@@ -1,5 +1,5 @@
 # Optional local models: live-session analysis and the Malaysian TTS narrator. Without these the backend
-# still runs: speech recognition falls back to the OpenAI API, and the metrics
+# still runs: the metrics
 # that need a model (pronunciation, eye contact, posture, emotion) are reported
 # as unavailable with a warning, and narration falls back to espeak. Model weights
 # download on first use (~5 GB).
@@ -7,17 +7,12 @@
 #   pip install -r requirements-ml.txt      (Docker: build with INSTALL_ML=true)
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-# CPU-only PyTorch, for Wav2Vec2 pronunciation / code-switching ASR / the ViT emotion model / TTS
-# ≥ 2.6: transformers refuses torch.load of .bin weights on older torch (CVE-2025-32434),
-# and the code-switching model ships only pytorch_model.bin, so routing silently failed on 2.4
+# CPU-only PyTorch, for Wav2Vec2 pronunciation / the ViT emotion model / TTS
+# ≥ 2.6: transformers refuses torch.load of .bin weights on older torch (CVE-2025-32434)
 torch==2.6.0
 torchaudio==2.6.0
 # ≥ 4.51 for Qwen3 (Malaysian-TTS-0.6B is a Qwen3 model); 4.53.3 is what it was saved with
 transformers==4.53.3
-
-# ASR: faster-whisper (English path + language-ID routing signal).
-# The Malay / code-switched path loads mesolitica/wav2vec2-xls-r-300m-mixed through transformers.
-faster-whisper==1.0.3
 
 # Audio features (stuttering prolongation detection)
 librosa==0.10.2.post1
