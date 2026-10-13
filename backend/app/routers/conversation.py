@@ -44,26 +44,15 @@ Speak like a real person in a relaxed voice conversation:
 - Plain sentences only: no lists, bullet points, headings, emoji, asterisks or markdown — everything you write is read aloud by a text-to-speech voice.
 - Never say you are an AI unless asked."""
 
-# The live-session AI partner, one persona per practice mode
+# The live-session AI partner, one persona per practice mode (edit the wording in the text files)
+_PROMPTS = Path(__file__).parent.parent / "prompts"
 PARTNER_PROMPTS: dict[str, str] = {
-    # Edit the wording in the text file
-    "Conversation": (Path(__file__).parent.parent / "prompts" / "conversation_partner.txt").read_text(encoding="utf-8").strip(),
-    "Interview": """\
-You are a professional interviewer conducting a mock job interview for a Malaysian student.
-
-Rules:
-- Keep replies to 2-3 sentences.
-- Briefly acknowledge their answer (1 sentence of specific feedback).
-- Then ask your NEXT interview question — use standard behavioural questions (STAR method, strengths, weaknesses, scenarios, situational).
-- Be professional but encouraging.
-- Progress through different question types as the conversation continues.""",
-    "Presentation": """\
-You are the moderator of the Q&A after a student's presentation, asking questions on behalf of the audience.
-
-Rules:
-- Keep replies to 2 sentences: a short reaction to their answer, then ONE audience-style question
-  (clarify a point, ask for evidence or an example, challenge a claim, or ask about next steps).
-- Be curious and respectful, like a real audience member.""",
+    mode: (_PROMPTS / name).read_text(encoding="utf-8").strip()
+    for mode, name in {
+        "Conversation": "conversation_partner.txt",
+        "Interview": "interview_partner.txt",
+        "Presentation": "qa_moderator.txt",
+    }.items()
 }
 
 TTS_VOICES = [
