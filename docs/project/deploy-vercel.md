@@ -73,5 +73,6 @@ response is not guaranteed to finish. What has to change:
 Kokoro-82M (Apache-2.0, the model you use now) also runs in the user's browser through
 `kokoro-js` (Transformers.js, WebGPU or WASM). No server: the model (~80 MB at q8) downloads
 once and the browser caches it. The same voices work (`af_heart`, `bf_emma`, …). WebGPU needs a
-Chromium browser; others fall back to WASM, which is slower. The session page would call
-`kokoro-js` instead of `POST /api/tts/speak`.
+Chromium browser with a real GPU; others use WASM (q8), which is slower. Implemented in
+`frontend/services/live.ts` (`conversationService.speak`): until the model has loaded, replies use the
+backend's `/api/tts/speak`, and failing that the browser's built-in voice.

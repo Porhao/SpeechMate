@@ -583,7 +583,7 @@ function SessionContent() {
       startSpeechRef.current();
   }, []);
 
-  // ── TTS (local Kokoro / OpenAI via backend, browser voice as fallback) ─────
+  // ── TTS (Kokoro in the browser, else the backend, else the browser's built-in voice) ─────
   const speakText = useCallback((text: string, onEnd?: () => void) => {
     const token = ++speakTokenRef.current;
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
@@ -1101,6 +1101,7 @@ function SessionContent() {
       presentationService.health().catch(() => null),
       startCamera(),
     ]);
+    if (voiceEnabledRef.current) conversationService.preloadVoice();
     // Transcribe the user's turns on the backend when it has a speech model
     const stt = Boolean(health && (health.providers?.openai));
     sttAvailableRef.current = stt; setSttAvailable(stt);

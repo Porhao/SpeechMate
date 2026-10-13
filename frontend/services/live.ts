@@ -3,8 +3,29 @@ import { blobFilename } from "./presentation";
 import type { FullAnalysisResult, InterviewSetup, LiveSession, PracticePlan, SessionType, Turn } from "@/types";
 
 const POLL_MS = 2500;
+
 // Local models can take a while on CPU for long recordings
 const ANALYSIS_TIMEOUT_MS = 10 * 60 * 1000;
+
+// The AI partner's voice: Kokoro-82M running in the browser (kokoro-js), so it needs no server.
+// The model downloads once (~90 MB at q8, ~300 MB fp32 on WebGPU) and the browser caches it.
+const KOKORO_MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
+const KOKORO_VOICE = "af_heart";
+let kokoroLoading: Promise<unknown> | null = null;
+let kokoro: import("kokoro-js").KokoroTTS | null = null;
+
+/** Starts the download once; `kokoro` is set when it's ready. A failed download is retried next time. */
+function loadKokoro() {
+  kokoroLoading ??= import("kokoro-js")
+    .then(async ({ KokoroTTS }) => {
+      // `navigator.gpu` can exist without a usable GPU (headless, blocklisted drivers): ask for an adapter
+      const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+      const webgpu = Boolean(await gpu?.requestAdapter().catch(() => null));
+      return KokoroTTS.from_pretrained(KOKORO_MODEL, webgpu ? { device: "webgpu", dtype: "fp32" } : { device: "wasm", dtype: "q8" });
+    })
+    .then((tts) => { kokoro = tts; })
+    .catch((e) => { kokoroLoading = null; console.warn("Browser voice could not load", e); });
+}
 
 // Live practice sessions (camera + mic with the AI partner). Requires sign-in.
 export const liveService = {
@@ -73,7 +94,20 @@ export const conversationService = {
     return (await api.upload<{ text: string }>("/stt", form)).text;
   },
 
+  /** Start downloading the voice model early, so the first reply doesn't wait for it. */
+  preloadVoice: loadKokoro,
+
+  /** Speech for the partner's reply: Kokoro in the browser once it has loaded, until then (or if it
+   *  fails) the backend's /tts/speak; the caller falls back to the browser's built-in voice after that. */
   speak: async (text: string, voice = "nova"): Promise<Blob> => {
+    loadKokoro();
+    if (kokoro) {
+      try {
+        return (await kokoro.generate(text, { voice: KOKORO_VOICE })).toBlob();
+      } catch (e) {
+        console.warn("Browser voice failed, trying the backend", e);
+      }
+    }
     const res = await api.fetch("/tts/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

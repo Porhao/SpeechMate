@@ -175,7 +175,7 @@ uvicorn app.main:app --reload
 **Frontend.**
 
 ```bash
-cd frontend && npm install && npm run dev     # http://localhost:3000
+cd frontend && pnpm install && pnpm dev     # http://localhost:3000
 ```
 
 The frontend calls `http://localhost:8000/api` by default. Set `NEXT_PUBLIC_API_URL` to point it elsewhere.
@@ -184,7 +184,7 @@ The frontend calls `http://localhost:8000/api` by default. Set `NEXT_PUBLIC_API_
 
 ```bash
 cd backend && pytest              # 57 tests, SQLite, fully offline (every AI stage's fallback path)
-cd frontend && npx tsc --noEmit && npm run lint
+cd frontend && pnpm exec tsc --noEmit && pnpm lint
 ```
 
 ---
