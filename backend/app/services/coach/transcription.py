@@ -25,9 +25,9 @@ def _transcribe_local(audio_wav: Path) -> str:
 
 async def transcribe(audio_wav: Path) -> str | None:
     """Return a verbatim transcript, or None when no transcription backend is available."""
-    from app.services.live._ml import available
+    from app.services.live._ml import local_stt
 
-    if available("faster_whisper"):
+    if local_stt():
         try:
             return await asyncio.to_thread(_transcribe_local, audio_wav)
         except Exception as e:  # noqa: BLE001 — try the API instead
@@ -37,13 +37,17 @@ async def transcribe(audio_wav: Path) -> str | None:
     if client is None:
         return None
 
+    from app.services.live.asr import whisper_language
+
+    lang = whisper_language(None)  # None = auto-detect, so Manglish isn't translated into English
+
     async def call() -> str:
         with audio_wav.open("rb") as f:
             resp = await client.audio.transcriptions.create(
                 model=settings.transcription_model,
                 file=f,
-                language="en",
                 prompt=VERBATIM_PROMPT,
+                **({"language": lang} if lang else {}),
             )
         return resp.text.strip()
 

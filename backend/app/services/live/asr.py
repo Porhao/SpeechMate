@@ -23,7 +23,7 @@ from pathlib import Path
 from app.config import settings
 from app.services.ai import get_openai_client, with_retries
 from app.services.coach.transcription import VERBATIM_PROMPT
-from app.services.live._ml import available, load_once
+from app.services.live._ml import available, load_once, local_stt
 
 logger = logging.getLogger(__name__)
 
@@ -220,7 +220,7 @@ async def _transcribe_openai(wav: Path) -> ASRResult | None:
 
 async def transcribe(wav_16k: Path, warnings: list[str]) -> ASRResult | None:
     """Transcribe a 16 kHz mono WAV. Appends to `warnings` for any fallback taken."""
-    if available("faster_whisper"):
+    if local_stt():
         try:
             return await asyncio.to_thread(_transcribe_local, wav_16k, warnings)
         except Exception as e:  # noqa: BLE001

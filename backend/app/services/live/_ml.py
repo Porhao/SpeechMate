@@ -19,6 +19,11 @@ def available(*modules: str) -> bool:
     return settings.use_local_ml and all(_installed(m) for m in modules)
 
 
+def local_stt() -> bool:
+    """Speech-to-text on the local faster-whisper model, unless CLOUD_STT sends it to the cloud API."""
+    return not settings.cloud_stt and available("faster_whisper")
+
+
 T = TypeVar("T")
 
 

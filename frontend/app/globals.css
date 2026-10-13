@@ -466,13 +466,6 @@ button:not(:disabled):not(.no-press):active,
   animation: waveform-bar 0.8s ease-in-out infinite;
 }
 
-/* Session input: the voice beam sweeps side to side while the partner thinks (VoiceBeam in session/page.tsx) */
-@keyframes voice-beam-sweep {
-  0%, 100% { transform: translateX(-16%); }
-  50%      { transform: translateX(16%); }
-}
-.voice-beam-sweep { animation: voice-beam-sweep 1.6s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .voice-beam { display: none; } }
 
 /* Session live transcript (LiveTranscript in session/page.tsx): a two-line window pinned to
    the newest words, older lines fading out above; each new phrase fades in */

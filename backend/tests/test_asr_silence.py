@@ -34,3 +34,14 @@ def test_context_goes_in_the_prompt_and_its_echo_is_dropped(tmp_path, monkeypatc
     segments, _ = asr.whisper_segments(tmp_path / "x.wav", None, context="Great. What tools did you use for the dashboard?")
     assert seen["initial_prompt"].startswith("Great. What tools did you use for the dashboard? ")
     assert [s.text for s in segments] == ["I used Power BI lah."]
+
+
+def test_cloud_stt_flag_skips_local_whisper(monkeypatch):
+    from app.config import settings
+    from app.services.live import _ml
+
+    monkeypatch.setattr(_ml, "available", lambda *m: True)  # as if faster-whisper were installed
+    monkeypatch.setattr(settings, "cloud_stt", False)
+    assert _ml.local_stt()
+    monkeypatch.setattr(settings, "cloud_stt", True)
+    assert not _ml.local_stt()

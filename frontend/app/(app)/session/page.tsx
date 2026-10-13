@@ -1,9 +1,10 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any -- MediaPipe handles have no bundled types */
 
-import { Suspense, useEffect, useRef, useState, useCallback } from "react";
+import { Suspense, useEffect, useRef, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
+import { VoiceBeam as VoiceGlow } from "voice-glow";
+import { BotAvatar } from "bot-avatars";
 import { useSearchParams, useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
 import {
   Mic, MicOff, PhoneOff, Send, Volume2, VolumeX, Shuffle,
   Activity, Loader2, Video, VideoOff, Briefcase, Presentation, ListChecks, Pencil, Keyboard,
@@ -14,11 +15,9 @@ import { cn, inkOf } from "@/lib/utils";
 import { liveService, conversationService } from "@/services/live";
 import { presentationService } from "@/services/presentation";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
+import { subscribeTheme } from "@/lib/theme";
 import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
 import type { SessionType, LiveSession, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
-
-// The partner's 3D orb (three.js, client-only)
-const VoiceOrb = dynamic(() => import("@/components/auth/VoiceOrb"), { ssr: false });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Message  = { role: "ai" | "user"; text: string; ts: number };
@@ -289,23 +288,19 @@ function HeaderPulse({ level, active, color = "#3E6FB0" }: { level: number; acti
   );
 }
 
-// ── Voice beam — a wash of the mode colour inside the input bar ──────────────
-// Rises from the bottom edge with the user's real mic level while they can speak, and sweeps
-// side to side while the partner thinks. Stays inside the box (no blur, no halo: Design_system.md),
-// and is hidden under reduced motion (globals.css).
-function VoiceBeam({ level, listening, thinking, color }: { level: number; listening: boolean; thinking: boolean; color: string }) {
-  const rise = thinking ? 0.5 : listening ? Math.min(1, 0.18 + level * 4) : 0;
+// ── Voice beam — a sound-reactive glow along the input bar's bottom edge (voice-glow) ──
+// Follows the user's own mic (low / mid / high bands) while they can speak, holds a soft
+// glow while the partner thinks, and fades out otherwise. The centre lobe is the mode colour.
+// The package stops its breathing, flow and hue drift under reduced motion.
+function VoiceBeam({ stream, listening, thinking, color, children }: {
+  stream: MediaStream | null; listening: boolean; thinking: boolean; color: string; children: ReactNode;
+}) {
+  const theme = useResolvedTheme();
   return (
-    <span aria-hidden className="voice-beam pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-      <span className={`absolute inset-y-0 -inset-x-1/4 ${thinking ? "voice-beam-sweep" : ""}`}>
-        <span className="absolute inset-0 origin-bottom transition-[transform,opacity] duration-150 ease-out"
-          style={{
-            opacity: rise ? 1 : 0,
-            transform: `scaleY(${rise})`,
-            background: `radial-gradient(45% 100% at 50% 100%, color-mix(in srgb, ${color} 40%, transparent), transparent 75%)`,
-          }} />
-      </span>
-    </span>
+    <VoiceGlow className="flex-1 min-w-0" theme={theme} colors={[color]}
+      stream={listening ? stream : null} level={thinking ? 0.35 : 0} active={listening || thinking}>
+      {children}
+    </VoiceGlow>
   );
 }
 
@@ -335,147 +330,26 @@ function LiveTranscript({ transcript, newest, status, color }: {
   );
 }
 
-// ── Interviewer Avatar ────────────────────────────────────────────────────────
-function InterviewerAvatar({ state }: { state: OrbState }) {
-  const s = {
-    idle:      { border: "rgba(26,58,58,0.32)", glow: "rgba(26,58,58,0.18)", text: "Ready",       tc: "rgba(255,255,255,0.38)" },
-    speaking:  { border: "rgba(26,58,58,0.85)", glow: "rgba(26,58,58,0.48)", text: "Speaking…",   tc: "#60a5fa" },
-    listening: { border: "rgba(77,122,89,0.72)",  glow: "rgba(77,122,89,0.32)",  text: "Listening…",  tc: "#4ade80" },
-    thinking:  { border: "rgba(156,106,40,0.72)", glow: "rgba(156,106,40,0.32)", text: "Thinking…",   tc: "#fbbf24" },
-  }[state];
+// ── Partner character (bot-avatars) ───────────────────────────────────────────
+// One character per mode. It sleeps before the session, looks around while you talk,
+// and hops while it thinks or speaks.
+const PARTNER_BOTS = {
+  Conversation: { type: "cat", face: "mouth", headphones: true },
+  Interview:    { type: "mech", face: "mouth", glasses: "square", bowTie: true },
+  Presentation: { type: "droid", face: "mouth", hat: "beret", glasses: "round" },
+} as const;
 
+function useResolvedTheme() {
+  return useSyncExternalStore(subscribeTheme, () => document.documentElement.dataset.theme === "dark" ? "dark" : "light", () => "light" as const);
+}
+
+function PartnerBot({ mode, state, started, size, theme }: {
+  mode: SessionType; state: OrbState; started: boolean; size: number; theme?: "light" | "dark";
+}) {
+  const appTheme = useResolvedTheme();
   return (
-    <div
-      className="relative overflow-hidden flex-shrink-0"
-      style={{
-        width: 240, height: 288, borderRadius: 22,
-        background: "linear-gradient(165deg, #0e0c2a 0%, #06091a 100%)",
-        border: `2px solid ${s.border}`,
-        boxShadow: `0 0 36px ${s.glow}, 0 8px 32px rgba(0,0,0,0.7)`,
-        transition: "border-color 0.65s ease, box-shadow 0.65s ease",
-      }}
-    >
-      {/* Ambient room glow */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        background: `radial-gradient(ellipse 120% 60% at 50% 0%, ${s.glow.replace(/[\d.]+\)$/, "0.14)")} 0%, transparent 60%)`,
-        transition: "background 0.65s ease",
-      }} />
-
-      {/* SVG figure */}
-      <svg viewBox="0 0 240 288" className="w-full h-full absolute inset-0">
-        <defs>
-          <radialGradient id="ivSkin" cx="38%" cy="30%" r="65%">
-            <stop offset="0%" stopColor="#d4a97e" />
-            <stop offset="100%" stopColor="#b88555" />
-          </radialGradient>
-          <radialGradient id="ivSuit" cx="50%" cy="0%" r="100%">
-            <stop offset="0%" stopColor="#252250" />
-            <stop offset="100%" stopColor="#16143a" />
-          </radialGradient>
-        </defs>
-
-        {/* Suit body */}
-        <path d="M 0 288 L 28 220 C 52 208 78 200 96 208 L 120 230 L 144 208 C 162 200 188 208 212 220 L 240 288 Z" fill="url(#ivSuit)" />
-        {/* Shirt */}
-        <path d="M 96 208 L 120 230 L 120 288 L 88 288 Z" fill="white" opacity="0.9" />
-        <path d="M 120 230 L 144 208 L 152 288 L 120 288 Z" fill="white" opacity="0.88" />
-        {/* Left lapel */}
-        <path d="M 28 220 C 52 208 78 200 96 208 L 120 230 L 88 258 Z" fill="#1e1c46" />
-        {/* Right lapel */}
-        <path d="M 212 220 C 188 208 162 200 144 208 L 120 230 L 152 258 Z" fill="#1e1c46" />
-        {/* Tie */}
-        <path d="M 116 234 L 124 234 L 127 278 L 120 287 L 113 278 Z" fill="#7c3aed" />
-        <path d="M 116 234 L 124 234 L 120 244 Z" fill="#5b21b6" />
-
-        {/* Neck */}
-        <rect x="108" y="178" width="24" height="38" rx="5" fill="url(#ivSkin)" />
-
-        {/* Head */}
-        <ellipse cx="120" cy="124" rx="54" ry="60" fill="url(#ivSkin)" />
-        {/* Ears */}
-        <ellipse cx="66" cy="126" rx="8" ry="11" fill="url(#ivSkin)" />
-        <ellipse cx="174" cy="126" rx="8" ry="11" fill="url(#ivSkin)" />
-
-        {/* Hair */}
-        <path d="M 66 113 C 68 72 78 58 97 52 C 109 48 120 47 120 47 C 120 47 131 48 143 52 C 162 58 172 72 174 113 C 166 83 154 70 140 65 C 132 62 125 61 120 61 C 115 61 108 62 100 65 C 86 70 74 83 66 113 Z" fill="#1a1035" />
-        <path d="M 66 113 C 64 123 65 135 67 142 C 68 135 69 126 69 118 Z" fill="#1a1035" />
-        <path d="M 174 113 C 176 123 175 135 173 142 C 172 135 171 126 171 118 Z" fill="#1a1035" />
-
-        {/* Left eye */}
-        <ellipse cx="103" cy="117" rx="11" ry="11.5" fill="white" />
-        <ellipse cx="104" cy="118" rx="7" ry="7.5" fill="#2a1d5a" />
-        <ellipse cx="105" cy="118" rx="4" ry="4.5" fill="#7c3aed" />
-        <ellipse cx="107" cy="115" rx="1.5" ry="1.5" fill="white" />
-        {/* Right eye */}
-        <ellipse cx="137" cy="117" rx="11" ry="11.5" fill="white" />
-        <ellipse cx="136" cy="118" rx="7" ry="7.5" fill="#2a1d5a" />
-        <ellipse cx="135" cy="118" rx="4" ry="4.5" fill="#7c3aed" />
-        <ellipse cx="137" cy="115" rx="1.5" ry="1.5" fill="white" />
-
-        {/* Eyebrows */}
-        <path d="M 92 103 C 96 99 104 98 110 100" stroke="#2a1d5a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        <path d="M 130 100 C 136 98 144 99 148 103" stroke="#2a1d5a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-
-        {/* Nose */}
-        <path d="M 120 126 L 116 139 C 117 142 123 142 124 139 Z" fill="rgba(0,0,0,0.07)" />
-
-        {/* Mouth — state-based */}
-        {state === "speaking" ? (
-          <ellipse cx="120" cy="156" rx="10" ry="5.5" fill="#8b5c3a" />
-        ) : state === "thinking" ? (
-          <path d="M 112 154 Q 120 151 128 154" stroke="#8b5c3a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        ) : (
-          <path d="M 111 153 Q 120 160 129 153" stroke="#8b5c3a" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-        )}
-
-        {/* Cheek warmth */}
-        <ellipse cx="88" cy="136" rx="14" ry="9" fill="rgba(220,100,80,0.05)" />
-        <ellipse cx="152" cy="136" rx="14" ry="9" fill="rgba(220,100,80,0.05)" />
-      </svg>
-
-      {/* Speaking waveform */}
-      {state === "speaking" && (
-        <div className="absolute bottom-[60px] left-1/2 -translate-x-1/2 flex items-end gap-[2px]">
-          {[4, 7, 11, 8, 14, 8, 11, 7, 4].map((h, i) => (
-            <span key={i} style={{
-              display: "block", width: 3, height: h, background: "#60a5fa", borderRadius: 2,
-              animation: `waveform-bar 0.55s ease-in-out ${i * 65}ms infinite`,
-            }} />
-          ))}
-        </div>
-      )}
-
-      {/* Thinking dots */}
-      {state === "thinking" && (
-        <div className="absolute bottom-[60px] left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <span key={i} className="w-2 h-2 rounded-full animate-bounce"
-              style={{ background: "#fbbf24", animationDelay: `${i * 0.15}s` }} />
-          ))}
-        </div>
-      )}
-
-      {/* Listening ripple */}
-      {state === "listening" && (
-        <div className="absolute bottom-[62px] right-5 w-3 h-3 rounded-full"
-          style={{ background: "#4ade80", boxShadow: "0 0 8px rgba(74,222,128,0.7)", animation: "ping 1.2s cubic-bezier(0,0,0.2,1) infinite" }} />
-      )}
-
-      {/* Name plate */}
-      <div
-        className="absolute bottom-0 left-0 right-0 px-4 py-2.5 flex items-center justify-between"
-        style={{ background: "linear-gradient(0deg, rgba(6,9,24,0.96) 0%, transparent 100%)" }}
-      >
-        <div>
-          <p className="text-white text-xs font-bold">Alex Chen</p>
-          <p className="text-[10px] transition-colors duration-500" style={{ color: s.tc }}>{s.text}</p>
-        </div>
-        <span className="text-[9px] font-bold px-2 py-0.5 rounded-md"
-          style={{ background: "rgba(26,58,58,0.22)", color: "#93c5fd", border: "1px solid rgba(26,58,58,0.35)" }}>
-          AI
-        </span>
-      </div>
-    </div>
+    <BotAvatar {...PARTNER_BOTS[mode]} size={size} theme={theme ?? appTheme}
+      state={!started ? "sleeping" : state === "speaking" || state === "thinking" ? "working" : "default"} />
   );
 }
 
@@ -584,11 +458,6 @@ function SessionContent() {
   const [audioLevel, setAudioLevel] = useState(0);
   // What the user is answering, sent with each turn so speech recognition gets topic words right
   const sttContextRef = useRef("");
-  // Drives the partner orb: it ripples with the user's voice while they speak
-  const orbEnergyRef = useRef(0);
-  useEffect(() => {
-    if (interimText === "Hearing you…") orbEnergyRef.current = Math.min(1, Math.max(orbEnergyRef.current, audioLevel * 3));
-  }, [audioLevel, interimText]);
 
   // ── Value refs ────────────────────────────────────────────────────────────
   const activeRef           = useRef(false);
@@ -1636,6 +1505,9 @@ function SessionContent() {
     </div>
   );
 
+  // On lg the camera takes whatever height the cards leave and stays 16:9 inside it
+  // (container query units), so the whole session fits the viewport without scrolling.
+  const CAM_FIT = "lg:flex-1 lg:min-h-[160px] lg:grid lg:place-items-center lg:[container-type:size] lg:[&>*]:w-[min(100cqw,calc(100cqh*16/9))]";
   const cameraStage = (
     <div className="clay relative w-full flex-shrink-0 overflow-hidden rounded-xl bg-black"
       style={{ aspectRatio: "16 / 9", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1762,7 +1634,7 @@ function SessionContent() {
   );
 
   return (
-    <div className="flex flex-col px-3 sm:px-6 py-4 min-h-[calc(100dvh-80px)]" style={{ background: "var(--bg)", color: "var(--ink)" }}>
+    <div className="flex flex-col px-3 sm:px-6 py-4 min-h-[calc(100dvh-80px)] lg:h-[calc(100dvh-80px)] lg:min-h-0" style={{ background: "var(--bg)", color: "var(--ink)" }}>
 
       {/* ── Analyzing overlay ──────────────────────────────────────────── */}
       {isEnding && (
@@ -1845,9 +1717,10 @@ function SessionContent() {
         <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
 
           {/* LEFT: Interviewer panel */}
-          <div className="flex flex-col gap-3 w-full lg:w-[60%] lg:flex-shrink-0">
+          <div className="flex flex-col gap-3 w-full lg:w-[60%] lg:flex-shrink-0 lg:min-h-0">
 
-            {cameraStage}
+            <div className={CAM_FIT}>{cameraStage}</div>
+            <div className="grid lg:grid-cols-2 gap-3">
             {lightingPanel}
 
             {/* Current question card */}
@@ -1863,6 +1736,7 @@ function SessionContent() {
                 </p>
               </div>
             )}
+            </div>
           </div>
 
           {/* RIGHT: whose turn + interviewer + responses */}
@@ -1885,7 +1759,10 @@ function SessionContent() {
                 )}
               </div>
               <div className="w-full h-full flex items-center justify-center pt-8">
-                <div style={{ transform: "scale(0.72)" }}><InterviewerAvatar state={orbState} /></div>
+                <div className="flex flex-col items-center gap-2">
+                  <PartnerBot mode={mode} state={orbState} started={sessionStarted} size={110} theme="dark" />
+                  <span className="text-[11px] font-semibold text-white/70">{stateLabel}</span>
+                </div>
               </div>
             </div>
 
@@ -1965,7 +1842,7 @@ function SessionContent() {
 
             {/* Input */}
             <div className="flex-shrink-0 flex gap-2">
-              <div className="relative flex-1">
+              <VoiceBeam stream={streamRef.current} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc}>
               <input type="text" value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
@@ -1983,8 +1860,7 @@ function SessionContent() {
                 onFocus={(e) => (e.target.style.borderColor = "rgba(96,165,250,0.5)")}
                 onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
               />
-              <VoiceBeam level={audioLevel} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc} />
-              </div>
+              </VoiceBeam>
               <button onClick={sendMessage}
                 disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                 className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
@@ -2001,17 +1877,17 @@ function SessionContent() {
         <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0">
 
           {/* LEFT: camera stage + AI status */}
-          <div className="w-full lg:w-[58%] lg:flex-shrink-0 flex flex-col gap-3">
+          <div className="w-full lg:w-[58%] lg:flex-shrink-0 flex flex-col gap-3 lg:min-h-0">
 
-          {cameraStage}
+          <div className={CAM_FIT}>{cameraStage}</div>
+
+          <div className="grid lg:grid-cols-2 gap-3">
 
           {/* AI partner status */}
           {/* The partner as a living 3D orb: it pulses while the AI talks or thinks and
               ripples with your voice while you speak */}
           <div className="glass-card px-4 py-3 flex items-center gap-4 flex-shrink-0">
-            <div className="w-20 h-20 flex-shrink-0 relative">
-              <VoiceOrb energyRef={orbEnergyRef} busy={aiSpeaking || thinking} className="absolute inset-0" />
-            </div>
+            <PartnerBot mode={mode} state={orbState} started={sessionStarted} size={56} />
             <div className="min-w-0">
               <p className="text-[10px] text-[var(--muted)] font-semibold uppercase tracking-wider">{partner}</p>
               <p className="text-base font-semibold" style={{ color: stateInk }}>{stateLabel}</p>
@@ -2074,6 +1950,7 @@ function SessionContent() {
               </p>
             </div>
           )}
+          </div>
         </div>
 
         {/* RIGHT: whose turn + the conversation */}
@@ -2162,7 +2039,7 @@ function SessionContent() {
 
               {/* Input */}
               <div className="flex-shrink-0 flex gap-3">
-                <div className="relative flex-1">
+                <VoiceBeam stream={streamRef.current} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc}>
                 <input type="text" value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
@@ -2183,8 +2060,7 @@ function SessionContent() {
                   onFocus={(e) => (e.target.style.borderColor = `${mc}50`)}
                   onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
                 />
-                <VoiceBeam level={audioLevel} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc} />
-                </div>
+                </VoiceBeam>
                 <button onClick={sendMessage}
                   disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
                   className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"

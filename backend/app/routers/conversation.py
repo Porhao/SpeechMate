@@ -201,7 +201,7 @@ async def speech_to_text(
 ):
     """Transcribe one conversation turn for the live AI partner: local faster-whisper, else the
     OpenAI API, else 503 (the frontend then falls back to the browser's speech recognition)."""
-    from app.services.live._ml import available
+    from app.services.live._ml import local_stt
 
     data = await read_limited(file, MAX_STT_BYTES, "One spoken turn")
     suffix = Path(file.filename or "turn.wav").suffix or ".wav"
@@ -210,12 +210,15 @@ async def speech_to_text(
     try:
         with open(fd, "wb") as f:
             f.write(data)
-        if available("faster_whisper"):
+        if local_stt():
             return {"text": await asyncio.to_thread(_local_stt, path, context), "engine": "faster-whisper"}
         client = get_openai_client()
         if client is None:
             raise HTTPException(status_code=503, detail="No speech recognition available")
-        extra = {} if settings.stt_language == "auto" else {"language": settings.stt_language or "en"}
+        from app.services.live.asr import whisper_language
+
+        # Auto-detect unless STT_LANGUAGE forces one: a forced token makes Whisper translate code-switched speech
+        extra = {"language": lang} if (lang := whisper_language(None)) else {}
         with path.open("rb") as f:
             resp = await client.audio.transcriptions.create(
                 model=settings.transcription_model, file=f, prompt=VERBATIM_PROMPT, **extra

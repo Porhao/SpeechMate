@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # Live-session analysis: local models (installed from requirements-ml.txt).
     # Each one is skipped, with a warning, when its packages aren't installed.
     use_local_ml: bool = True
+    # Speech-to-text in the cloud instead of the local Whisper: True sends every transcription
+    # (live turns, session analysis, rehearsals) to the OpenAI-compatible API (OPENAI_API_KEY,
+    # OPENAI_BASE_URL, TRANSCRIPTION_MODEL). The audio then leaves this machine.
+    cloud_stt: bool = False
     # A size (tiny/base/small/medium/large-v3), a faster-whisper repo id, or the folder of a
     # converted model, e.g. /models/ct2/malaysian-whisper-small-v3 (scripts/convert_whisper.sh)
     whisper_model_size: str = "small"
