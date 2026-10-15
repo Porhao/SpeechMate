@@ -97,6 +97,26 @@ export const conversationService = {
   /** Start downloading the voice model early, so the first reply doesn't wait for it. */
   preloadVoice: loadKokoro,
 
+  /** Like `speak`, one sentence at a time, so playback can start while the rest is generated.
+   *  Before the browser model has loaded it yields `speak`'s single clip. */
+  speakStream: async function* (text: string): AsyncGenerator<Blob> {
+    loadKokoro();
+    if (!kokoro) { yield await conversationService.speak(text); return; }
+    let yielded = false;
+    try {
+      // Our own closed splitter: kokoro-js 1.2.1 never closes the one it makes for a plain string,
+      // so its stream would wait forever after the last sentence
+      const { TextSplitterStream } = await import("kokoro-js");
+      const splitter = new TextSplitterStream();
+      splitter.push(text);
+      splitter.close();
+      for await (const { audio } of kokoro.stream(splitter, { voice: KOKORO_VOICE })) { yielded = true; yield audio.toBlob(); }
+    } catch (e) {
+      if (yielded) throw e;
+      yield await conversationService.speak(text);  // failed before any audio: the backend's voice
+    }
+  },
+
   /** Speech for the partner's reply: Kokoro in the browser once it has loaded, until then (or if it
    *  fails) the backend's /tts/speak; the caller falls back to the browser's built-in voice after that. */
   speak: async (text: string, voice = "nova"): Promise<Blob> => {

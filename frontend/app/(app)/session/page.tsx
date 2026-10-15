@@ -609,26 +609,45 @@ function SessionContent() {
     };
     setVoicePending(true);
 
-    conversationService.speak(text.slice(0, 2000))
-      .then((blob) => {
-        if (token !== speakTokenRef.current) return;  // a newer utterance replaced this one
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        audio.onplaying = started;
-        audio.onended = () => { URL.revokeObjectURL(url); finish(); };
-        audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
-        audio.play().catch(finish);
-      })
-      .catch(() => {
+    // Sentences play in order as they arrive; the next one is generated while one plays
+    const queue: Blob[] = [];
+    let playing = false, ended = false, gotAny = false;
+    const playNext = () => {
+      if (token !== speakTokenRef.current) return;  // a newer utterance replaced this one
+      const blob = queue.shift();
+      if (!blob) { playing = false; if (ended) finish(); return; }
+      playing = true;
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      const next = () => { URL.revokeObjectURL(url); playNext(); };
+      audio.onplaying = started;
+      audio.onended = next;
+      audio.onerror = next;
+      audio.play().catch(next);
+    };
+    (async () => {
+      try {
+        for await (const blob of conversationService.speakStream(text.slice(0, 2000))) {
+          if (token !== speakTokenRef.current) return;
+          gotAny = true; queue.push(blob);
+          if (!playing) playNext();
+        }
+      } catch {
         if (token !== speakTokenRef.current) return;
-        // Browser fallback
-        const synth = window.speechSynthesis; synth.cancel();
-        const utt = new SpeechSynthesisUtterance(text);
-        const v = synth.getVoices().find((v) => v.lang.startsWith("en")) ?? null;
-        if (v) utt.voice = v; utt.rate = 0.9;
-        utt.onstart = started; utt.onend = finish; utt.onerror = finish; synth.speak(utt);
-      });
+        if (!gotAny) {
+          // Browser fallback
+          const synth = window.speechSynthesis; synth.cancel();
+          const utt = new SpeechSynthesisUtterance(text);
+          const v = synth.getVoices().find((v) => v.lang.startsWith("en")) ?? null;
+          if (v) utt.voice = v; utt.rate = 0.9;
+          utt.onstart = started; utt.onend = finish; utt.onerror = finish; synth.speak(utt);
+          return;
+        }
+      }
+      ended = true;
+      if (!playing) finish();
+    })();
   }, [detachRecognizer, resumeListening]);
 
   // ── Auto-reply after user speech (real OpenAI chat) ─────────────────────
