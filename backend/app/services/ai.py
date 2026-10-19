@@ -1,12 +1,15 @@
 """Shared helpers for external AI calls: client construction and retries."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from typing import TypeVar
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -19,6 +22,39 @@ _openai_client: AsyncOpenAI | None = None
 
 
 _llm_client: AsyncOpenAI | None = None
+
+# ── LLM token usage ─────────────────────────────────────────────────────────
+# Every chat completion's `usage` is added to the tally of the current task (if any), so a
+# session can report what its LLM calls cost: track_llm_usage() around the work, then read the dict.
+_usage: ContextVar[dict | None] = ContextVar("llm_usage", default=None)
+
+
+@contextlib.contextmanager
+def track_llm_usage(tally: dict | None = None):
+    """Collect {calls, prompt_tokens, completion_tokens} for LLM calls made inside the block."""
+    tally = tally if tally is not None else {}
+    for k in ("calls", "prompt_tokens", "completion_tokens"):
+        tally.setdefault(k, 0)
+    token = _usage.set(tally)
+    try:
+        yield tally
+    finally:
+        _usage.reset(token)
+
+
+async def _count_usage(response: httpx.Response) -> None:
+    tally = _usage.get()
+    if tally is None or not response.request.url.path.endswith("/chat/completions") or response.status_code != 200:
+        return
+    try:
+        usage = json.loads(await response.aread()).get("usage") or {}  # non-streaming calls only (none stream)
+    except Exception:  # noqa: BLE001 — accounting must never break a call
+        return
+    tally["calls"] += 1
+    tally["prompt_tokens"] += int(usage.get("prompt_tokens") or 0)
+    tally["completion_tokens"] += int(usage.get("completion_tokens") or 0)
+    logger.info("llm usage: model=%s prompt=%s completion=%s", settings.llm_model,
+                usage.get("prompt_tokens"), usage.get("completion_tokens"))
 
 
 def llm_provider() -> str | None:
@@ -46,6 +82,7 @@ def get_llm_client() -> AsyncOpenAI | None:
             base_url=settings.llm_base_url,
             timeout=settings.llm_timeout_sec,
             max_retries=0,
+            http_client=httpx.AsyncClient(timeout=settings.llm_timeout_sec, event_hooks={"response": [_count_usage]}),
         )
     return _llm_client
 

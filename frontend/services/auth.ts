@@ -37,5 +37,25 @@ export const authService = {
 
   updateProfile: (data: UserProfileUpdate) => api.put<User>("/users/profile", data),
 
+  /** Agree to (or withdraw from) cloud processing: audio to Groq, text to Gemini. */
+  setConsent: (accept: boolean) => api.post<User>("/users/me/consent", { accept }),
+
+  /** Download everything stored about the user as one JSON file. */
+  exportData: async () => {
+    const res = await api.fetch("/users/me/export");
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: "speechmate-my-data.json" });
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  /** Delete the account and all its data; the password is asked again. */
+  deleteAccount: (password: string) =>
+    api.fetch("/users/me", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(res.status === 403 ? "Wrong password" : (await res.json().catch(() => ({}))).detail ?? "Couldn't delete the account");
+      }),
+
   isSignedIn: () => typeof window !== "undefined" && !!localStorage.getItem("access_token"),
 };

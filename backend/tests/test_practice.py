@@ -143,11 +143,18 @@ def test_pillars_group_measured_metrics_only():
         "details": {"stuttering": None, "emotion": None},
     }
     lang = extra_metrics.analyze_language_use("We built a dashboard that helped the finance team close reports faster every month.")
-    p = extra_metrics.build_pillars(analysis, None, lang, None, {"gaze_tunneling": 0.5})
+    # A browser-sent value is ignored now; Gaze Tunneling comes from the server's own computation
+    p = extra_metrics.build_pillars(analysis, None, lang, None, {"gaze_tunneling": 0.5},
+                                    {"r": 0.5, "p": 0.02, "label": "Strong link", "windows": 36, "events": 9})
     assert p["voice"]["score"] == 90.0 and p["voice"]["status"] == "good"
     assert [m["key"] for m in p["language"]["metrics"]] == ["fillers", "vocabulary", "hedging"]
     assert p["body"]["score"] == 60 and p["body"]["status"] == "ok"
-    assert p["confidence"]["metrics"][0]["key"] == "gaze_tunneling"
+    gt = p["confidence"]["metrics"][0]
+    assert gt["key"] == "gaze_tunneling" and gt["score"] == 50.0
+    # A link that doesn't beat chance costs nothing
+    p = extra_metrics.build_pillars(analysis, None, lang, None, None,
+                                    {"r": 0.3, "p": 0.2, "label": "No clear link", "windows": 36, "events": 9})
+    assert p["confidence"]["metrics"][0]["score"] == 100.0
 
 
 def test_new_metric_recommendations():
@@ -161,20 +168,21 @@ def test_new_metric_recommendations():
     assert {r.area for r in recs} == {"vocal_variety", "volume", "hedging", "response_time"}
 
 
-def test_per_slide_key_point_coverage_drives_feedback():
-    from app.services.coach.feedback import rule_based_coach_feedback
-    from app.services.coach.metrics import compute_metrics
+def test_count_fillers_in_context():
+    from app.services.live.speech import count_fillers
 
-    m = compute_metrics(
-        duration_sec=60, silences=[], transcript="Plan your week with a weekly planner every Sunday.",
-        ideal_text="", ideal_duration_sec=None,
-        slides=[(1, "Plan the week with a weekly planner every Sunday.", "Use a weekly planner"),
-                (2, "Pomodoro technique: focus twenty five minutes then rest.", "Work in focused pomodoro blocks")],
-    )
-    cov = {c["slide_index"]: c["status"] for c in m["slide_coverage"]}
-    assert cov == {1: "covered", 2: "missed"}
-    fb = rule_based_coach_feedback(m)
-    assert any(o["slide_index"] == 2 and "pomodoro" in o["observation"].lower() for o in fb["observations"])
+    counts = count_fillers("Um, so you know, I think, uh, you know, it's like, kind of good. Umm.")
+    assert counts["you know"] == 2 and counts["um"] == 1 and counts["umm"] == 1 and counts["uh"] == 1
+    assert counts["like"] == 1 and "kind of" not in counts      # a hedge, measured separately (extra_metrics.py)
+    assert count_fillers("The umbrella was humming in the summer") == {}
+
+
+def test_slide_key_term_coverage_tracks_missed_terms():
+    from app.services.live.talk import script_coverage
+
+    ideal = "Prioritize tasks using the Eisenhower matrix. Block focused time on your calendar."
+    coverage, missed = script_coverage("I prioritize my tasks and block time on my calendar", ideal)
+    assert 0 < coverage < 1 and "eisenhower" in missed and "calendar" not in missed
 
 
 def test_intro_is_greeting_plus_planned_first_question():

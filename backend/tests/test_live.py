@@ -15,6 +15,7 @@ from app.database import Base, engine
 from app.main import app
 from app.services import tasks
 from app.services.live import coaching, language, scoring, speech
+from tests.conftest import sign_in
 from tests.test_e2e import _tone_wav
 
 
@@ -206,19 +207,9 @@ async def client(monkeypatch):
         yield c
 
 
-async def _sign_in(client: httpx.AsyncClient, email: str = "aisyah@example.com") -> dict:
-    r = await client.post("/api/auth/register", json={
-        "full_name": "Aisyah", "email": email, "password": "correct-horse", "communication_goal": "Improve Presentations",
-    })
-    assert r.status_code == 201, r.text
-    r = await client.post("/api/auth/login", json={"email": email.upper(), "password": "correct-horse"})
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
-
-
 async def test_auth_and_profile(client: httpx.AsyncClient):
     assert (await client.get("/api/users/profile")).status_code == 401
-    headers = await _sign_in(client)
+    headers = await sign_in(client)
 
     r = await client.post("/api/auth/register", json={"full_name": "X", "email": "aisyah@example.com", "password": "12345678"})
     assert r.status_code == 400
@@ -275,20 +266,25 @@ async def test_uploads_are_capped_and_partial_files_removed(tmp_path):
 
 
 async def test_conversation_endpoints_without_key(client: httpx.AsyncClient):
-    r = await client.post("/api/chat/message", json={"messages": [{"role": "user", "content": "hi"}]})
+    turn = {"file": ("turn.wav", _tone_wav([(1, True)]))}
+    # The cloud LLM / speech recognition / TTS aren't open to anyone without an account
+    assert (await client.post("/api/chat/message", json={"messages": []})).status_code == 401
+    assert (await client.post("/api/stt", files=turn)).status_code == 401
+    assert (await client.post("/api/tts/speak", json={"text": "hello"})).status_code == 401
+    headers = await sign_in(client)
+    r = await client.post("/api/chat/message", headers=headers, json={"messages": [{"role": "user", "content": "hi"}]})
     assert r.status_code == 503
-    assert (await client.post("/api/coach/chat", json={"question": "help"})).status_code == 404  # removed
-    assert (await client.post("/api/tts/speak", json={"text": "hello"})).status_code == 503
-    assert len((await client.get("/api/tts/voices")).json()["voices"]) == 8
-    # No local model and no key: the frontend falls back to the browser's speech recognition
-    r = await client.post("/api/stt", files={"file": ("turn.wav", _tone_wav([(1, True)]))})
-    assert r.status_code == 503
+    assert (await client.post("/api/tts/speak", headers=headers, json={"text": "hello"})).status_code == 503
+    # No key: 503, and the frontend lets the user type
+    assert (await client.post("/api/stt", headers=headers, files=turn)).status_code == 503
+    for removed in ("/api/tts/voices", "/api/narrator-voices", "/api/progress", "/api/reports"):
+        assert (await client.get(removed, headers=headers)).status_code == 404
 
 
 @pytest.mark.skipif(shutil.which(settings.ffmpeg_bin) is None, reason="ffmpeg is required")
 async def test_live_session_analysis_loop(client: httpx.AsyncClient):
-    headers = await _sign_in(client)
-    other = await _sign_in(client, "someone@example.com")
+    headers = await sign_in(client)
+    other = await sign_in(client, "someone@example.com")
 
     # Interview needs its setup; without an LLM the plan comes from the question bank
     assert (await client.post("/api/live", headers=headers, json={"session_type": "Interview"})).status_code == 422
@@ -339,16 +335,6 @@ async def test_live_session_analysis_loop(client: httpx.AsyncClient):
     fb = a["content_feedback"]
     assert fb["kind"] == "answers" and fb["source"] == "rules" and len(fb["answers"]) == 1
 
-    # Only measured scores become progress points (here: presence, from the response time)
-    assert [p["metric_name"] for p in (await client.get("/api/progress", headers=headers)).json()] == ["presence_score"]
-    r = await client.post("/api/reports/generate", headers=headers)
-    assert r.status_code == 201
-    report = r.json()
-    assert report["content"]["totals"]["sessions"] == 1
-    assert report["report_url"] == f"/api/reports/{report['id']}"
-    assert (await client.get(report["report_url"], headers=headers)).status_code == 200
-    assert len((await client.get("/api/reports", headers=headers)).json()) == 1
-
     history = (await client.get("/api/live", headers=headers)).json()
     assert [h["id"] for h in history] == [lid]
     assert (await client.delete(f"/api/live/{lid}", headers=headers)).status_code == 204
@@ -357,7 +343,7 @@ async def test_live_session_analysis_loop(client: httpx.AsyncClient):
 
 @pytest.mark.skipif(shutil.which(settings.ffmpeg_bin) is None, reason="ffmpeg is required")
 async def test_silent_recording_fails_cleanly(client: httpx.AsyncClient):
-    headers = await _sign_in(client)
+    headers = await sign_in(client)
     lid = (await client.post("/api/live", headers=headers, json={"session_type": "Conversation"})).json()["id"]
     await client.post(f"/api/live/{lid}/recording", headers=headers, files={"file": ("rec.wav", _tone_wav([(3, False)]))})
     await client.post(f"/api/live/{lid}/analyze", headers=headers)

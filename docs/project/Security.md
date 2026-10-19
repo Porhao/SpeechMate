@@ -16,7 +16,9 @@ SpeechMate handles **voice, face video, resumes and personal goals**, which is s
 | Input validation | Pydantic schemas on every body; turn lists capped (200); deck must be .pptx/.pdf; narrator voice whitelisted | `schemas/`, routers |
 | LLM output | JSON validated against schemas; re-prompted once; "stronger answers" checked so they don't invent facts the user never said | `practice_plans.py` |
 | Secrets in repo | `.env`, `.env.*`, `fine-tune/data/`, `fine-tune/eval/` git-ignored (recordings never committed) | `.gitignore` |
-| Local processing | Speech, vision and LLM run on the user's machine by default; nothing leaves it unless OpenAI/ElevenLabs keys are configured | `config.py` |
+| Cloud processing consent | Audio goes to Groq (speech-to-text) and text to Gemini; vision, pronunciation and prosody stay on the server. Users agree on a consent screen first; the time is stored (`users.cloud_consent_at`) and can be withdrawn in Settings. Without it the server refuses sessions, analyses, interview plans, deck uploads and rehearsals (403 `cloud_consent_required`). Tested | `app/auth.py` (`require_cloud_consent`), `components/layout/ConsentGate.tsx` |
+| Retention | Raw live-session recordings are deleted once their analysis succeeds (after the results are committed), unless the user keeps them (`users.keep_recordings`). Tested | `services/live/pipeline.py` |
+| Access and erasure | `GET /users/me/export` downloads all the user's data as JSON (no storage paths or password hash); `DELETE /users/me` (password re-entered) removes every row and file. Tested | `routers/auth.py`, Settings → Privacy & your data |
 | Deletion | Deleting a session removes its recording and analysis (cascade) | `live.py` |
 
 ## Open risks (priority order)
@@ -28,8 +30,8 @@ SpeechMate handles **voice, face video, resumes and personal goals**, which is s
 | 3 | Slide images (`/sessions/{id}/slides/{n}/image`) are served to anyone with the deck id | The id is a random UUID, so it's a capability URL; an `<img>` can't send the Bearer token | Signed short-lived image URLs if decks become sensitive |
 | 4 | Demo account shown on the login page | Shared account in a deployed build | Set `NEXT_PUBLIC_SHOW_DEMO_LOGIN=false` and don't seed demo data outside dev |
 | 5 | Logout clears the cookie but doesn't revoke tokens server-side | A refresh token copied before logout works until it expires (7 days) | Store a token id per user and reject old ones |
-| 6 | No account deletion / data export | PDPA access and erasure requests are manual | Add `DELETE /users/me` (cascade + storage) and an export endpoint |
-| 7 | Recordings retained indefinitely | More data held than needed | Retention job (e.g. delete raw video after analysis, keep results) |
+| 6 | Deck rehearsal recordings are kept until the deck is deleted | More data held than needed | Apply the live-session retention rule to rehearsals |
+| 7 | One consent covers both cloud providers | Users can't accept one and refuse the other | Per-provider consent if required by an ethics board |
 
 ## Privacy rules for contributors
 

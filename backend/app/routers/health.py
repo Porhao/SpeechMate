@@ -39,6 +39,5 @@ async def health_check():
         "tts": {"base_url": settings.tts_base_url, "voice": settings.local_tts_voice if settings.tts_base_url else None},
         "providers": {
             "openai": bool(settings.openai_api_key),
-            "elevenlabs": bool(settings.elevenlabs_api_key),
         },
     }

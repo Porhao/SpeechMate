@@ -85,7 +85,7 @@ async def run_ideal_presentation_pipeline(session_id: uuid.UUID) -> None:
 async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slide]:
     await _set_status(
         db, session, "processing_slides",
-        error_detail=None, warnings=None, video_storage_path=None, voice_cloning_used=None, insights=None,
+        error_detail=None, warnings=None, insights=None,
     )
     # Retries start from a clean slate
     await db.execute(delete(Slide).where(Slide.session_id == session.id))
@@ -106,7 +106,6 @@ async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slid
             slide_index=i,
             png_storage_path=storage_service.relative(png),
             slide_text=texts[i - 1] if i - 1 < len(texts) else None,
-            status="rendered",
         )
         db.add(slide)
         slides.append(slide)

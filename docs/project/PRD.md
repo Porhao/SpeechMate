@@ -1,6 +1,6 @@
 # SpeechMate — Product Requirements
 
-Status: living document · Owner: project author · Last updated: 2026-10-07
+Status: living document · Owner: project author · Last updated: 2026-10-16
 
 ## 1. Problem
 
@@ -42,7 +42,7 @@ Out of scope (removed 2026-10-01): pronunciation drills mode, general coach chat
 ### Non-functional
 | ID | Requirement | Target |
 |---|---|---|
-| N1 | Runs fully local (no cloud keys required) | Docker Compose: Postgres, FastAPI, Next.js, Ollama, Kokoro |
+| N1 | Deployable with cloud AI (no GPU, no large downloads), with a local option | Cloud: Groq speech-to-text + Gemini LLM; Docker Compose: Postgres, FastAPI, Next.js, Kokoro. Local: Ollama + local Whisper via settings (restorable) |
 | N2 | Honesty | Nothing estimated: unmeasured metrics shown as unavailable; confidence needs ≥ 30% of its evidence |
 | N3 | Analysis time | < 2 min for a 5-min session on the reference machine with ≥ 10 GB RAM for WSL |
 | N4 | Accessibility | WCAG AA contrast in light and dark; keyboard shortcuts; large-text option; reduced motion respected |
@@ -52,7 +52,7 @@ Out of scope (removed 2026-10-01): pronunciation drills mode, general coach chat
 
 | Metric | Target |
 |---|---|
-| Transcription WER on Malaysian speech | Clearly below standard Whisper (achieved: 6.1% vs 51.3%) |
+| Transcription WER on Malaysian speech | Clearly below standard Whisper medium (achieved locally: 6.1% vs 51.3%; deployed Groq whisper-large-v3: 4.9% English, 7.3% Malay, 16.5% synthetic Manglish). Real-speaker WER pending |
 | Confidence score vs. human raters | Spearman ρ ≥ 0.5 (docs/confidence-model.md) |
 | Feedback rated specific & actionable (UAT, 5-point Likert) | ≥ 4.0 |
 | Users who complete a 2nd session within a week | ≥ 50% |

@@ -1,28 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Upload, FileText, RotateCcw, Trash2, Loader2, ChevronRight,
-  AlertTriangle, CheckCircle2, XCircle, ArrowRight,
+  Upload, FileText, RotateCcw, Loader2, ChevronRight,
+  AlertTriangle, CheckCircle2, XCircle, ArrowRight, LayoutGrid, List as ListIcon,
 } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
-import type { BackendHealth, DeckListItem } from "@/types";
+import { liveService } from "@/services/live";
+import type { BackendHealth, DeckListItem, LiveSession } from "@/types";
 import { formatDate } from "@/utils/format";
 import { tint, inkOf } from "@/lib/utils";
+import { mascot } from "@/lib/mascot";
+import { STAGES, deckProgress, type DeckProgress } from "@/lib/deckPipeline";
+import { useExit } from "@/hooks/useExit";
 import { PageHeader } from "@/components/ui/kit";
+import { SearchBar, Highlight, matches } from "@/components/ui/SearchBar";
+import UploadCard, { type UploadPhase } from "@/components/ui/UploadCard";
 import ClayArt from "@/components/three/ClayArt";
+import DeleteButton from "@/components/ui/DeleteButton";
 
 const ACCENT = "#A8620F";
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
-  processing_slides: "Parsing slides",
-  analyzing_content: "Analysing content",
-  generating_scripts: "Writing scripts",
-  synthesizing_audio: "Synthesizing voice",
-  assembling_video: "Assembling video",
+  processing_slides: "Reading slides",
+  analyzing_content: "Understanding them",
   complete: "Ready",
   failed: "Failed",
 };
@@ -41,20 +45,64 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+/** One deck on the board: its stage colour, how far along it is, and its best score. */
+function BoardCard({ p, query, leaving, onDelete }: { p: DeckProgress; query: string; leaving: boolean; onDelete: () => void }) {
+  const stage = STAGES[p.step - 1];
+  const failed = p.deck.status === "failed";
+  return (
+    <li className={`row-in ${leaving ? "row-exit" : ""}`}>
+      {/* The title is a link stretched over the whole card; the bin sits above it */}
+      <div className="clay relative rounded-xl p-4 transition-transform hover:-translate-y-0.5 focus-within:-translate-y-0.5"
+        style={{ background: stage.bg, color: stage.fg }}>
+        <div className="flex items-start gap-2">
+          <p className="flex-1 min-w-0 text-[11px] font-medium opacity-75">
+            {p.lastAt ? `Last practised ${formatDate(p.lastAt)}` : `Uploaded ${formatDate(p.deck.created_at)}`}
+          </p>
+          <span className="relative z-10">
+            <DeleteButton disabled={DECK_IN_PROGRESS.has(p.deck.status)} onDelete={onDelete} light={stage.fg === "#FFFFFF"} label="Delete presentation" />
+          </span>
+        </div>
+        <Link href={`/presentations/${p.deck.session_id}`} className="block font-semibold leading-snug mt-1 break-words outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-[var(--accent-ink)]">
+          <Highlight text={p.deck.original_filename} query={query} />
+        </Link>
+        <p className="text-xs mt-1 opacity-80">
+          {p.deck.slide_count ? `${p.deck.slide_count} slides` : STATUS_LABEL[p.deck.status] ?? p.deck.status}
+          {p.talks ? ` · presented ${p.talks}×` : ""}{p.rehearsals ? ` · Q&A ${p.rehearsals}×` : ""}
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          {/* How far along the four stages */}
+          <span className="flex-1 flex gap-1" role="img" aria-label={`Stage ${p.step} of 4`}>
+            {STAGES.map((s, i) => (
+              <span key={s.id} className="h-1.5 flex-1 rounded-full" style={{ background: i < p.step ? "currentColor" : "color-mix(in srgb, currentColor 22%, transparent)" }} />
+            ))}
+          </span>
+          <span className="font-display text-xl tabular-nums leading-none" aria-label={p.best != null ? `Best score ${p.best}` : undefined}>{failed ? "!" : p.best ?? "—"}</span>
+        </div>
+        {failed && <p className="text-[11px] font-semibold mt-2" style={{ color: "var(--bad)" }}>Preparing failed: open it to retry</p>}
+      </div>
+    </li>
+  );
+}
+
 export default function PresentationsPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<DeckListItem[] | null>(null);
+  const [sessions, setSessions] = useState<LiveSession[]>([]);
   const [health, setHealth] = useState<BackendHealth | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [pptx, setPptx] = useState<File | null>(null);
   const [requirement, setRequirement] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [phase, setPhase] = useState<UploadPhase>("idle");
+  const [progress, setProgress] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<"board" | "list">("board");
+  const { isLeaving, exit } = useExit();
 
   const pptxInput = useRef<HTMLInputElement>(null);
+  const submitting = phase !== "idle";
 
   const load = useCallback(async () => {
     try {
@@ -69,10 +117,11 @@ export default function PresentationsPage() {
     presentationService.list()
       .then(setDecks)
       .catch((e: Error) => setLoadError(e.message));
+    liveService.history().then(setSessions).catch(() => null);  // for each deck's stage
     presentationService.health().then(setHealth).catch(() => null);
   }, []);
 
-  // Keep the list fresh while any deck is still generating.
+  // Keep the list fresh while any deck is still being prepared.
   useEffect(() => {
     if (!decks?.some((d) => DECK_IN_PROGRESS.has(d.status))) return;
     const t = setInterval(load, 4000);
@@ -80,9 +129,10 @@ export default function PresentationsPage() {
   }, [decks, load]);
 
   const pickPptx = (file: File | undefined) => {
-    if (!file) return;
+    if (!file || submitting) return;
     if (!/\.(pptx|pdf)$/i.test(file.name)) {
       setSubmitError("Please choose a PowerPoint (.pptx) or PDF file.");
+      mascot("error", "That one isn't a .pptx or .pdf.");
       return;
     }
     setSubmitError(null);
@@ -91,27 +141,37 @@ export default function PresentationsPage() {
 
   const submit = async () => {
     if (!pptx || submitting) return;
-    setSubmitting(true);
+    setPhase("uploading"); setProgress(0);
     setSubmitError(null);
+    mascot("busy", "Uploading your deck…");
     try {
-      const { session_id } = await presentationService.create(pptx, null, requirement);
-      router.push(`/presentations/${session_id}`);
+      const { session_id } = await presentationService.create(pptx, requirement, (f) => {
+        setProgress(f);
+        if (f >= 1) setPhase("processing");
+      });
+      setPhase("done");
+      mascot("success", "Got it! I'm reading your slides now.");
+      setTimeout(() => router.push(`/presentations/${session_id}`), 900);  // let the check pop
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Upload failed.");
-      setSubmitting(false);
+      setPhase("idle"); setProgress(null);
+      mascot("error");
     }
   };
 
   const remove = async (id: string) => {
-    setConfirmDelete(null);
     try {
       await presentationService.remove(id);
-      setDecks((d) => d?.filter((x) => x.session_id !== id) ?? null);
+      exit(id, () => setDecks((d) => d?.filter((x) => x.session_id !== id) ?? null));
+      mascot("deleted", "Deck deleted.");
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Delete failed.");
+      mascot("error");
     }
   };
 
+  const shown = useMemo(() => (decks ?? []).filter((d) => matches(query, d.original_filename)), [decks, query]);
+  const board = useMemo(() => shown.map((d) => deckProgress(d, sessions)), [shown, sessions]);
   const noAI = health && !health.llm.provider;
 
   return (
@@ -131,26 +191,27 @@ export default function PresentationsPage() {
         >
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>
-            The backend has no LLM configured (<code>OPENAI_API_KEY</code>, or <code>LLM_BASE_URL</code> for a local
-            model like Ollama), so scripts are built from the slide text and coach feedback is rule-based.
+            The backend has no LLM configured (<code>LLM_BASE_URL</code> / <code>LLM_API_KEY</code>), so the deck insights
+            come from the slide text and the Q&amp;A uses a standard question set.
           </span>
         </div>
       )}
 
-      {/* ── Stage 1: setup ─────────────────────────────────────────────── */}
+      {/* ── Upload ─────────────────────────────────────────────────────── */}
       <div className="glass-card rounded-2xl p-5 sm:p-6 space-y-5">
         <h2 className="text-base font-semibold" style={{ color: "var(--ink)" }}>New presentation</h2>
 
-        {/* PPTX drop zone */}
+        {/* Drop zone: pulses while a file is dragged over it */}
         <div
           role="button"
           tabIndex={0}
-          onClick={() => pptxInput.current?.click()}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pptxInput.current?.click(); }}
+          aria-disabled={submitting}
+          onClick={() => !submitting && pptxInput.current?.click()}
+          onKeyDown={(e) => { if (!submitting && (e.key === "Enter" || e.key === " ")) pptxInput.current?.click(); }}
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { e.preventDefault(); setDragging(false); pickPptx(e.dataTransfer.files[0]); }}
-          className="rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors"
+          className={`rounded-xl p-6 flex flex-col items-center justify-center text-center transition-colors ${submitting ? "" : "cursor-pointer"} ${dragging ? "drop-hot" : ""}`}
           style={{
             border: `1.5px dashed ${dragging ? ACCENT : "var(--line-strong)"}`,
             background: dragging ? "rgba(138,90,34,0.05)" : "var(--bg)",
@@ -164,23 +225,17 @@ export default function PresentationsPage() {
             onChange={(e) => pickPptx(e.target.files?.[0])}
           />
           {pptx ? (
-            <div className="flex items-center gap-3">
-              <FileText className="w-8 h-8" style={{ color: inkOf(ACCENT) }} />
-              <div className="text-left">
-                <p className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{pptx.name}</p>
-                <p className="text-xs" style={{ color: "var(--faint)" }}>{(pptx.size / 1024 / 1024).toFixed(1)} MB · click to change</p>
-              </div>
-            </div>
+            <UploadCard name={pptx.name} size={pptx.size} phase={phase} progress={progress} color={inkOf(ACCENT)}
+              processingLabel="Uploaded. Starting to read your slides…" />
           ) : (
             <>
-              <Upload className="w-7 h-7 mb-2" style={{ color: inkOf(ACCENT) }} />
-              <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>Drop a .pptx or .pdf here, or click to browse</p>
+              <Upload className={`w-7 h-7 mb-2 transition-transform ${dragging ? "-translate-y-1 scale-110" : ""}`} style={{ color: inkOf(ACCENT) }} />
+              <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>{dragging ? "Drop it here" : "Drop a .pptx or .pdf here, or click to browse"}</p>
               <p className="text-xs mt-1" style={{ color: "var(--faint)" }}>Required</p>
             </>
           )}
         </div>
 
-        {/* Requirement */}
         <div>
           <label htmlFor="requirement" className="text-sm font-medium" style={{ color: "var(--ink)" }}>
             Audience and purpose <span style={{ color: "var(--faint)" }}>(optional)</span>
@@ -190,6 +245,7 @@ export default function PresentationsPage() {
             value={requirement}
             onChange={(e) => setRequirement(e.target.value)}
             rows={2}
+            disabled={submitting}
             placeholder="e.g. First-year students, non-specialist audience, 5-minute talk"
             className="mt-2 w-full px-3 py-2.5 rounded-xl text-sm outline-none resize-none placeholder:text-slate-400"
             style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
@@ -205,13 +261,29 @@ export default function PresentationsPage() {
           style={{ background: ACCENT }}
         >
           {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-          {submitting ? "Uploading…" : "Upload and prepare"}
+          {phase === "uploading" ? "Uploading…" : phase === "idle" ? "Upload and prepare" : "Opening your deck…"}
         </button>
       </div>
 
-      {/* ── Past decks ─────────────────────────────────────────────────── */}
+      {/* ── Your decks: a pipeline board, or a list ───────────────────── */}
       <div className="glass-card rounded-2xl p-5 sm:p-6">
-        <h2 className="text-base font-semibold mb-4" style={{ color: "var(--ink)" }}>Your presentations</h2>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <h2 className="text-base font-semibold mr-auto" style={{ color: "var(--ink)" }}>Your presentations</h2>
+          {decks && decks.length > 0 && (
+            <>
+              <SearchBar value={query} onChange={setQuery} placeholder="Search your decks…" results={shown.length} label="Search your presentations" />
+              <div role="tablist" aria-label="View" className="inline-flex p-1 gap-1 rounded-full" style={{ background: "var(--surface-3)" }}>
+                {([["board", "Board", LayoutGrid], ["list", "List", ListIcon]] as const).map(([id, label, Icon]) => (
+                  <button key={id} role="tab" aria-selected={view === id} onClick={() => setView(id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                    style={{ background: view === id ? "var(--surface)" : "transparent", color: view === id ? "var(--ink)" : "var(--muted)", boxShadow: view === id ? "var(--shadow-card)" : "none" }}>
+                    <Icon className="w-3.5 h-3.5" /> {label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         {loadError && (
           <div className="flex items-center gap-2 text-sm mb-3" style={{ color: "var(--bad)" }}>
             <AlertTriangle className="w-4 h-4" /> {loadError}
@@ -220,37 +292,58 @@ export default function PresentationsPage() {
         )}
         {decks === null && !loadError && <Loader2 className="w-5 h-5 animate-spin" style={{ color: "var(--faint)" }} />}
         {decks?.length === 0 && <p className="text-sm" style={{ color: "var(--faint)" }}>No presentations yet. Upload a deck above to start.</p>}
-        <div className="space-y-1">
-          {decks?.map((d) => (
-            <div key={d.session_id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--surface-2)] transition-colors">
-              <FileText className="w-5 h-5 flex-shrink-0" style={{ color: inkOf(ACCENT) }} />
-              <Link href={`/presentations/${d.session_id}`} className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>{d.original_filename}</p>
-                <p className="text-xs" style={{ color: "var(--faint)" }}>
-                  {formatDate(d.created_at)}{d.slide_count ? ` · ${d.slide_count} slides` : ""}
-                </p>
-              </Link>
-              <StatusPill status={d.status} />
-              {confirmDelete === d.session_id ? (
-                <span className="flex items-center gap-2 text-xs">
-                  <button onClick={() => remove(d.session_id)} className="font-semibold" style={{ color: "var(--bad)" }}>Delete</button>
-                  <button onClick={() => setConfirmDelete(null)} style={{ color: "var(--muted)" }}>Cancel</button>
-                </span>
-              ) : (
-                <button
-                  onClick={() => setConfirmDelete(d.session_id)}
-                  disabled={DECK_IN_PROGRESS.has(d.status)}
-                  className="p-1.5 rounded-lg disabled:opacity-30"
-                  aria-label="Delete presentation"
-                  title={DECK_IN_PROGRESS.has(d.status) ? "Wait for generation to finish" : "Delete"}
-                >
-                  <Trash2 className="w-4 h-4" style={{ color: "var(--faint)" }} />
-                </button>
-              )}
-              <Link href={`/presentations/${d.session_id}`} aria-label="Open"><ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} /></Link>
-            </div>
-          ))}
-        </div>
+        {decks && decks.length > 0 && shown.length === 0 && (
+          <p className="text-sm py-6 text-center" style={{ color: "var(--muted)" }}>No deck matches &ldquo;{query}&rdquo;.</p>
+        )}
+
+        {view === "board" && shown.length > 0 && (
+          <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
+            {STAGES.map((stage) => {
+              const cards = board.filter((p) => p.stage === stage.id);
+              return (
+                <section key={stage.id} className="snap-start flex-shrink-0 w-[240px] sm:w-auto sm:flex-1 sm:min-w-[200px] rounded-xl p-2.5"
+                  style={{ background: "var(--surface-2)", border: "1px solid var(--line-2)" }} aria-label={stage.label}>
+                  <header className="flex items-center gap-2 px-1.5 pb-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: stage.bg, border: "1px solid var(--line)" }} />
+                    <h3 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{stage.label}</h3>
+                    <span className="text-[11px] font-semibold px-1.5 rounded-full tabular-nums" style={{ background: "var(--surface-3)", color: "var(--ink-2)" }}>{cards.length}</span>
+                  </header>
+                  <p className="px-1.5 -mt-1.5 pb-2.5 text-[11px]" style={{ color: "var(--muted)" }}>{stage.hint}</p>
+                  <ul className="space-y-2.5">
+                    {cards.map((p) => (
+                      <BoardCard key={p.deck.session_id} p={p} query={query} leaving={isLeaving(p.deck.session_id)}
+                        onDelete={() => remove(p.deck.session_id)} />
+                    ))}
+                    {cards.length === 0 && <li className="text-xs px-1.5 py-3 text-center rounded-lg" style={{ color: "var(--faint)", border: "1px dashed var(--line)" }}>Nothing here</li>}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+        )}
+
+        {view === "list" && (
+          <ul className="space-y-1">
+            {board.map((p) => {
+              const d = p.deck;
+              return (
+                <li key={d.session_id} className={`row-in flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--surface-2)] transition-colors ${isLeaving(d.session_id) ? "row-exit" : ""}`}>
+                  <FileText className="w-5 h-5 flex-shrink-0" style={{ color: inkOf(ACCENT) }} />
+                  <Link href={`/presentations/${d.session_id}`} className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}><Highlight text={d.original_filename} query={query} /></p>
+                    <p className="text-xs" style={{ color: "var(--faint)" }}>
+                      {formatDate(d.created_at)}{d.slide_count ? ` · ${d.slide_count} slides` : ""} · {STAGES[p.step - 1].label}
+                    </p>
+                  </Link>
+                  <StatusPill status={d.status} />
+                  <DeleteButton disabled={DECK_IN_PROGRESS.has(d.status)} onDelete={() => remove(d.session_id)} label="Delete presentation" />
+                  <Link href={`/presentations/${d.session_id}`} aria-label="Open"><ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} /></Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
         {decks && decks.length > 0 && (
           <button onClick={load} className="mt-3 flex items-center gap-1 text-xs" style={{ color: "var(--muted)" }}>
             <RotateCcw className="w-3 h-3" /> Refresh

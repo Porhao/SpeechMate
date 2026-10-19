@@ -1,31 +1,19 @@
-# Optional local models: live-session analysis and the Malaysian TTS narrator. Without these the backend
-# still runs: the metrics
-# that need a model (pronunciation, eye contact, posture, emotion) are reported
-# as unavailable with a warning, and narration falls back to espeak. Model weights
-# download on first use (~5 GB).
+# Optional local models for live-session analysis. Without these the backend still runs: the
+# metrics that need a model (pronunciation, eye contact, posture, emotion) are reported as
+# unavailable with a warning. Model weights download on first use (~2.5 GB).
 #
 #   pip install -r requirements-ml.txt      (Docker: build with INSTALL_ML=true)
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-# CPU-only PyTorch, for Wav2Vec2 pronunciation / the ViT emotion model / TTS
+# CPU-only PyTorch, for the wav2vec2 phoneme recogniser (pronunciation) and the ViT emotion model
 # ≥ 2.6: transformers refuses torch.load of .bin weights on older torch (CVE-2025-32434)
 torch==2.6.0
 torchaudio==2.6.0
-# ≥ 4.51 for Qwen3 (Malaysian-TTS-0.6B is a Qwen3 model); 4.53.3 is what it was saved with
 transformers==4.53.3
 
 # Audio features (stuttering prolongation detection)
 librosa==0.10.2.post1
 numpy<2
-
-# Malaysian TTS (mesolitica/Malaysian-TTS-0.6B-v1) decodes audio with DistilCodec,
-# whose package imports these at load time (wandb/tensorboard are never used at runtime;
-# pinned to versions that accept protobuf 4, which MediaPipe 0.10.14 needs)
-https://github.com/mesolitica/DistilCodec/archive/3173efdf2ab212fa2c4a2f921d9d915bb8750e5b.zip
-einops==0.8.2
-vector-quantize-pytorch==1.17.3
-wandb==0.17.9
-tensorboard==2.17.1
 
 # Vision: MediaPipe face mesh (eye contact), pose (posture), face detection (emotion crop)
 mediapipe==0.10.14

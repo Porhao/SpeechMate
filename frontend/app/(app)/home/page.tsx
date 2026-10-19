@@ -3,13 +3,16 @@
 // Home: the three things SpeechMate does, how each works in three steps, and
 // where you are (real stats, your latest focus, recent sessions).
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Briefcase, ChevronRight, MessageCircle, Presentation } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { useMyStats } from "@/hooks/useMyStats";
 import { Card, TiltCard } from "@/components/ui/kit";
 import ClayArt from "@/components/three/ClayArt";
-import type { LiveSession } from "@/types";
+import TaskList from "@/components/home/TaskList";
+import { presentationService } from "@/services/presentation";
+import type { DeckListItem, LiveSession } from "@/types";
 
 const FUNCTIONS = [
   {
@@ -48,6 +51,9 @@ export default function HomePage() {
   const firstName = user?.full_name?.split(" ")[0];
   const latestDone = stats?.recent.find((s) => s.status === "complete" && s.analysis);
   const focus = latestDone?.analysis?.recommendations.exercises[0];
+  // Decks feed the task list (present it, rehearse its Q&A)
+  const [decks, setDecks] = useState<DeckListItem[] | null>(null);
+  useEffect(() => { if (signedIn) presentationService.list().then(setDecks).catch(() => setDecks([])); }, [signedIn]);
 
   return (
     <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[1280px] mx-auto">
@@ -93,6 +99,9 @@ export default function HomePage() {
           </TiltCard>
         ))}
       </div>
+
+      {/* What to do next: drills, decks to present, retries; and what's still running */}
+      {user && stats && decks && <div className="mb-5"><TaskList userId={user.id} sessions={stats.all} decks={decks} /></div>}
 
       {/* Where you are */}
       <div className="grid lg:grid-cols-2 gap-5">

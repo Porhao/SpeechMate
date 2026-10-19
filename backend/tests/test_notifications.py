@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.main import app
 from app.services import tasks
+from tests.conftest import sign_in
 from tests.test_e2e import _tone_wav
 
 
@@ -22,15 +23,9 @@ async def client(monkeypatch):
         yield c
 
 
-async def _sign_in(client, email):
-    await client.post("/api/auth/register", json={"full_name": "T", "email": email, "password": "password123"})
-    tok = (await client.post("/api/auth/login", json={"email": email, "password": "password123"})).json()
-    return {"Authorization": f"Bearer {tok['access_token']}"}
-
-
 @pytest.mark.skipif(shutil.which(settings.ffmpeg_bin) is None, reason="ffmpeg is required")
 async def test_finished_live_analysis_notifies_its_owner_only(client):
-    me, other = await _sign_in(client, "me@example.com"), await _sign_in(client, "other@example.com")
+    me, other = await sign_in(client, "me@example.com"), await sign_in(client, "other@example.com")
     assert (await client.get("/api/notifications")).status_code == 401
     assert (await client.get("/api/notifications", headers=me)).json() == {"unread": 0, "items": []}
 
@@ -52,7 +47,7 @@ async def test_finished_live_analysis_notifies_its_owner_only(client):
 
 
 async def test_mark_all_read_and_deck_ownership(client):
-    me, other = await _sign_in(client, "me@example.com"), await _sign_in(client, "other@example.com")
+    me, other = await sign_in(client, "me@example.com"), await sign_in(client, "other@example.com")
     # A deck upload that fails straight away (not a real .pptx) still notifies its owner
     r = await client.post("/api/sessions", headers=me, files={"pptx": ("broken.pptx", b"not a deck")})
     assert r.status_code == 201
@@ -61,7 +56,7 @@ async def test_mark_all_read_and_deck_ownership(client):
     mine = (await client.get("/api/sessions", headers=me)).json()
     assert [d["original_filename"] for d in mine] == ["broken.pptx"]
     assert (await client.get("/api/sessions", headers=other)).json() == []
-    assert (await client.get("/api/sessions")).json() == []  # signed out: only unowned decks
+    assert (await client.get("/api/sessions")).status_code == 401  # decks need an account
 
     n = (await client.get("/api/notifications", headers=me)).json()
     assert n["unread"] == 1 and n["items"][0]["kind"] == "deck_failed"

@@ -78,11 +78,17 @@ async def get_current_user(
     return await user_from_token(credentials.credentials, "access", db)
 
 
-async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: AsyncSession = Depends(get_db),
-) -> User | None:
-    """The signed-in user if a token is sent, otherwise None (for endpoints that work either way)."""
-    if credentials is None:
-        return None
-    return await user_from_token(credentials.credentials, "access", db)
+# ── Cloud-processing consent (PDPA) ─────────────────────────────────────────
+CONSENT_REQUIRED = "cloud_consent_required"   # 403 detail the frontend answers with the consent screen
+
+
+def check_cloud_consent(user: User | None) -> None:
+    """403 when a signed-in user hasn't agreed to cloud processing yet (settings.require_cloud_consent)."""
+    if user is not None and settings.require_cloud_consent and user.cloud_consent_at is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CONSENT_REQUIRED)
+
+
+async def require_cloud_consent(user: User = Depends(get_current_user)) -> User:
+    """Dependency for routes that start cloud processing: signed in and consented."""
+    check_cloud_consent(user)
+    return user

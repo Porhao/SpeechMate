@@ -17,11 +17,13 @@ import uuid
 
 from sqlalchemy import func, select
 
+from app.config import settings
 from app.database import async_session_factory
-from app.models.live_session import LiveSession, ProgressRecord
+from app.models.live_session import LiveSession
 from app.models.user import User
 from app.services import practice_plans
-from app.services.live import asr, coaching, extra_metrics, language, pronunciation, scoring, speech, vision
+from app.services.live import asr, coaching, extra_metrics, language, phone_gop, pronunciation, scoring, speech, vision
+from app.services.ai import track_llm_usage
 from app.services.live._ml import available
 from app.services.live.talk import talk_feedback
 from app.services.notifications import notify
@@ -31,12 +33,6 @@ from app.services.storage import storage_service
 
 logger = logging.getLogger(__name__)
 
-PROGRESS_METRICS = (
-    "fluency_score", "pronunciation_score", "eye_contact_score",
-    "confidence_score", "posture_score", "overall_score",
-    "voice_score", "language_score", "body_score", "presence_score",
-)
-PILLAR_METRICS = {"voice": "voice_score", "language": "language_score", "body": "body_score", "confidence": "presence_score"}
 
 
 async def analyze_recording(
@@ -78,6 +74,7 @@ async def analyze_recording(
         raise
     asr_result, transcript, lang, fluency, fillers, stutter, pron, pron_score, prosody, lang_use = sp
     eye, posture, emotion, gestures = vi
+    tunneling = await _gaze_tunneling(recording, duration, asr_result, stutter) if eye else None
 
     # ── Scoring ───────────────────────────────────────────────────────────
     # The user's own talking time (turn gaps excluded), so every count becomes a fair per-minute rate
@@ -180,12 +177,93 @@ async def analyze_recording(
             "prosody": extra_metrics.as_dict(prosody),
             "language_use": extra_metrics.as_dict(lang_use),
             "gestures": extra_metrics.as_dict(gestures),
+            "gaze_tunneling": tunneling,
+            # Timed disfluencies (filler words at their word timings + the detector's events), for
+            # evaluation against annotators and for pointing users to the moment
+            "disfluencies": extra_metrics.disfluency_events(asr_result.word_timestamps if asr_result else [],
+                                                            stutter.detected_events),
             "client": client_metrics,
         },
     }
     # The simple view: four pillars, each with its measured metrics
-    analysis["pillars"] = extra_metrics.build_pillars(analysis, prosody, lang_use, gestures, client_metrics)
+    analysis["pillars"] = extra_metrics.build_pillars(analysis, prosody, lang_use, gestures, client_metrics, tunneling)
     return analysis, warnings
+
+
+STT_USD_PER_HOUR, STT_MIN_BILLED_SEC = 0.111, 10  # Groq whisper-large-v3 list price (checked 2026-10-15)
+
+
+def session_usage(turn_llm: dict | None, analysis_llm: dict, client_metrics: dict | None, analysis_audio_sec: float) -> dict:
+    """What one session used: speech-to-text requests and billed audio (each live turn is billed at
+    least 10 s, plus one upload of the user's speech for the analysis) and LLM tokens (the partner's
+    turns + the analysis), each priced at list rates (STT_USD_PER_HOUR; LLM_USD_PER_M_INPUT / _OUTPUT
+    are settings because the LLM is configurable). A free tier makes the real bill $0."""
+    turns = [float(x) for x in (client_metrics or {}).get("stt_audio_sec") or [] if isinstance(x, (int, float)) and x > 0]
+    billed = sum(max(STT_MIN_BILLED_SEC, x) for x in turns) + max(STT_MIN_BILLED_SEC, analysis_audio_sec)
+    llm = {k: (turn_llm or {}).get(k, 0) + analysis_llm.get(k, 0) for k in ("calls", "prompt_tokens", "completion_tokens")}
+    return {
+        "stt": {"turn_requests": len(turns), "turn_audio_sec": round(sum(turns), 1),
+                "analysis_audio_sec": round(analysis_audio_sec, 1), "billed_sec": round(billed, 1),
+                "usd": round(billed / 3600 * STT_USD_PER_HOUR, 5)},
+        "llm": {**llm, "turns": turn_llm or {}, "analysis": analysis_llm,
+                "usd": round((llm["prompt_tokens"] * settings.llm_usd_per_m_input
+                              + llm["completion_tokens"] * settings.llm_usd_per_m_output) / 1e6, 5)},
+    }
+
+
+async def _gaze_tunneling(recording, duration: float, asr_result, stutter) -> dict | None:
+    """Gaze Tunneling from the recording: a gaze sample every ~0.5 s against the disfluencies'
+    word timings. After the vision stage, because it shares that stage's face-mesh model."""
+    try:
+        gaze = await asyncio.to_thread(vision.gaze_timeline, str(recording), duration)
+    except Exception:  # noqa: BLE001 — an optional metric; the rest of the analysis stands
+        logger.exception("Gaze timeline failed")
+        return None
+    events = extra_metrics.disfluency_times(asr_result.word_timestamps if asr_result else [], stutter.detected_events)
+    return extra_metrics.gaze_tunneling(gaze, events, duration)
+
+
+async def _pronunciation(wav, transcript: str, words: list[dict], warnings: list[str]):
+    """Phone-level accent-fair scoring (phone_gop.py) when word timings exist, else word-level CTC."""
+    if words and available("torchaudio"):
+        try:
+            r = await asyncio.to_thread(phone_gop.assess, wav, words)
+            if r and r["score"] is not None:
+                return pronunciation.PronunciationResult(
+                    score=r["score"], word_scores=r["word_scores"], incorrect_words=r["incorrect_words"],
+                    mispronunciation_count=len(r["intelligibility"]), method="phone-gop",
+                    regional=r["regional"], intelligibility=r["intelligibility"])
+        except Exception as e:  # noqa: BLE001
+            logger.exception("Phone-level pronunciation failed; using the word-level scorer")
+            warnings.append(f"Phone-level pronunciation scoring failed ({e}); used the word-level scorer.")
+    try:
+        return await asyncio.to_thread(pronunciation.assess, wav, transcript)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Pronunciation assessment failed")
+        warnings.append(f"Pronunciation scoring failed ({e}).")
+        return None
+
+
+TRANSLATION_SUSPECT, MIN_WORDS_FOR_CHECK, BETTER_BY = 40.0, 5, 15.0
+
+
+async def _check_translation(wav, asr_result, pron, warnings: list[str]):
+    """Groq whisper-large-v3 with auto language sometimes returns a *translation* of Malaysian-accented
+    English into Malay (1 of 4 test clips: docs/benchmarks/stt-groq-cloud-2026-10-15.md). The phone-level
+    scorer notices: the transcript's sounds don't match the audio. Then transcribe once more with English
+    forced, and keep whichever transcript fits the recording better."""
+    if not (pron and pron.method == "phone-gop" and pron.score is not None and pron.score < TRANSLATION_SUSPECT
+            and len(pron.word_scores) >= MIN_WORDS_FOR_CHECK):
+        return asr_result, pron
+    retry = await asr.transcribe(wav, [], language="en")
+    if not (retry and retry.transcript):
+        return asr_result, pron
+    pron2 = await _pronunciation(wav, retry.transcript, retry.word_timestamps, [])
+    if pron2 and pron2.method == "phone-gop" and pron2.score is not None and pron2.score >= pron.score + BETTER_BY:
+        warnings.append("Speech recognition first returned a translation instead of what you said; "
+                        "it was transcribed again as English, which matched the recording's sounds better.")
+        return retry, pron2
+    return asr_result, pron
 
 
 async def _speech_stage(wav, duration: float, silences, warnings: list[str]):
@@ -204,24 +282,27 @@ async def _speech_stage(wav, duration: float, silences, warnings: list[str]):
     prosody_task = asyncio.create_task(prosody_part())
     asr_result = await asr.transcribe(wav, warnings)
     transcript = asr_result.transcript if asr_result else ""
+
+    pron = None
+    if transcript:
+        if available("transformers", "torch", "numpy"):
+            pron = await _pronunciation(wav, transcript, asr_result.word_timestamps, warnings)
+            asr_result, pron = await _check_translation(wav, asr_result, pron, warnings)
+            transcript = asr_result.transcript
+        else:
+            warnings.append("Pronunciation scoring needs the local Wav2Vec2 model (requirements-ml.txt); skipped.")
     words = asr_result.word_timestamps if asr_result else []
 
     lang = language.detect_language_and_accent(transcript) if transcript else None
     fluency = speech.analyze_fluency(transcript, duration, words, silences) if transcript else None
     fillers = speech.detect_fillers(transcript, duration) if transcript else None
     stutter = speech.detect_stuttering(transcript, words, silences, duration, wav)
-
-    pron = None
-    if transcript:
-        if available("transformers", "torch", "numpy"):
-            try:
-                pron = await asyncio.to_thread(pronunciation.assess, wav, transcript)
-            except Exception as e:  # noqa: BLE001
-                logger.exception("Pronunciation assessment failed")
-                warnings.append(f"Pronunciation scoring failed ({e}).")
-        else:
-            warnings.append("Pronunciation scoring needs the local Wav2Vec2 model (requirements-ml.txt); skipped.")
-    pron_score = language.adjust_pronunciation_for_accent(pron.score, lang) if pron and lang else None
+    # The phone-level scorer accepts Malaysian English variation itself; the word-level fallback
+    # gets the older blanket allowance instead
+    if pron and pron.method == "phone-gop":
+        pron_score = pron.score
+    else:
+        pron_score = language.adjust_pronunciation_for_accent(pron.score, lang) if pron and lang else None
     lang_use = extra_metrics.analyze_language_use(transcript) if transcript else None
     return asr_result, transcript, lang, fluency, fillers, stutter, pron, pron_score, await prosody_task, lang_use
 
@@ -288,40 +369,35 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
             )).scalar_one_or_none()
             user = await db.get(User, live.user_id)
             recording = storage_service.get_absolute_path(live.recording_storage_path)
-            analysis, warnings = await analyze_recording(
-                recording, recording.parent, history,
-                session_type=live.session_type,
-                user_goal=user.communication_goal if user else None,
-                previous=previous,
-                context=live.context,
-                turns=live.turns,
-                client_metrics=live.client_metrics,
-            )
+            with track_llm_usage() as analysis_llm:
+                analysis, warnings = await analyze_recording(
+                    recording, recording.parent, history,
+                    session_type=live.session_type,
+                    user_goal=user.communication_goal if user else None,
+                    previous=previous,
+                    context=live.context,
+                    turns=live.turns,
+                    client_metrics=live.client_metrics,
+                )
+            analysis["details"]["usage"] = session_usage(
+                (live.context or {}).get("llm_usage"), analysis_llm, live.client_metrics, analysis["duration_sec"])
 
             live.analysis = {"session_id": str(live.id), **analysis}
             live.warnings = warnings or None
             live.status = "complete"
-            values = {
-                "fluency_score": analysis["speech"]["fluency_score"],
-                "pronunciation_score": analysis["speech"]["pronunciation_score"],
-                "eye_contact_score": analysis["vision"]["eye_contact_score"],
-                "confidence_score": analysis["vision"]["confidence_score"],
-                "posture_score": analysis["vision"]["posture_score"],
-                "overall_score": analysis["communication_score"]["overall_score"],
-                **{name: analysis["pillars"][key]["score"] for key, name in PILLAR_METRICS.items()},
-            }
-            for name in PROGRESS_METRICS:
-                if values[name] is not None:
-                    db.add(ProgressRecord(
-                        user_id=live.user_id, live_session_id=live.id,
-                        metric_name=name, metric_value=float(values[name]),
-                    ))
             overall = analysis["communication_score"]["overall_score"]
             notify(db, live.user_id, "live_analysis", f"Your {live.session_type.lower()} session results are ready",
                    (f"Overall score {overall:.0f}. " if overall is not None else "")
                    + (f"Focus next: {analysis['recommendations']['weekly_focus']}." if analysis["recommendations"]["exercises"] else ""),
                    f"/results/{live.id}")
+            # Retention: the raw recording isn't needed once its results are saved, unless the user
+            # keeps recordings (to re-analyse later). Files go only after the results are committed.
+            delete_recording = user is not None and not user.keep_recordings
+            if delete_recording:
+                live.recording_storage_path = None
             await db.commit()
+            if delete_recording:
+                storage_service.delete_session(f"live/{live.id}")
             logger.info("Live analysis ready for %s", live_id)
         except MediaError as e:
             await db.rollback()

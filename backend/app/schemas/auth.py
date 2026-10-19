@@ -2,8 +2,13 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
+
+# The learner profile the AI adapts to (services/learner.py)
+StudyLevel = Literal["Secondary", "Pre-university", "Undergraduate", "Postgraduate", "Working professional"]
+FeedbackStyle = Literal["encouraging", "balanced", "direct"]
 
 
 class RegisterRequest(BaseModel):
@@ -39,6 +44,11 @@ class UserResponse(BaseModel):
     communication_goal: str | None = None
     skill_level: str
     challenges: list[str] = []
+    study_level: str | None = None
+    field_of_study: str | None = None
+    feedback_style: str | None = None
+    cloud_consent_at: datetime | None = None
+    keep_recordings: bool = False
     created_at: datetime
 
 
@@ -49,3 +59,15 @@ class UpdateProfileRequest(BaseModel):
     communication_goal: str | None = None
     skill_level: str | None = None
     challenges: list[str] | None = None
+    study_level: StudyLevel | None = None
+    field_of_study: str | None = Field(None, max_length=100)
+    feedback_style: FeedbackStyle | None = None
+    keep_recordings: bool | None = None
+
+
+class ConsentRequest(BaseModel):
+    accept: bool          # false withdraws consent
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)

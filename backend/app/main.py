@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, conversation, health, live, notifications, practice, sessions
+from app.routers import auth, conversation, health, live, notifications, sessions
 from app.services import tasks
 
 # Configure logging
@@ -31,10 +31,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="SpeechMate",
     description=(
-        "AI communication coach for Malaysian speakers. Presentation coaching (an Ideal "
-        "Presentation Agent that narrates your deck in your own voice, and a Coach Agent that "
-        "gives Observation–Impact–Suggestion feedback), plus live practice sessions with an AI "
-        "partner and multimodal speech + vision analysis."
+        "AI speaking coach for Malaysian speakers: daily conversation, mock interviews and "
+        "presentation practice (deck insights, a slide-by-slide talk check and a Q&A from the deck) "
+        "with an AI partner, analysed afterwards from speech, language and video."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -52,8 +51,6 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router)
 app.include_router(sessions.router, prefix="/api")
-app.include_router(sessions.voices_router, prefix="/api")
-app.include_router(practice.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(live.router, prefix="/api")
 app.include_router(conversation.router, prefix="/api")

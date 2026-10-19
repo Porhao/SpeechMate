@@ -12,6 +12,7 @@ from app.database import Base, engine
 from app.main import app
 from app.services import deck_insights, tasks
 from make_sample_deck import build as build_sample_deck
+from tests.conftest import sign_in
 
 TEXTS = [
     "Time Management for Students\nWhy it matters",
@@ -91,18 +92,22 @@ async def test_pdf_deck_end_to_end(tmp_path):
     pdf = tmp_path / "deck.pdf"
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        r = await client.post("/api/sessions", files={"pptx": ("deck.pdf", pdf.read_bytes())})
+        headers = await sign_in(client)
+        r = await client.post("/api/sessions", headers=headers, files={"pptx": ("deck.pdf", pdf.read_bytes())})
         assert r.status_code == 201, r.text
         sid = r.json()["session_id"]
         await tasks.wait_for_all(timeout=600)
-        s = (await client.get(f"/api/sessions/{sid}")).json()
+        s = (await client.get(f"/api/sessions/{sid}", headers=headers)).json()
         assert s["status"] == "complete", s
         assert s["slide_count"] == 3
         ins = s["insights"]
         assert ins["stats"]["slide_count"] == 3
         assert ins["slides"][0]["key_point"].startswith("Five Strategies")  # text extracted from the PDF
-        assert s["video_ready"] is False  # decks are presented by the user; no example narration
-
-    r = await httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test").post(
-        "/api/sessions", files={"pptx": ("deck.docx", b"x")})
-    assert r.status_code == 400
+        assert s["slides_rendered"] == 3
+        img = await client.get(f"/api/sessions/{sid}/slides/1/image", headers=headers)
+        assert img.status_code == 200 and img.headers["content-type"] == "image/png"
+        assert (await client.get(f"/api/sessions/{sid}/slides/1/image")).status_code == 401   # not signed in
+        other = await sign_in(client, "someone@example.com")
+        assert (await client.get(f"/api/sessions/{sid}/slides/1/image", headers=other)).status_code == 404  # not yours
+        r = await client.post("/api/sessions", headers=headers, files={"pptx": ("deck.docx", b"x")})
+        assert r.status_code == 400

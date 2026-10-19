@@ -16,6 +16,7 @@ export interface MyStats {
   thisWeek: number;
   byMode: Record<string, { sessions: number; avgScore: number | null }>;
   recent: LiveSession[];
+  all: LiveSession[];      // every session, newest first (tasks need them all)
 }
 
 const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
@@ -49,6 +50,7 @@ function compute(list: LiveSession[]): MyStats {
     thisWeek: list.filter((s) => new Date(s.created_at).getTime() >= weekAgo).length,
     byMode,
     recent: list.slice(0, 5),
+    all: list,
   };
 }
 

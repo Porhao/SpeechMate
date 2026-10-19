@@ -13,44 +13,22 @@ Legend: `[x]` done · `[~]` partly done (the note says what's left) · `[ ]` not
 
 ---
 
-## AI layer: cloud vs. local
+## AI layer (deployed: cloud configuration, 2026-10-16)
 
-SpeechMate is **local-first**: every stage has a local option, and cloud APIs are optional extras. Every stage also has an offline fallback, so the app runs with no keys and no local models. Check `GET /health` to see what's active: `local_ml` lists the local models, `providers` the cloud APIs.
+Every stage has an offline fallback, so the app runs with no keys and no local models. `GET /health` shows what's active: `local_ml` lists the local models, `llm` and `providers` the cloud APIs.
 
-**Live practice session analysis:**
+| Stage | Deployed | Without it |
+|---|---|---|
+| Speech recognition (sessions and each live turn) | Groq `whisper-large-v3` (auto language, verbatim Manglish prompt, word timestamps, silence filter, translation guard) | no transcript; the user types live turns |
+| Pronunciation | phone-level GOP: `facebook/wav2vec2-xlsr-53-espeak-cv-ft` + forced alignment, Malaysian English features accepted | shown as unavailable |
+| Stutter prolongations, pitch, loudness | librosa | transcript-only hint / unavailable |
+| Eye contact, posture, gestures, head steadiness, Gaze Tunneling | MediaPipe Face Mesh / Pose (2 fps gaze stream) | shown as unavailable |
+| Facial expression | ViT `trpakov/vit-face-expression` | shown as unavailable |
+| Fluency, pauses, fillers (in context), vocabulary, hedging, language ratio, pillars, recommendations | plain code (ffmpeg + rules) | always runs |
+| AI partner, interview / Q&A plans, answer feedback, deck insights, talk feedback | Gemini `gemini-3.5-flash-lite` (validated JSON; plans enforced in code) | question bank, fixed reactions, rule-based feedback, text outline |
+| Partner's voice | Kokoro-82M in the browser (Kokoro server or OpenAI TTS as backup) | browser speech synthesis |
 
-| Stage | Local model (`backend/requirements-ml.txt`) | Cloud (`OPENAI_API_KEY`) | Neither available |
-|---|---|---|---|
-| Speech recognition | ✅ **Primary**: Mesolitica **Malaysian Whisper large-v3-turbo** via faster-whisper (CPU int8, auto language detection), also for each live turn (`/api/stt`, ~2.5 s per 5 s turn) | Fallback: OpenAI Whisper API | no transcript (conversation: browser recogniser) |
-| Malay / code-switched ASR | ✅ Mesolitica `wav2vec2-xls-r-300m-mixed` | — | Whisper transcript kept, with a warning |
-| Pronunciation | ✅ Wav2Vec2 `facebook/wav2vec2-base-960h` | — | shown as unavailable |
-| Stutter prolongations | ✅ librosa energy analysis | — | transcript-only hint |
-| Eye contact, posture | ✅ MediaPipe Face Mesh / Pose | — | shown as unavailable |
-| Facial emotion | ✅ ViT `trpakov/vit-face-expression` | — | shown as unavailable |
-| Pitch variation, loudness | ✅ librosa (YIN + RMS) | — | shown as unavailable |
-| Gestures, head steadiness | ✅ MediaPipe Pose | — | shown as unavailable |
-| Fluency, pauses, fillers (in context), vocabulary, hedging, language ratio, pillars, recommendations | ✅ plain code (ffmpeg + rules, no model) | — | always runs |
-| AI conversation partner | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | scripted prompts |
-| Interview question plan (role + resume) / Q&A plan (deck) | ✅ Ollama `qwen2.5` (validated JSON) | `gpt-4o-mini` | question bank / deck insights |
-| Interviewer & moderator turns | ✅ plan enforced in code + `qwen2.5` one-line reactions | `gpt-4o-mini` | fixed reactions |
-| Answer feedback (interview, Q&A) & language tips (conversation) | ✅ Ollama `qwen2.5`, fact-checked | `gpt-4o-mini` | rule-based (STAR cues, specificity) |
-| Partner's voice | ✅ **Kokoro-82M** (natural, ~3.5× faster than real time on CPU); Malaysian TTS on a GPU | OpenAI TTS | browser speech synthesis |
-
-**Presentation coaching:**
-
-| Stage | Local model | Cloud (`OPENAI_API_KEY`) | Neither available |
-|---|---|---|---|
-| Slide scripts | ✅ Ollama `qwen2.5vl` (vision) | `gpt-4o-mini` | template script built from the slide text |
-| Narration voice | ✅ **Mesolitica `Malaysian-TTS-0.6B-v1`** (7 voices, Malay/English/code-switching) | OpenAI TTS; ElevenLabs *only* to clone your own voice | espeak-ng → silence |
-| Practice transcription | ✅ faster-whisper | OpenAI Whisper API | skipped |
-| OIS feedback, audience reaction, chat | ✅ Ollama `qwen2.5` | `gpt-4o-mini` | rule-based |
-
-**Current setup:** fully local, with no cloud keys.
-- `backend/.env` points the LLM at the bundled Ollama (`qwen2.5:3b` text, `qwen2.5vl:3b` vision).
-- The Docker image installs the speech, vision and TTS models (`INSTALL_ML=true`).
-- The live partner's voice is Kokoro (`TTS_BASE_URL`). Nothing depends on a cloud service.
-
-**Planned vs. built:** the design documents name **Gemini Flash** as the LLM. The code talks to any OpenAI-compatible server, currently local **Qwen2.5 / Qwen2.5-VL on Ollama** (the same model family the PresentCoach paper uses); Gemini, OpenAI or DashScope work by changing `LLM_BASE_URL` / `LLM_MODEL`.
+The example narration (Malaysian TTS, voice cloning), slide scripts and the upload-a-rehearsal coach were removed (2026-10-07 and 2026-10-16); a local LLM (Ollama) still works by setting `LLM_BASE_URL`.
 
 ---
 

@@ -1,29 +1,25 @@
 """Live practice sessions (camera + mic with the AI partner): start/end, upload the
-recording, run the multimodal analysis, and read progress history and reports."""
+recording and run the multimodal analysis."""
 
 import uuid
-from collections import defaultdict
-from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import get_current_user, require_cloud_consent
 from app.database import get_db
-from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession, ProgressRecord, Report
+from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
 from app.models.session import Session as Deck
 from app.models.slide import Slide
 from app.models.user import User
-from app.routers.sessions import audio_extension
 from app.schemas.live import (
     InterviewSetup,
     LiveEndRequest,
     LiveSessionResponse,
     LiveStartRequest,
     PracticePlan,
-    ProgressRecordOut,
-    ReportOut,
 )
 from app.services import practice_plans, tasks
 from app.services.live.pipeline import run_live_analysis
@@ -33,6 +29,17 @@ from app.services.storage import storage_service
 router = APIRouter(tags=["live sessions"])
 
 LIVE_STORAGE_PREFIX = "live"
+AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm", ".ogg", ".oga", ".flac", ".aac", ".mp4", ".mov"}
+
+
+def audio_extension(filename: str | None) -> str:
+    ext = Path(filename or "").suffix.lower()
+    if ext not in AUDIO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported audio format '{ext or '?'}'. Use one of: {', '.join(sorted(AUDIO_EXTENSIONS))}",
+        )
+    return ext
 
 
 def _to_response(s: LiveSession) -> LiveSessionResponse:
@@ -84,7 +91,7 @@ async def read_resume(
 
 
 @router.post("/interview/plan", response_model=PracticePlan, dependencies=[Depends(rate_limit("plan", 6))])
-async def interview_plan(body: InterviewSetup, user: User = Depends(get_current_user)):
+async def interview_plan(body: InterviewSetup, user: User = Depends(require_cloud_consent)):
     """Curate the mock-interview questions from the candidate's setup (and resume) for preview."""
     return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user))
 
@@ -116,7 +123,7 @@ async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: 
 
 @router.post("/live", response_model=LiveSessionResponse, status_code=201)
 async def start_live_session(
-    body: LiveStartRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    body: LiveStartRequest, user: User = Depends(require_cloud_consent), db: AsyncSession = Depends(get_db)
 ):
     """Start a session. Interview needs `interview` (the setup); Presentation needs `deck_id`.
     Both get a curated question plan that the AI partner follows."""
@@ -143,13 +150,31 @@ async def start_live_session(
     return _to_response(s)
 
 
+def _summary(s: LiveSession) -> LiveSessionResponse:
+    """A list row: what the history, home (tasks) and deck pages show. The turns, question plan and
+    résumé text stay out of it (GET /live/{id} has everything)."""
+    a, c = s.analysis or {}, s.context or {}
+    r = _to_response(s)
+    r.turns = None
+    r.context = {k: c[k] for k in ("kind", "topic", "deck_id", "deck_title") if k in c} | (
+        {"setup": {"position": c["setup"].get("position")}} if isinstance(c.get("setup"), dict) else {})
+    r.analysis = {
+        "communication_score": {"overall_score": (a.get("communication_score") or {}).get("overall_score")},
+        "recommendations": {"exercises": (a.get("recommendations") or {}).get("exercises") or []},  # the 3 drills: Home's tasks
+        "pillars": a.get("pillars"),
+    } if a else None
+    return r
+
+
 @router.get("/live", response_model=list[LiveSessionResponse])
-async def list_live_sessions(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """The user's live sessions, most recent first."""
-    result = await db.execute(
-        select(LiveSession).where(LiveSession.user_id == user.id).order_by(LiveSession.created_at.desc())
-    )
-    return [_to_response(s) for s in result.scalars()]
+async def list_live_sessions(deck_id: uuid.UUID | None = None, user: User = Depends(get_current_user),
+                             db: AsyncSession = Depends(get_db)):
+    """The user's live sessions as summaries, most recent first; `deck_id` keeps one deck's attempts."""
+    q = select(LiveSession).where(LiveSession.user_id == user.id)
+    if deck_id:
+        q = q.where(LiveSession.context["deck_id"].as_string() == str(deck_id))
+    result = await db.execute(q.order_by(LiveSession.created_at.desc()))
+    return [_summary(s) for s in result.scalars()]
 
 
 @router.get("/live/{live_id}", response_model=LiveSessionResponse)
@@ -197,7 +222,7 @@ async def upload_recording(
 
 @router.post("/live/{live_id}/analyze", response_model=LiveSessionResponse, status_code=202)
 async def analyze_live_session(
-    live_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    live_id: uuid.UUID, user: User = Depends(require_cloud_consent), db: AsyncSession = Depends(get_db)
 ):
     """Start the multimodal analysis in the background; poll GET /live/{id}."""
     s = await _own_session(db, user, live_id)
@@ -205,8 +230,6 @@ async def analyze_live_session(
         raise HTTPException(status_code=409, detail="Upload the recording before analysing")
     if s.status in LIVE_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="Analysis is already running")
-    # Re-analysis replaces this session's earlier progress points
-    await db.execute(delete(ProgressRecord).where(ProgressRecord.live_session_id == live_id))
     s.status, s.error_detail, s.warnings, s.analysis = "analyzing", None, None, None
     await db.commit()
     tasks.spawn(run_live_analysis(live_id), name=f"live-{live_id}")
@@ -224,96 +247,3 @@ async def delete_live_session(
     await db.commit()
     storage_service.delete_session(f"{LIVE_STORAGE_PREFIX}/{live_id}")
 
-
-@router.get("/progress", response_model=list[ProgressRecordOut])
-async def get_progress(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Every metric from every analysed live session, oldest first (for charts)."""
-    result = await db.execute(
-        select(ProgressRecord).where(ProgressRecord.user_id == user.id).order_by(ProgressRecord.recorded_at)
-    )
-    return [
-        ProgressRecordOut(
-            id=r.id, live_session_id=r.live_session_id, metric_name=r.metric_name,
-            metric_value=r.metric_value, recorded_at=r.recorded_at,
-        )
-        for r in result.scalars()
-    ]
-
-
-# ── Reports ─────────────────────────────────────────────────────────────────
-
-def _report_out(r: Report) -> ReportOut:
-    return ReportOut(
-        id=r.id, report_type=r.report_type, report_url=f"/api/reports/{r.id}",
-        content=r.content, created_at=r.created_at,
-    )
-
-
-@router.post("/reports/generate", response_model=ReportOut, status_code=201)
-async def generate_report(
-    report_type: str = "summary", user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
-    """Snapshot the user's progress: per-metric averages, first/latest/best values and session counts."""
-    sessions = list((await db.execute(
-        select(LiveSession).where(LiveSession.user_id == user.id).order_by(LiveSession.created_at)
-    )).scalars())
-    records = list((await db.execute(
-        select(ProgressRecord).where(ProgressRecord.user_id == user.id).order_by(ProgressRecord.recorded_at)
-    )).scalars())
-
-    series: dict[str, list[float]] = defaultdict(list)
-    for r in records:
-        series[r.metric_name].append(r.metric_value)
-    metrics = {
-        name: {
-            "sessions": len(vals),
-            "average": round(sum(vals) / len(vals), 1),
-            "first": vals[0],
-            "latest": vals[-1],
-            "best": max(vals),
-            "change": round(vals[-1] - vals[0], 1),
-        }
-        for name, vals in series.items()
-    }
-    by_type: dict[str, int] = defaultdict(int)
-    for s in sessions:
-        by_type[s.session_type] += 1
-    analysed = [s for s in sessions if s.status == "complete" and s.analysis]
-    latest = analysed[-1].analysis if analysed else None
-
-    content = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "user": {"full_name": user.full_name, "communication_goal": user.communication_goal},
-        "totals": {
-            "sessions": len(sessions),
-            "analysed_sessions": len(analysed),
-            "practice_minutes": round(sum(s.duration_sec for s in sessions) / 60, 1),
-            "by_type": dict(by_type),
-        },
-        "metrics": metrics,
-        "latest_recommendations": (latest or {}).get("recommendations"),
-        "latest_strengths": ((latest or {}).get("communication_score") or {}).get("strengths", []),
-        "latest_improvement_areas": ((latest or {}).get("communication_score") or {}).get("improvement_areas", []),
-    }
-    report = Report(user_id=user.id, report_type=report_type, content=content)
-    db.add(report)
-    await db.commit()
-    return _report_out(report)
-
-
-@router.get("/reports", response_model=list[ReportOut])
-async def list_reports(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Report).where(Report.user_id == user.id).order_by(Report.created_at.desc()))
-    return [_report_out(r) for r in result.scalars()]
-
-
-@router.get("/reports/{report_id}", response_model=ReportOut)
-async def get_report(
-    report_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
-    report = (await db.execute(
-        select(Report).where(Report.id == report_id, Report.user_id == user.id)
-    )).scalar_one_or_none()
-    if not report:
-        raise HTTPException(status_code=404, detail="Report not found")
-    return _report_out(report)

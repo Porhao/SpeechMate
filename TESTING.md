@@ -18,11 +18,9 @@ How to try each of the three functions by hand, the demo accounts to use, and a 
 
 The first start downloads a lot:
 - Docker images;
-- the speech/vision models (on the first analysis);
-- the Malaysian TTS (on the first deck);
-- the Ollama models (in the background; follow with `docker compose logs -f ollama-pull`).
+- the speech/vision models (on the first analysis).
 
-Until the LLM has downloaded, AI features use their offline fallbacks (question bank, rule-based feedback).
+Without an LLM key, AI features use their offline fallbacks (question bank, rule-based feedback).
 
 Use **Chrome or Edge** and allow the camera and microphone. Use headphones if you can, so the AI's voice doesn't reach your mic.
 
@@ -118,24 +116,24 @@ They're created at startup when `SEED_DEMO_DATA=true`, which the root `docker-co
   - Project evaluation.
 
 ### G. Fallbacks (no LLM)
-Stop the LLM with `docker compose stop ollama`, then:
+Blank `LLM_API_KEY` in `backend/.env` and restart the backend (`docker compose up -d backend`), then:
 - interview preview shows *"standard question bank"*;
 - the interviewer still follows the plan (fixed reactions);
 - answer feedback is rule-based (marked);
 - the conversation partner uses scripted prompts.
 
-Nothing crashes. Restart with `docker compose start ollama`.
+Nothing crashes. Put the key back and restart to undo.
 
 ### H. API checks (http://localhost:8000/docs)
 1. `POST /api/auth/login` with the demo account → copy the `access_token` → **Authorize**.
 2. Try these:
    - `POST /api/interview/plan` with `{"position": "Nurse", "interview_type": "behavioural"}`;
-   - `GET /api/live`: sessions with `context` (setup + plan), `turns`, and `analysis.pillars` / `analysis.content_feedback`;
-   - `GET /api/progress`: one point per metric per session, including `voice_score`, `language_score`, `body_score`, `presence_score`.
+   - `GET /api/live`: your sessions as summaries (score, the drills, pillars; `?deck_id=` for one deck);
+   - `GET /api/live/{id}`: one session in full, with `context` (setup + plan), `turns`, `analysis.pillars` and `analysis.content_feedback`.
 
 ### Automated tests
 ```bash
-docker compose exec backend sh -c "pip install -r requirements-dev.txt && pytest"   # 57 backend tests
+docker compose exec backend sh -c "pip install -r requirements-dev.txt && pytest"   # 63 backend tests
 cd frontend && npx tsc --noEmit && npm run lint                                    # frontend
 ```
 
@@ -164,7 +162,7 @@ cd frontend && npx tsc --noEmit && npm run lint                                 
 | **Hedging** | Phrases that make you sound unsure (*I think, maybe, kind of, I guess*), per 100 words. |
 | **Key point per slide** | Whether each slide's key point (from the deck insights) came through in your rehearsal: Covered, Partly or Missed. |
 | **Kokoro** | The open-source 82M TTS that gives the AI partner its natural voice. |
-| **LLM / VLM** | Large language model (text) / vision-language model (reads slide images). Here: Ollama `qwen2.5` / `qwen2.5vl`. |
+| **LLM** | Large language model. Here: Gemini `gemini-3.5-flash-lite` (cloud). |
 | **MATTR (vocabulary richness)** | Moving-average type-token ratio: the share of different words in each 50-word window. |
 | **OIS** | **Observation → Impact → Suggestion**: what happened, why it matters to the audience, and one thing to do next time. |
 | **Pillars** | The four simple scores on Results: **Voice & delivery**, **Language & clarity**, **Body language**, **Confidence & presence**. Each is the mean of its measured metrics. |

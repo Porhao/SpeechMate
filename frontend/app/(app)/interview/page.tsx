@@ -9,6 +9,8 @@ import { FileText, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 import { interviewService, liveService } from "@/services/live";
 import { authService } from "@/services/auth";
 import ClayArt from "@/components/three/ClayArt";
+import UploadCard, { type UploadPhase } from "@/components/ui/UploadCard";
+import { mascot } from "@/lib/mascot";
 import { Button, Card, Field, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import type { InterviewSetup, PracticePlan } from "@/types";
 
@@ -55,6 +57,9 @@ export default function InterviewSetupPage() {
   const [setup, setSetup] = useState<InterviewSetup>({ position: "", level: "graduate", interview_type: "mixed" });
   const [resumeName, setResumeName] = useState<string | null>(null);
   const [resumeBusy, setResumeBusy] = useState(false);
+  // The upload animation: which file, how far, and the moment it's read (UploadCard)
+  const [upload, setUpload] = useState<{ file: File; phase: UploadPhase; progress: number } | null>(null);
+  const [removingResume, setRemovingResume] = useState(false);
   const [plan, setPlan] = useState<PracticePlan | null>(null);
   const [planBusy, setPlanBusy] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -75,12 +80,25 @@ export default function InterviewSetupPage() {
 
   const uploadResume = async (file: File) => {
     setResumeBusy(true); setError(null);
+    setUpload({ file, phase: "uploading", progress: 0 });
+    mascot("busy", "Reading your resume…");
     try {
-      const { text } = await interviewService.readResume(file);
+      const { text } = await interviewService.readResume(file, (f) =>
+        setUpload((u) => u && { ...u, progress: f, phase: f >= 1 ? "processing" : "uploading" }));
+      setUpload((u) => u && { ...u, phase: "done", progress: 1 });
+      mascot("success", "Got your resume. I'll use it for the questions.");
+      await new Promise((r) => setTimeout(r, 800));  // let the check pop
       setSetup((s) => ({ ...s, resume_text: text })); setResumeName(file.name); setPlan(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't read that resume");
-    } finally { setResumeBusy(false); }
+      mascot("error");
+    } finally { setResumeBusy(false); setUpload(null); }
+  };
+
+  // Delete animation: the resume row folds away, then it's cleared
+  const removeResume = () => {
+    setRemovingResume(true);
+    setTimeout(() => { set("resume_text", undefined); setResumeName(null); setRemovingResume(false); mascot("deleted", "Resume removed."); }, 450);
   };
 
   const preview = async () => {
@@ -143,14 +161,19 @@ export default function InterviewSetupPage() {
                 Resume <span className="text-xs font-normal" style={{ color: "var(--muted)" }}>optional · PDF, DOCX or TXT</span>
               </p>
               {setup.resume_text ? (
-                <div className="flex items-start gap-3 p-3 rounded-md" style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
+                <div className={`row-in flex items-start gap-3 p-3 rounded-md ${removingResume ? "row-exit" : ""}`} style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
                   <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: "var(--accent-ink)" }} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>{resumeName}</p>
                     <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--muted)" }}>{setup.resume_text.slice(0, 220)}…</p>
                   </div>
-                  <button onClick={() => { set("resume_text", undefined); setResumeName(null); }} aria-label="Remove resume"
-                    className="p-1" style={{ color: "var(--muted)" }}><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={removeResume} disabled={removingResume} aria-label="Remove resume"
+                    className="p-1" style={{ color: "var(--muted)" }}><Trash2 className={`w-4 h-4 ${removingResume ? "bin-wobble" : ""}`} /></button>
+                </div>
+              ) : upload ? (
+                <div className="flex justify-center p-4 rounded-lg" style={{ border: "1px dashed var(--line-strong)", background: "var(--surface)" }}>
+                  <UploadCard name={upload.file.name} size={upload.file.size} phase={upload.phase} progress={upload.progress}
+                    color="var(--accent-ink)" processingLabel="Reading your resume…" />
                 </div>
               ) : (
                 <button type="button" onClick={() => fileRef.current?.click()} disabled={resumeBusy}

@@ -170,9 +170,18 @@ def build_candidates(
         bad = list(dict.fromkeys(w for w in bad if len(w) > 2))[:6]
         score = pronunciation.get("score") or 0
         if bad and (score < 80 or len(bad) >= 3):
+            # The phone-level scorer says which sound was unclear and what it sounded like instead
+            sounds = [f"“{d['word']}” (/{d['expected']}/ sounded like /{d['heard']}/)" if d["heard"] != "(dropped)"
+                      else f"“{d['word']}” (/{d['expected']}/ dropped)"
+                      for d in (pronunciation.get("intelligibility") or [])[:3]]
+            regional = len(pronunciation.get("regional") or [])
+            evidence = (f"Least clear: {', '.join(sounds)} (pronunciation score {score:.0f})." if sounds
+                        else f"These words were least clear: {', '.join(bad)} (pronunciation score {score:.0f}).")
+            if regional:
+                evidence += f" {regional} Malaysian English feature(s), like th said as t, were accepted, not marked down."
             out.append(Recommendation(
                 "pronunciation", "Sharpen unclear words",
-                f"These words were least clear: {', '.join(bad)} (pronunciation score {score:.0f}).",
+                evidence,
                 "Unclear key words force listeners to guess — accent is fine, clarity is what matters.",
                 f"Say each word slowly three times, stressing the correct syllable, then use each in a sentence: "
                 f"{', '.join(bad[:3])}. Record and compare with an online dictionary's audio.",

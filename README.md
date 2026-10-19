@@ -8,7 +8,7 @@ SpeechMate does three things:
 |---|---|---|---|
 | 💬 | **Daily conversation** | Pick a topic and talk with an AI partner (camera + mic). | Your **voice, language, body language and confidence**, with language tips |
 | 💼 | **Mock interview** | Enter the position, company, level, your background and (optionally) **your resume**. The AI curates the questions, then interviews you, following up when an answer is thin. | Everything above, plus **feedback on every answer**: relevance, STAR structure, specificity and a stronger version built from your own facts |
-| 📊 | **Presentation practice** | Upload a `.pptx` or `.pdf`. The AI **reads and summarises the deck first**, narrates an example, coaches your rehearsals slide by slide, then runs a **Q&A drawn from your deck**. | Which slides' key points you missed, Observation → Impact → Suggestion coaching, and feedback on every Q&A answer |
+| 📊 | **Presentation practice** | Upload a `.pptx` or `.pdf`. The AI **reads and summarises the deck first**. You present it on camera, moving through the slides yourself, and each slide is checked against what you said. Then the AI runs a **Q&A drawn from your deck**. | Per slide: did what you said match it (covered / left out / tip, time on screen); voice and body language; feedback on every Q&A answer |
 
 Nothing is scored while you speak. After each session one simple results page shows:
 1. an overall score and a two-sentence summary;
@@ -24,14 +24,14 @@ Nothing is scored while you speak. After each session one simple results page sh
 2. **Curated, not generic.**
    - Interview questions come from your role and resume.
    - Q&A questions come from your slides.
-   - The AI follows a question plan enforced in code, so even a small local model can't drift off topic.
+   - The AI follows a question plan enforced in code, so it can't drift off topic.
 3. **Grounded feedback.**
    - Every recommendation cites what was measured.
    - Rewritten "stronger answers" are fact-checked against what you actually said.
    - Anything that couldn't be measured is listed as such, never estimated.
 4. **Never interrupts.** All feedback comes after you finish (Cognitive Load Theory).
 5. **Gaze Tunneling.** The correlation between looking away and stumbling: "you look away right when you lose your words".
-6. **Local and private.** Voice and video analysis run on your machine (Kokoro, MediaPipe). The LLM (Gemini) and speech recognition (Groq) are cloud calls, so transcripts, slide images and recorded audio leave the machine.
+6. **Private by design.** Voice and video analysis run on your machine (Kokoro, MediaPipe, wav2vec2). The LLM (Gemini) and speech recognition (Groq) are cloud calls, so you agree to that first (PDPA consent); recordings are deleted after analysis unless you keep them, and you can export or delete all your data.
 
 The full list of AI functions, metrics, formulas and evaluation targets is in **[`docs/AI_MATRIX.md`](docs/AI_MATRIX.md)**. It is also in the app under **How it's measured**.
 
@@ -44,12 +44,12 @@ The full list of AI functions, metrics, formulas and evaluation targets is in **
 | **Home** | The three functions, your next focus and recent sessions |
 | **Conversation** (`/conversation`) | Choose a scenario (small talk, your week, studies & work, an opinion…) or your own topic → start |
 | **Interview** (`/interview`) | Fill in the role and your background, upload a resume, preview the curated questions → start |
-| **Presentation** (`/presentations`) | Upload a deck → insights → example video → rehearse (whole deck or one slide) → **Start Q&A rehearsal** |
+| **Presentation** (`/presentations`) | Upload a deck → insights → present it on camera (slide-by-slide check) → **Start Q&A rehearsal** |
 | **Session** (`/session`) | A large camera view of yourself, a small MediaPipe tracking view, lighting advice and the AI partner's voice |
 | **Results** (`/results/<id>`) | The simple four-pillar report for one session (opens automatically, or from the bell) |
 | **Progress** (`/progress`) | Every session, the overall trend and a trend per pillar, filtered by function |
 | **How it's measured** (`/methodology`) | The reference matrix: metrics, AI functions, evaluation |
-| Bell (top left) | Notifications when an analysis, example video or rehearsal feedback is ready |
+| Bell (top left) | Notifications when an analysis or deck preparation is ready (or failed) |
 | Settings | Light / dark / system theme, profile |
 
 ---
@@ -66,17 +66,15 @@ SpeechMate/
 ```
 
 - **Frontend:** Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Zustand. MediaPipe Tasks Vision runs in the browser for live face and pose tracking.
-- **Backend:** FastAPI, async SQLAlchemy and Alembic on PostgreSQL, JWT auth. Analyses and video generation run as background jobs; the results page polls them, and the bell notifies you when they finish.
-- **AI** (all local by default):
+- **Backend:** FastAPI, async SQLAlchemy and Alembic on PostgreSQL, JWT auth. Analyses and deck preparation run as background jobs; the results page polls them, and the bell notifies you when they finish.
+- **AI** (cloud configuration, deployed; a local LLM via Ollama also works by settings):
 
 | Job | Model |
 |---|---|
 | Text: partner, plans, insights, feedback | Gemini `gemini-3.5-flash-lite` |
-| Vision: slide scripts | the same Gemini model (reads slide images) |
-| Speech recognition | Whisper large-v3 via Groq's OpenAI-compatible API (auto language, verbatim Manglish prompt, word timestamps) |
+| Speech recognition | Whisper large-v3 via Groq's OpenAI-compatible API (FLAC upload, auto language, verbatim Manglish prompt, word timestamps, silence filter) |
 | AI partner's voice | Kokoro-82M |
-| Narration | Mesolitica Malaysian-TTS-0.6B-v1 |
-| Pronunciation | Wav2Vec2 |
+| Pronunciation | phone-level GOP: wav2vec2 phoneme recogniser (xlsr-53-espeak) + forced alignment; Malaysian English features accepted as regional |
 | Pitch and volume | librosa |
 | Eye contact, posture, gestures | MediaPipe |
 | Facial expression | ViT |
@@ -87,7 +85,8 @@ SpeechMate/
 recording → 16 kHz audio → speech recognition → language mix & Manglish particles
   → fluency · pace · fillers (in context) · repetitions/blocks · pronunciation · pitch · volume · vocabulary · hedging
   → sampled video frames → eye contact · posture · gestures · head steadiness · expression
-  → + response time and Gaze Tunneling from the browser
+  → Gaze Tunneling: a 2 fps gaze stream from the video vs the disfluencies' word timings, with a significance test
+  → + response time from the browser
   → confidence → overall score → four pillars
   → answer feedback against the question plan (interview / Q&A) or language tips (conversation)
   → three evidence-based drills → progress history → notification
@@ -113,9 +112,7 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 | `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | The AI partner's voice. `http://kokoro:8880/v1` runs the bundled Kokoro; voices include `af_heart`, `am_michael`, `bf_emma` |
 | `OPENAI_BASE_URL`, `TRANSCRIPTION_MODEL` | Speech recognition (cloud): Groq is `https://api.groq.com/openai/v1` with `whisper-large-v3`, key in `OPENAI_API_KEY` |
 | `STT_LANGUAGE` | Empty = auto-detect (recommended); `ms` / `en` forces a language |
-| `MALAYSIAN_TTS_VOICE` | Default narrator voice (`husein`, `idayu`, …); can also be chosen per deck |
 | `OPENAI_API_KEY` | Speech recognition key (Groq `gsk_…`); also cloud LLM / TTS if no local ones are set |
-| `ELEVENLABS_API_KEY` | *Optional:* narrate the example in **your own cloned voice** |
 
 
 ### 2. Start
@@ -131,8 +128,7 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 | Health | http://localhost:8000/health (which models and providers are active) |
 
 The first build takes a while. Model weights download on first use and are cached in Docker volumes:
-- speech/vision models: about 2.5 GB;
-- Malaysian TTS: about 2.5 GB;
+- speech/vision models: about 2.5 GB.
 
 Database migrations run automatically.
 
@@ -147,7 +143,6 @@ Database migrations run automatically.
 | Deck insights | ~35 s |
 | AI partner reply (text + voice) | ~2–5 s |
 | Session analysis (2–5 min recording) | ~1–3 min |
-| Example narration | a few minutes per slide |
 
 ### Useful commands
 
@@ -183,7 +178,7 @@ The frontend calls `http://localhost:8000/api` by default. Set `NEXT_PUBLIC_API_
 ### Tests
 
 ```bash
-cd backend && pytest              # 57 tests, SQLite, fully offline (every AI stage's fallback path)
+cd backend && pytest              # 63 tests, SQLite, fully offline (every AI stage's fallback path)
 cd frontend && pnpm exec tsc --noEmit && pnpm lint
 ```
 
@@ -194,9 +189,9 @@ cd frontend && pnpm exec tsc --noEmit && pnpm lint
 - **PostgreSQL** tables:
   - `users`;
   - `live_sessions`: Conversation / Interview / Presentation Q&A, with their setup and question plan (`context`), transcript turns (`turns`), browser metrics and analysis;
-  - `progress_records`, `reports`, `notifications`;
-  - presentation decks: `sessions`, `slides`, `practice_sessions`, `chat_messages`.
-- **Files** (decks, slide images, narration, videos, recordings) live under `STORAGE_BASE_PATH` (the `storage_data` volume).
+  - `notifications`;
+  - presentation decks: `sessions`, `slides`.
+- **Files** (decks, slide images, recordings) live under `STORAGE_BASE_PATH` (the `storage_data` volume).
 - **Resumes:** only the extracted text is kept, inside the interview session that used it. Deleting the session deletes it.
 
 ---
@@ -212,8 +207,8 @@ cd frontend && pnpm exec tsc --noEmit && pnpm lint
 ## ⚠️ Current limitations
 
 - **Stuttering** detection is a signal-processing heuristic. The trained CNN + BiLSTM classifier in `TECHNICAL.md` needs a labelled dataset (SEP-28k / UCLASS).
-- **Pronunciation** uses Wav2Vec2 CTC confidence, not phoneme-level forced alignment (GOP).
+- **Pronunciation** is phone-level (GOP over a forced alignment) with Malaysian English features accepted, but its thresholds are not yet calibrated against human raters.
 - The **English/Malay ratio** uses a lexicon of about 190 BM/Manglish words, not a trained language-ID model.
 - **Gestures** need your hands in view. At a desk the score is capped, not penalised.
-- With the default **3B** local model, plans and feedback are good but less nuanced than with a 7B+ or cloud model. See `docs/AI_MATRIX.md` §4.
+- **Cloud processing:** the deployed setup sends audio to Groq and text to Gemini. Speech-to-text costs about US$0.014 per 5-minute session (within Groq's free tier at student scale); a local configuration avoids sending data out.
 - The vision metrics have been verified on synthetic video only. They need real webcam recordings for the accuracy evaluation.

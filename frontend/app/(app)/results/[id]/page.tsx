@@ -7,15 +7,16 @@
 //   4. the top three things to practise, each with the evidence it's based on
 // Everything shown was measured in this session; anything that couldn't be is listed, not invented.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, Loader2, Play, RotateCcw } from "lucide-react";
 import { liveService } from "@/services/live";
 import { Button, Card, Dots, LinkButton, Notice, ScoreBar, StatusBadge, statusColor } from "@/components/ui/kit";
-import { presentationService } from "@/services/presentation";
 import type { ContentFeedback, FullAnalysisResult, LiveSession, Pillar, SlideFeedback } from "@/types";
 import { formatDuration } from "@/utils/format";
+import SlideImage from "@/components/presentation/SlideImage";
+import { mascot } from "@/lib/mascot";
 
 const POLL_MS = 3000;
 const TITLES: Record<string, string> = {
@@ -177,8 +178,7 @@ function SlidesFeedbackCard({ fb, deckId }: { fb: Extract<ContentFeedback, { kin
           return (
             <li key={sl.slide_index} className="grid sm:grid-cols-[180px_1fr] gap-4 p-3 rounded-lg" style={{ border: "1px solid var(--line)" }}>
               {deckId ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={presentationService.slideImageUrl(deckId, sl.slide_index)} alt={`Slide ${sl.slide_index}`} loading="lazy"
+                <SlideImage deckId={deckId} n={sl.slide_index} alt={`Slide ${sl.slide_index}`}
                   className="w-full aspect-video object-contain rounded-md" style={{ background: "var(--surface-2)", opacity: sl.status === "skipped" ? 0.5 : 1 }} />
               ) : <span />}
               <div className="min-w-0 text-sm space-y-1.5">
@@ -297,13 +297,21 @@ export default function ResultsPage() {
   const [retrying, setRetrying] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
+  const lastStatus = useRef<string | null>(null);
   const load = useCallback(async () => {
-    try { setSession(await liveService.get(id)); setError(null); }
+    try {
+      const next = await liveService.get(id);
+      // Mate cheers when an analysis finishes while you watch (or shakes if it failed)
+      if (lastStatus.current === "analyzing" && next.status === "complete") mascot("success", "Your results are ready!");
+      if (lastStatus.current === "analyzing" && next.status === "failed") mascot("error", "The analysis failed. You can try again.");
+      lastStatus.current = next.status;
+      setSession(next); setError(null);
+    }
     catch (e) { setError(e instanceof Error ? e.message : "Couldn't load this session"); }
   }, [id]);
 
   useEffect(() => {
-    liveService.get(id).then(setSession).catch((e) => setError(e instanceof Error ? e.message : "Couldn't load this session"));
+    liveService.get(id).then((s) => { lastStatus.current = s.status; setSession(s); }).catch((e) => setError(e instanceof Error ? e.message : "Couldn't load this session"));
   }, [id]);
   const analyzing = session?.status === "analyzing";
   useEffect(() => {

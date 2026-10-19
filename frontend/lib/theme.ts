@@ -19,7 +19,7 @@ function resolve(pref: ThemePref): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export function applyTheme(pref: ThemePref = getThemePref()) {
+function applyTheme(pref: ThemePref = getThemePref()) {
   document.documentElement.dataset.theme = resolve(pref);
 }
 

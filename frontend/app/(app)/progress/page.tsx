@@ -5,12 +5,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Loader2, Trash2 } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import { liveService } from "@/services/live";
 import { authService } from "@/services/auth";
 import { Card, LinkButton, Notice, PageHeader, statusColor } from "@/components/ui/kit";
 import type { LiveSession, MetricStatus } from "@/types";
 import { formatDuration } from "@/utils/format";
+import { mascot } from "@/lib/mascot";
+import { useExit } from "@/hooks/useExit";
+import DeleteButton from "@/components/ui/DeleteButton";
+import { SearchBar, Highlight, matches } from "@/components/ui/SearchBar";
 
 const TYPES = [
   { id: "all", label: "All" },
@@ -41,6 +45,10 @@ function subtitle(s: LiveSession) {
   if (s.session_type === "Presentation") return s.context?.deck_title;
   return s.context?.topic;
 }
+
+/** A session's name in the list: its kind, plus the topic, role or deck. */
+const rowTitle = (s: LiveSession) =>
+  `${s.context?.kind === "talk" ? "Presentation" : TYPE_LABEL[s.session_type] ?? s.session_type}${subtitle(s) ? ` · ${subtitle(s)}` : ""}`;
 
 type Point = { v: number; date: string; label?: string };  // label: shown in the tooltip instead of v
 
@@ -144,6 +152,8 @@ export default function ProgressPage() {
   const [list, setList] = useState<LiveSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [type, setType] = useState<(typeof TYPES)[number]["id"]>("all");
+  const [query, setQuery] = useState("");
+  const { isLeaving, exit } = useExit();
 
   useEffect(() => {
     if (!authService.isSignedIn()) {
@@ -167,10 +177,17 @@ export default function ProgressPage() {
   const minutes = Math.round(shown.reduce((t, s) => t + s.duration_sec, 0) / 60);
 
   const remove = async (id: string) => {
-    if (!confirm("Delete this session and its results? This can't be undone.")) return;
-    await liveService.remove(id).catch(() => null);
-    setList((l) => l?.filter((s) => s.id !== id) ?? null);
+    try {
+      await liveService.remove(id);
+      exit(id, () => setList((l) => l?.filter((s) => s.id !== id) ?? null));
+      mascot("deleted", "Session deleted.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't delete that session");
+      mascot("error");
+    }
   };
+  // Search the session list by type, topic, role or deck
+  const listed = shown.filter((s) => matches(query, rowTitle(s), new Date(s.created_at).toLocaleDateString("en-MY", { dateStyle: "medium" })));
 
   return (
     <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto space-y-6">
@@ -242,19 +259,22 @@ export default function ProgressPage() {
             })}
           </div>
 
-          <Card title="All sessions">
+          <Card title="All sessions" action={
+            <SearchBar value={query} onChange={setQuery} placeholder="Search sessions…" results={listed.length} label="Search your sessions" />
+          }>
+            {listed.length === 0 && <p className="text-sm py-6 text-center" style={{ color: "var(--muted)" }}>No session matches &ldquo;{query}&rdquo;.</p>}
             <ul className="divide-y divide-[var(--line-2)]">
-              {shown.map((s) => {
+              {listed.map((s) => {
                 const score = overall(s);
                 return (
-                  <li key={s.id} className="flex items-center gap-3 py-3">
+                  <li key={s.id} className={`row-in flex items-center gap-3 py-3 ${isLeaving(s.id) ? "row-exit" : ""}`}>
                     <Link href={`/results/${s.id}`} className="flex-1 min-w-0 flex items-center gap-4 group">
                       <span className="w-12 text-center font-display text-xl tabular-nums" style={{ color: score != null ? statusColor(statusOf(score)) : "var(--faint)" }}>
                         {score ?? "—"}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-medium truncate" style={{ color: "var(--ink)" }}>
-                          {s.context?.kind === "talk" ? "Presentation" : TYPE_LABEL[s.session_type] ?? s.session_type}{subtitle(s) ? ` · ${subtitle(s)}` : ""}
+                          <Highlight text={rowTitle(s)} query={query} />
                         </span>
                         <span className="block text-xs" style={{ color: "var(--muted)" }}>
                           {new Date(s.created_at).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" })} · {formatDuration(s.duration_sec)}
@@ -263,9 +283,8 @@ export default function ProgressPage() {
                       </span>
                       <ChevronRight className="w-4 h-4 opacity-40 group-hover:opacity-100" style={{ color: "var(--ink)" }} />
                     </Link>
-                    <button onClick={() => remove(s.id)} aria-label="Delete session" className="p-2 opacity-50 hover:opacity-100" style={{ color: "var(--muted)" }}>
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <DeleteButton onDelete={() => remove(s.id)} label="Delete session"
+                      disabled={s.status === "analyzing"} disabledTitle="Wait for the analysis to finish" />
                   </li>
                 );
               })}

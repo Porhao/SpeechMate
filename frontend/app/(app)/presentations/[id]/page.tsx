@@ -15,6 +15,7 @@ import { authService } from "@/services/auth";
 import { liveService } from "@/services/live";
 import GenerationProgress from "@/components/presentation/GenerationProgress";
 import DeckInsightsPanel from "@/components/presentation/DeckInsightsPanel";
+import SlideImage from "@/components/presentation/SlideImage";
 import { Card, Notice, statusColor } from "@/components/ui/kit";
 import type { DeckStatusResponse, LiveSession } from "@/types";
 import { formatDuration } from "@/utils/format";
@@ -39,7 +40,7 @@ export default function PresentationWorkspace() {
   useEffect(() => {
     presentationService.get(id).then(setDeck).catch((e: Error) => setLoadError(e.message));
     if (authService.isSignedIn()) {
-      liveService.history().then((l) => setAttempts(l.filter((s) => s.context?.deck_id === id))).catch(() => setAttempts([]));
+      liveService.history(id).then(setAttempts).catch(() => setAttempts([]));
     }
   }, [id]);
 
@@ -157,8 +158,7 @@ export default function PresentationWorkspace() {
               <ol className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {slides.map((n) => (
                   <li key={n} className="rounded-lg overflow-hidden" style={{ border: "1px solid var(--line)" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={presentationService.slideImageUrl(id, n)} alt={`Slide ${n}`} loading="lazy"
+                    <SlideImage deckId={id} n={n} alt={`Slide ${n}`}
                       className="w-full aspect-video object-contain" style={{ background: "var(--surface-2)" }} />
                     <p className="px-3 py-2.5 text-sm leading-snug" style={{ color: "var(--ink-2)" }}>
                       <b style={{ color: "var(--ink)" }}>{n}.</b> {keyPoints.get(n) ?? "—"}

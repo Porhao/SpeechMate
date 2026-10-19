@@ -1,11 +1,6 @@
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { blobFilename } from "./presentation";
-import type { FullAnalysisResult, InterviewSetup, LiveSession, PracticePlan, SessionType, Turn } from "@/types";
-
-const POLL_MS = 2500;
-
-// Local models can take a while on CPU for long recordings
-const ANALYSIS_TIMEOUT_MS = 10 * 60 * 1000;
+import type { InterviewSetup, LiveSession, PracticePlan, SessionType, Turn } from "@/types";
 
 // The AI partner's voice: Kokoro-82M running in the browser (kokoro-js), so it needs no server.
 // The model downloads once (~90 MB at q8, ~300 MB fp32 on WebGPU) and the browser caches it.
@@ -47,32 +42,21 @@ export const liveService = {
   },
 
   get: (id: string) => api.get<LiveSession>(`/live/${id}`),
-  history: () => api.get<LiveSession[]>("/live"),
+  /** Summaries (score, the drills, pillars, a few context labels; no turns): `get` has the rest. */
+  history: (deckId?: string) => api.get<LiveSession[]>(deckId ? `/live?deck_id=${deckId}` : "/live"),
   remove: (id: string) => api.delete<void>(`/live/${id}`),
 
   /** Start the analysis in the background (poll `get` for the result). */
   startAnalysis: (id: string) => api.post<LiveSession>(`/live/${id}/analyze`, {}),
 
-  /** Start the multimodal analysis and wait for the result. */
-  analyze: async (id: string): Promise<FullAnalysisResult> => {
-    await api.post<LiveSession>(`/live/${id}/analyze`, {});
-    const deadline = Date.now() + ANALYSIS_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-      await new Promise((r) => setTimeout(r, POLL_MS));
-      const s = await liveService.get(id);
-      if (s.status === "complete" && s.analysis) return { ...s.analysis, warnings: s.warnings };
-      if (s.status === "failed") throw new Error(s.error_detail ?? "Analysis failed");
-    }
-    throw new Error("Analysis is taking too long — check the session again later.");
-  },
 };
 
 // Mock-interview preparation: read a resume, preview the curated question plan
 export const interviewService = {
-  readResume: (file: File) => {
+  readResume: (file: File, onProgress?: (fraction: number) => void) => {
     const form = new FormData();
     form.append("file", file, file.name);
-    return api.upload<{ text: string; chars: number }>("/interview/resume", form);
+    return api.upload<{ text: string; chars: number }>("/interview/resume", form, onProgress);
   },
   plan: (setup: InterviewSetup) => api.post<PracticePlan>("/interview/plan", setup),
 };
@@ -91,7 +75,17 @@ export const conversationService = {
     const form = new FormData();
     form.append("file", audio, "turn.wav");
     if (context) form.append("context", context.slice(-1000));
-    return (await api.upload<{ text: string }>("/stt", form)).text;
+    // Retry a dropped request, a rate limit or a provider hiccup; 503 (no STT configured) and other 4xx are final
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return (await api.upload<{ text: string }>("/stt", form)).text;
+      } catch (e) {
+        const status = e instanceof ApiError ? e.status : 0;
+        const transient = status === 0 || status === 429 || status === 502 || status === 504 || status === 500;
+        if (!transient || attempt >= 2) throw e;
+        await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+      }
+    }
   },
 
   /** Start downloading the voice model early, so the first reply doesn't wait for it. */

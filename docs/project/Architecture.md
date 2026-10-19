@@ -13,21 +13,25 @@ flowchart LR
     FE[frontend :3000<br/>next start]
     API[backend :8000<br/>FastAPI · SQLAlchemy async]
     DB[(Postgres 16)]
-    OL[Gemini API<br/>gemini-3.5-flash-lite]
     KO[Kokoro-FastAPI :8880<br/>TTS]
     VOL[(model_cache volume<br/>/models: HF models)]
     ST[(storage/<br/>recordings · decks · audio)]
+  end
+  subgraph Cloud APIs
+    OL[Gemini API<br/>gemini-3.5-flash-lite]
+    GQ[Groq API<br/>whisper-large-v3]
   end
   UI -- REST + JWT --> API
   VAD -- /api/stt turn audio + context --> API
   API --> DB
   API -- OpenAI-compatible --> OL
+  API -- FLAC / WAV turns --> GQ
   API -- OpenAI-compatible --> KO
   API --- VOL
   API --- ST
 ```
 
-Everything runs locally; OpenAI / ElevenLabs keys are optional fallbacks.
+Cloud configuration (deployed): speech-to-text goes to Groq `whisper-large-v3` and LLM calls to Gemini, both through OpenAI-compatible APIs; voice (Kokoro), pronunciation, prosody and vision run locally. A local LLM (Ollama) works by changing `LLM_BASE_URL`.
 
 ## Frontend (`frontend/`)
 
@@ -35,6 +39,10 @@ Everything runs locally; OpenAI / ElevenLabs keys are optional fallbacks.
 |---|---|---|
 | Routes | `app/(auth)` login, register, onboarding · `app/(app)` home, conversation, interview, presentations, session, results/[id], progress, methodology, profile, settings | `(app)/layout.tsx` = nav + footer; `(app)/template.tsx` = page transition |
 | Live session | `app/(app)/session/page.tsx` | camera stage, MediaPipe tracking, turn-taking, TTS playback, recording (MediaRecorder) |
+| Live session pieces | `session/script.ts` (fallback prompts, topics, mood and pace helpers), `session/widgets.tsx` (message bubble, mic pulse, voice glow, volume meter, live transcript, partner character) | pure helpers and display components used by the page |
+| Navigation | `components/layout/TopNav.tsx` (top: where you practise: Home, Conversation, Interview, Presentation, Progress, bell, profile chip), `components/layout/SideRail.tsx` (left, desktop: light/dark, Profile, Settings, Your data, How it's measured, Sign out) | on small screens both are in the top bar's menu |
+| Companion and action animations | `components/layout/Mascot.tsx` + `lib/mascot.ts` (Mate reacts to `mascot(action)` calls: upload, delete, search, task ticked, error, results ready); `components/ui/UploadCard.tsx` (real upload progress via XHR, `api.upload(path, form, onProgress)`), `components/ui/DeleteButton.tsx` + `hooks/useExit.ts` (rows fold away), `components/ui/SearchBar.tsx` (decks, sessions); animations in `globals.css` (off under reduced motion) | |
+| Tasks and pipeline | `components/home/TaskList.tsx` (Home: drills, decks to present or rehearse, retries, daily reminder; "In progress" tab; ticks in localStorage per account), `lib/deckPipeline.ts` (Preparing → Ready → Presented → Q&A rehearsed; the Presentations board) | |
 | Turn capture | `lib/voiceTurns.ts` | adaptive energy VAD, 1.6 s end-of-turn silence, browser-filtered resample, `isBusy` |
 | API client | `services/*.ts` (`api.ts` adds JWT, refreshes on 401) | |
 | State | `store/` (zustand, persisted user) | |
@@ -44,11 +52,10 @@ Everything runs locally; OpenAI / ElevenLabs keys are optional fallbacks.
 
 | Router | Endpoints | Purpose |
 |---|---|---|
-| `auth.py` | `/auth/register · login · refresh · logout`, `/users/profile` | bcrypt + JWT access/refresh |
-| `live.py` | `/live` CRUD, `/live/{id}/end · recording · analyze`, `/interview/plan · resume`, `/progress`, `/reports` | live sessions and their analysis |
-| `conversation.py` | `/chat/message`, `/stt`, `/tts/speak`, `/tts/voices` | AI partner turns, speech in/out |
-| `sessions.py` | `/sessions` (decks), slides, scripts, audio, video, `/narrator-voices` | presentation decks |
-| `practice.py` | `/sessions/{id}/practice` (+ chat) | rehearsal of a deck |
+| `auth.py` | `/auth/register · login · refresh · logout`, `/users/profile`, `/users/me/consent · export`, `DELETE /users/me` | bcrypt + JWT access/refresh, PDPA consent / access / erasure |
+| `live.py` | `/live` (list = summaries, `?deck_id=`), `/live/{id}` + `/end · recording · analyze`, `/interview/plan · resume` | live sessions and their analysis |
+| `conversation.py` | `/chat/message`, `/stt`, `/tts/speak` | AI partner turns, speech in/out (signed in; the cloud ones need consent) |
+| `sessions.py` | `/sessions` (decks), `/sessions/{id}/retry`, `/sessions/{id}/slides/{n}/image` | presentation decks, owner only (slide images are fetched with the token: `SlideImage`) |
 | `notifications.py` | `/notifications` | bell |
 | `health.py` | `/health` | binaries, local ML, LLM, TTS availability |
 
@@ -64,9 +71,11 @@ Background work runs in-process (`services/tasks.py` `spawn`), so **restarting t
 ### Analysis pipeline (`services/live/pipeline.py`)
 ```
 recording → 16 kHz WAV ─┬─ content feedback (LLM, started immediately, in parallel)
-                        ├─ speech: ASR → fluency/fillers/stutter → pronunciation (+ prosody in parallel)
+                        ├─ speech: ASR (Groq, FLAC, silence filter) → fluency/fillers/stutter → pronunciation (+ prosody in parallel)
                         └─ then vision: frames → eye contact ‖ (posture → gestures) ‖ emotion
-→ confidence (11 cues) → communication score → pillars → coaching plan (LLM) → progress records + notification
+                              → Gaze Tunneling (2 fps gaze stream vs disfluency word timings, permutation test)
+→ confidence (11 cues) → communication score → pillars → coaching plan (LLM) → usage (STT seconds, LLM tokens)
+→ progress records + notification
 ```
 Speech and vision run one after the other on purpose: running both model sets at once exhausted 7.6 GB of RAM.
 

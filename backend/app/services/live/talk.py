@@ -10,9 +10,43 @@ the words spoken while it was showing. Each slide is then judged two ways:
   most important thing they left out, and one tip.
 """
 
+import re
+from collections import Counter
+
 from pydantic import BaseModel, Field
 
-from app.services.coach.metrics import script_coverage
+STOPWORDS = set("""
+a about above after again against all am an and any are as at be because been before being below
+between both but by can could did do does doing down during each few for from further had has have
+having he her here hers herself him himself his how i if in into is it its itself just let lets me
+more most my myself no nor not now of off on once only or other our ours ourselves out over own same
+she should so some such than that the their theirs them themselves then there these they this those
+through to too under until up very was we were what when where which while who whom why will with
+would you your yours yourself yourselves today also well really thing things going get got one two
+three first next let's we're it's that's there's here's you're i'm don't can't
+""".split())
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9']+", text.lower().replace("’", "'"))
+
+def key_terms(text: str, limit: int = 25) -> list[str]:
+    """Most frequent content words of a script, in order of importance."""
+    words = [w.strip("'") for w in _words(text)]
+    content = [w for w in words if len(w) > 3 and w not in STOPWORDS and not w.isdigit()]
+    return [w for w, _ in Counter(content).most_common(limit)]
+
+def script_coverage(transcript: str, ideal_text: str) -> tuple[float | None, list[str]]:
+    """Share of the ideal script's key terms the speaker used, plus the missed ones."""
+    terms = key_terms(ideal_text)
+    if not terms:
+        return None, []
+    spoken = {w.strip("'") for w in _words(transcript)}
+    # Light stemming so "benefit" matches "benefits"
+    spoken |= {w.rstrip("s") for w in spoken}
+    missed = [t for t in terms if t not in spoken and t.rstrip("s") not in spoken]
+    return round(1 - len(missed) / len(terms), 3), missed[:8]
+
 
 # Presenters paraphrase slides, so keyword coverage runs lower than against a script
 COVERED, PARTLY = 0.4, 0.2

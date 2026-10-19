@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, Text, Uuid
+from sqlalchemy import Boolean, DateTime, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -25,6 +25,16 @@ class User(Base):
     communication_goal: Mapped[str | None] = mapped_column(String(100), nullable=True)
     skill_level: Mapped[str] = mapped_column(String(50), nullable=False, default="Beginner")
     challenges: Mapped[list | None] = mapped_column(JSONType, nullable=True)
+    # Who the AI is talking to, so questions and feedback fit (services/learner.py)
+    study_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    field_of_study: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    feedback_style: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # Privacy (PDPA): when the user agreed to cloud processing (audio → Groq, text → Gemini);
+    # None = not yet, and the routes that start cloud processing refuse (require_cloud_consent)
+    cloud_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Raw recordings are deleted once their analysis succeeds, unless the user keeps them
+    keep_recordings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

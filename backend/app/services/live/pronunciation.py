@@ -26,6 +26,10 @@ class PronunciationResult:
     word_scores: list[dict] = field(default_factory=list)  # [{word, score, is_correct}]
     incorrect_words: list[str] = field(default_factory=list)
     mispronunciation_count: int = 0
+    # "phone-gop" (phone_gop.py: accent-fair, per phoneme) or "ctc-word" (this module's fallback)
+    method: str = "ctc-word"
+    regional: list[dict] = field(default_factory=list)          # Malaysian English variation: accepted
+    intelligibility: list[dict] = field(default_factory=list)   # deviations that cost clarity
 
     def to_dict(self) -> dict:
         return asdict(self)

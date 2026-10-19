@@ -185,28 +185,3 @@ async def analyse_deck(texts: list[str], requirement_prompt: str | None) -> tupl
         logger.error("Deck insights failed: %s", e)
         warning = f"AI deck analysis failed ({e}); showing a text-based outline instead."
     return {**rule_based_insights(texts, stats, requirement_prompt), "stats": stats, "source": "rules"}, warning
-
-
-def script_context(insights: dict | None, slide_index: int) -> str | None:
-    """Whole-talk context for one slide's narration."""
-    if not insights:
-        return None
-    parts = [f"Main message of the whole talk: {insights.get('main_message', '')}"]
-    sections = insights.get("structure") or []
-    for s in sections:
-        if slide_index in (s.get("slides") or []):
-            parts.append(f"This slide is in the \"{s.get('section')}\" part of the talk.")
-    point = next((s["key_point"] for s in insights.get("slides", []) if s.get("slide_index") == slide_index), None)
-    if point:
-        parts.append(f"The point this slide must land: {point}")
-    return "\n".join(parts)
-
-
-def coach_context(insights: dict | None) -> str:
-    if not insights:
-        return ""
-    return (
-        f"Deck summary: {insights.get('summary', '')}\n"
-        f"Main message: {insights.get('main_message', '')}\n"
-        "Slide key points: " + "; ".join(f"[{s['slide_index']}] {s['key_point']}" for s in insights.get("slides", []))
-    )

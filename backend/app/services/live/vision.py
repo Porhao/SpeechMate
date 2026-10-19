@@ -183,6 +183,56 @@ def analyze_eye_contact(frames: list) -> EyeContactResult | None:
     )
 
 
+# ── Gaze timeline (for Gaze Tunneling) ──────────────────────────────────────
+
+GAZE_FPS = 2.0                 # samples per second: fine enough for 5 s windows
+GAZE_TIMEOUT_SEC = 180
+
+
+def gaze_timeline(video_path: str, duration_sec: float) -> list[tuple[float, bool]]:
+    """[(t_sec, looked_away)] at ~GAZE_FPS for every sampled frame with a face, on the same
+    timeline as the audio (the recorder pauses video and audio together). Streams the file:
+    one frame in memory at a time. Empty if unreadable or timed out."""
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(_gaze_timeline_blocking, video_path, duration_sec)
+    try:
+        return future.result(timeout=GAZE_TIMEOUT_SEC)
+    except FutureTimeoutError:
+        logger.warning("Timed out reading the gaze timeline from %s", video_path)
+        return []
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _gaze_timeline_blocking(video_path: str, duration_sec: float) -> list[tuple[float, bool]]:
+    import cv2
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return []
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = fps if 5 <= fps <= 120 else 30.0   # browser webm often reports 1000 or 0
+    step = max(int(round(fps / GAZE_FPS)), 1)
+    samples, idx = [], 0                      # (frame index, looked_away)
+    while idx < int(duration_sec * 120) + 1000:  # cap for a stream that never signals EOF
+        if idx % step:
+            if not cap.grab():
+                break
+        else:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            result = _face_mesh().process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            if result.multi_face_landmarks:
+                samples.append((idx, _gaze(result.multi_face_landmarks[0].landmark)[0] != "camera"))
+        idx += 1
+    cap.release()
+    if not samples or idx == 0:
+        return []
+    # Frame position → seconds, scaled to the audio's length (robust to a wrong reported fps)
+    return [(i / idx * duration_sec, away) for i, away in samples]
+
+
 # ── Posture ─────────────────────────────────────────────────────────────────
 
 @load_once

@@ -1,14 +1,15 @@
 "use client";
 
-// The app's only navigation: a floating clay bar (see .clay-nav in globals.css) with
-// raised 3D tabs and a live 3D clay microphone as the logo. On small screens the
-// links fold into a clay drop-down panel. It's the fixed anchor of page transitions.
+// The top navigation: where you practise. A floating clay bar (see .clay-nav in globals.css)
+// with raised 3D tabs, a live 3D clay microphone as the logo, and the bell and your profile on
+// the right. Tools and account pages live in the side rail (SideRail.tsx). On small screens
+// both fold into one clay drop-down panel. It's the fixed anchor of page transitions.
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
-import { Menu, Mic2, Settings, X } from "lucide-react";
+import { Menu, Mic2, X } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { ThemeToggleButton } from "@/components/theme/ThemeToggle";
 import NotificationBell from "@/components/layout/NotificationBell";
@@ -19,13 +20,18 @@ const ClayScene = dynamic(() => import("@/components/three/ClayScene"), {
   loading: () => <Mic2 className="w-4 h-4 m-auto" style={{ color: "var(--pink)" }} />,
 });
 
-// The three practice functions, then progress and the reference matrix
+// The three practice functions and your progress
 const LINKS: { href: string; label: string; also?: string[] }[] = [
   { href: "/home", label: "Home" },
   { href: "/conversation", label: "Conversation" },
   { href: "/interview", label: "Interview" },
   { href: "/presentations", label: "Presentation" },
   { href: "/progress", label: "Progress", also: ["/results"] },
+];
+// The side rail's pages, for the small-screen menu (the rail is desktop only)
+const RAIL_LINKS = [
+  { href: "/profile", label: "Profile" },
+  { href: "/settings", label: "Settings" },
   { href: "/methodology", label: "How it's measured" },
 ];
 
@@ -57,9 +63,8 @@ export default function TopNav() {
           </span>
           <span className="font-display text-[17px] text-[var(--ink)] hidden sm:inline">SpeechMate</span>
         </Link>
-        <div className="-ml-2"><NotificationBell /></div>
 
-        <nav className="hidden lg:flex items-center gap-1.5" aria-label="Main">
+        <nav className="hidden lg:flex items-center gap-1.5 mx-auto" aria-label="Main">
           {LINKS.map(({ href, label }) => {
             const active = isActive(href);
             return (
@@ -71,17 +76,20 @@ export default function TopNav() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-1.5">
-          <ThemeToggleButton />
-          <Link href="/settings" aria-label="Settings"
-            className="nav-pill w-9 h-9 rounded-full hidden sm:flex items-center justify-center"
-            style={{ color: isActive("/settings") ? "var(--ink)" : "var(--muted)" }}>
-            <Settings className="w-4 h-4" />
-          </Link>
+        <div className="ml-auto lg:ml-0 flex items-center gap-1.5">
+          <NotificationBell />
+          <span className="lg:hidden"><ThemeToggleButton /></span>
           <Link href="/profile" aria-label="Profile"
-            className="clay w-9 h-9 rounded-full flex items-center justify-center text-white text-[11px] font-semibold transition-transform hover:-translate-y-0.5"
-            style={{ background: "var(--accent)", outline: isActive("/profile") ? "2px solid var(--accent-ink)" : "none", outlineOffset: 2 }}>
-            <span suppressHydrationWarning>{initials(user?.full_name)}</span>
+            className="nav-pill flex items-center gap-2.5 rounded-full p-0.5 xl:pr-3">
+            <span className="clay w-9 h-9 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0"
+              style={{ background: "var(--accent)", outline: isActive("/profile") ? "2px solid var(--accent-ink)" : "none", outlineOffset: 2 }}>
+              <span suppressHydrationWarning>{initials(user?.full_name)}</span>
+            </span>
+            {/* Name and email, like an account chip, where there's room */}
+            <span className="hidden xl:flex flex-col leading-tight text-left max-w-[160px]" suppressHydrationWarning>
+              <span className="text-sm font-semibold truncate" style={{ color: "var(--ink)" }}>{user?.full_name ?? "Your profile"}</span>
+              {user?.email && <span className="text-[11px] truncate" style={{ color: "var(--muted)" }}>{user.email}</span>}
+            </span>
           </Link>
           <button
             className="nav-pill lg:hidden w-10 h-10 rounded-full flex items-center justify-center text-[var(--ink)]"
@@ -96,7 +104,7 @@ export default function TopNav() {
 
       {open && (
         <nav className="clay-nav lg:hidden max-w-[1320px] mx-auto mt-2 p-2 rounded-2xl flex flex-col gap-1" aria-label="Main">
-          {[...LINKS, { href: "/settings", label: "Settings" }, { href: "/profile", label: "Profile" }].map(({ href, label }) => {
+          {[...LINKS, ...RAIL_LINKS].map(({ href, label }) => {
             const active = isActive(href);
             return (
               <Link key={href} href={href} aria-current={active ? "page" : undefined}

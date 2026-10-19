@@ -74,22 +74,6 @@ class LiveSessionResponse(BaseModel):
     created_at: datetime
 
 
-class ProgressRecordOut(BaseModel):
-    id: uuid.UUID
-    live_session_id: uuid.UUID
-    metric_name: str
-    metric_value: float
-    recorded_at: datetime
-
-
-class ReportOut(BaseModel):
-    id: uuid.UUID
-    report_type: str
-    report_url: str
-    content: dict
-    created_at: datetime
-
-
 class ConversationMessage(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(max_length=4000)

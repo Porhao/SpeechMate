@@ -14,7 +14,6 @@ from sqlalchemy import update
 from app.config import settings
 from app.database import async_session_factory
 from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
-from app.models.practice_session import PRACTICE_IN_PROGRESS_STATUSES, PracticeSession
 from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
 
 logger = logging.getLogger(__name__)
@@ -61,19 +60,11 @@ async def fail_interrupted_jobs() -> None:
             .where(Session.status.in_(SESSION_IN_PROGRESS_STATUSES))
             .values(status="failed", error_detail=message)
         )
-        p = await db.execute(
-            update(PracticeSession)
-            .where(PracticeSession.status.in_(PRACTICE_IN_PROGRESS_STATUSES))
-            .values(status="failed", error_detail=message)
-        )
         live = await db.execute(
             update(LiveSession)
             .where(LiveSession.status.in_(LIVE_IN_PROGRESS_STATUSES))
             .values(status="failed", error_detail="Interrupted by a server restart — request the analysis again.")
         )
         await db.commit()
-        if s.rowcount or p.rowcount or live.rowcount:
-            logger.warning(
-                "Marked %d session(s), %d practice run(s) and %d live analysis job(s) as interrupted",
-                s.rowcount, p.rowcount, live.rowcount,
-            )
+        if s.rowcount or live.rowcount:
+            logger.warning("Marked %d deck(s) and %d live analysis job(s) as interrupted", s.rowcount, live.rowcount)

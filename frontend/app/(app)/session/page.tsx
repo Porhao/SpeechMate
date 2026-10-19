@@ -1,382 +1,31 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any -- MediaPipe handles have no bundled types */
 
-import { Suspense, useEffect, useRef, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
-import { VoiceBeam as VoiceGlow } from "voice-glow";
-import { BotAvatar } from "bot-avatars";
+import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Mic, MicOff, PhoneOff, Send, Volume2, VolumeX, Shuffle,
-  Activity, Loader2, Video, VideoOff, Briefcase, Presentation, ListChecks, Pencil, Keyboard,
+  Activity, Loader2, Video, VideoOff, Briefcase, Presentation, ListChecks, Keyboard,
 } from "lucide-react";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFeedbackStore } from "@/store/useFeedbackStore";
 import { cn, inkOf } from "@/lib/utils";
 import { liveService, conversationService } from "@/services/live";
 import { presentationService } from "@/services/presentation";
+import { ApiError } from "@/services/api";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
-import { subscribeTheme } from "@/lib/theme";
+import SlideImage from "@/components/presentation/SlideImage";
 import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
-import type { SessionType, LiveSession, GazeTunnelingResult, GazeTunnelingWindow } from "@/types";
+import type { SessionType, LiveSession } from "@/types";
+import {
+  BACKCHANNEL_TEXTS, CHECKIN_MESSAGES, FILLER_WORDS, MODE_ACKS, MODE_PROMPTS, MODE_TITLES, MOOD_STATES, RANDOM_TOPICS,
+  clamp, ema, inferMood, paceWpm, type Blendshape, type MoodLabel,
+} from "./script";
+import { HeaderPulse, LiveTranscript, PartnerBot, UserBubble, VoiceBeam, VolumeMeter, type OrbState } from "./widgets";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Message  = { role: "ai" | "user"; text: string; ts: number };
 type MpStatus = "idle" | "loading" | "ready" | "error";
-type OrbState = "idle" | "thinking" | "speaking" | "listening";
-
-// ── Random topics (RandomTopicGen-inspired) ───────────────────────────────────
-const RANDOM_TOPICS = [
-  "What technology will change the world most in the next decade?",
-  "Should social media platforms be regulated like public utilities?",
-  "What makes a great leader in today's fast-moving world?",
-  "How has remote work changed the way we think about productivity?",
-  "What role should AI play in education — tool or teacher?",
-  "Is it possible to balance ambition and mental wellbeing? How?",
-  "What's the most underrated skill in the modern workplace?",
-  "How do you think about failure — obstacle or teacher?",
-  "What habit has made the biggest positive impact in your life?",
-  "If you could solve one global problem, what would it be and why?",
-  "What does success look like to you in five years?",
-  "How do you communicate a complex idea to someone unfamiliar with it?",
-];
-
-// ── Mode content ──────────────────────────────────────────────────────────────
-const MODE_PROMPTS: Record<string, string[]> = {
-  Conversation: [
-    "Let's have a natural conversation. Tell me — what's been the most interesting thing in your week?",
-    "What's one skill or hobby you've been trying to develop lately?",
-    "If you could have dinner with anyone in history, who would it be and why?",
-    "What's something you recently changed your mind about? What shifted your thinking?",
-  ],
-  Interview: [
-    "Great to meet you. Could you start by walking me through your background and what you're studying?",
-    "Tell me about your greatest strength — can you give a concrete example of it in action?",
-    "Describe a challenge you faced and exactly how you overcame it.",
-    "Where do you see yourself in five years, and why does this role fit that path?",
-  ],
-  // Only used when the deck's Q&A plan couldn't be loaded
-  Presentation: [
-    "Thank you for your presentation. Let's open the floor. What is the one thing you want the audience to remember?",
-    "Could you give a concrete example that supports your main point?",
-    "What are the limitations of your approach?",
-    "What would you do next if you had more time?",
-  ],
-};
-
-const MODE_TITLES: Record<string, string> = {
-  Conversation: "Daily conversation",
-  Interview: "Mock interview",
-  Presentation: "Presentation Q&A",
-};
-
-const MODE_ACKS: Record<string, string[]> = {
-  Conversation: [
-    "That's a really interesting perspective! ",
-    "I love that — tell me more about it. ",
-    "Ha, that's actually fascinating. ",
-    "What a great point. Here's my follow-up: ",
-  ],
-  Interview: [
-    "Thank you — that showed real depth. Now, ",
-    "Strong answer — I appreciated the specificity. My next question: ",
-    "Excellent. You articulated that very clearly. Let me follow up: ",
-    "Really insightful. Here's what I want to explore next: ",
-  ],
-  Presentation: [
-    "Thanks, that's clear. ",
-    "Good answer. Another question from the audience: ",
-    "Interesting. Next question: ",
-  ],
-};
-
-const CHECKIN_MESSAGES = [
-  "Just checking in — are you still there? Take your time, no rush at all.",
-  "It looks like you've gone quiet. Everything okay? We can continue whenever you're ready.",
-  "No pressure — would you like me to repeat the question, or shall we try a different topic?",
-];
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const BACKCHANNEL_TEXTS = ["Mm-hmm.", "I see.", "Right.", "Yeah.", "Go on.", "Interesting."];
-// Hesitation sounds only: ordinary words ("like", "so", "right") and Manglish particles
-// aren't disfluencies (the server's analysis handles fillers in context)
-const FILLER_WORDS = new Set(["um", "umm", "uh", "uhh", "er", "err", "erm", "ah", "hmm"]);
-
-const clamp  = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
-const ema    = (prev: number, next: number, a = 0.2) => prev * (1 - a) + next * a;
-type Lm = { x: number; y: number; z: number; visibility?: number };
-
-function computeEye(lms: Lm[]): number {
-  if (!lms || lms.length < 455) return 50;
-  const nose = lms[4], le = lms[234], re = lms[454];
-  const xDev = Math.abs(nose.x - 0.5) * 2, yDev = Math.abs(nose.y - 0.42) * 2;
-  const rot  = Math.min(1, Math.abs(le.z - re.z) * 4);
-  return clamp(Math.round((1 - clamp(xDev)) * 35 + (1 - clamp(yDev)) * 20 + (1 - rot) * 45));
-}
-
-function computePosture(lms: Lm[]): number {
-  if (!lms || lms.length < 25) return 50;
-  const n = lms[0], ls = lms[11], rs = lms[12];
-  if ((ls.visibility ?? 0) < 0.3 || (rs.visibility ?? 0) < 0.3) return 50;
-  return clamp(Math.round(
-    Math.max(0, 1 - Math.abs(ls.y - rs.y) * 10) * 40 +
-    Math.max(0, 1 - Math.abs(n.x - (ls.x + rs.x) / 2) * 8) * 35 +
-    (n.y < (ls.y + rs.y) / 2 - 0.02 ? 25 : n.y < (ls.y + rs.y) / 2 ? 15 : 5),
-  ));
-}
-
-// ── Gaze Tunneling ───────────────────────────────────────────────────────────
-// Fuses two signals every competitor reports as separate cards: where the
-// speaker was looking (eye-contact samples, ~2/sec) and when their speech
-// broke down (filler words + immediate word-repetitions, timestamped as
-// they're recognised). Bucketed into fixed windows, then a real Pearson
-// correlation between gaze aversion and disfluency density — not a canned
-// number, actual arithmetic over what this session's tracking produced.
-function computeGazeTunneling(
-  gazeSamples: { t: number; eye: number }[],
-  disfluencyEvents: { t: number }[],
-  windowSeconds = 5,
-): GazeTunnelingResult {
-  const totalEvents = disfluencyEvents.length;
-  if (gazeSamples.length < 4) {
-    return { windows: [], windowSeconds, correlation: 0, coOccurrencePct: 0, totalEvents, label: "Not enough data" };
-  }
-
-  const duration = gazeSamples[gazeSamples.length - 1].t;
-  const numWindows = Math.max(1, Math.ceil(duration / windowSeconds));
-  const windows: GazeTunnelingWindow[] = [];
-  for (let i = 0; i < numWindows; i++) {
-    const start = i * windowSeconds, end = start + windowSeconds;
-    const inWindow = gazeSamples.filter((s) => s.t >= start && s.t < end);
-    const avgEye = inWindow.length
-      ? inWindow.reduce((sum, s) => sum + s.eye, 0) / inWindow.length
-      : windows[windows.length - 1]?.eyeContact ?? 50;
-    const disCount = disfluencyEvents.filter((e) => e.t >= start && e.t < end).length;
-    windows.push({ t: start, eyeContact: Math.round(avgEye), disfluencyCount: disCount });
-  }
-
-  const n = windows.length;
-  if (n < 3 || totalEvents === 0) {
-    return { windows, windowSeconds, correlation: 0, coOccurrencePct: 0, totalEvents, label: "Not enough data" };
-  }
-
-  // Pearson correlation between gaze aversion (100 − eye contact) and disfluency count per window.
-  const xs = windows.map((w) => 100 - w.eyeContact);
-  const ys = windows.map((w) => w.disfluencyCount);
-  const meanX = xs.reduce((a, b) => a + b, 0) / n;
-  const meanY = ys.reduce((a, b) => a + b, 0) / n;
-  let num = 0, denX = 0, denY = 0;
-  for (let i = 0; i < n; i++) {
-    const dx = xs[i] - meanX, dy = ys[i] - meanY;
-    num += dx * dy; denX += dx * dx; denY += dy * dy;
-  }
-  const correlation = denX > 0 && denY > 0 ? num / Math.sqrt(denX * denY) : 0;
-
-  // Co-occurrence: % of disfluency events that fell in a window where eye
-  // contact dipped meaningfully below this session's own average.
-  const sessionAvgEye = windows.reduce((a, w) => a + w.eyeContact, 0) / n;
-  const dipThreshold = sessionAvgEye - 8;
-  let coOccur = 0;
-  disfluencyEvents.forEach((e) => {
-    const win = windows.find((w) => e.t >= w.t && e.t < w.t + windowSeconds);
-    if (win && win.eyeContact < dipThreshold) coOccur++;
-  });
-  const coOccurrencePct = Math.round((coOccur / totalEvents) * 100);
-
-  const label: GazeTunnelingResult["label"] =
-    correlation > 0.4 ? "Strong link" : correlation > 0.15 ? "Some link" : "No clear link";
-
-  return {
-    windows, windowSeconds,
-    correlation: Math.round(correlation * 100) / 100,
-    coOccurrencePct, totalEvents, label,
-  };
-}
-
-// ── Mood inference ────────────────────────────────────────────────────────────
-// Rule-based, not a trained classifier — reads MediaPipe's ARKit-style face
-// blendshape coefficients (52 facial-muscle activation scores from the same
-// FaceLandmarker already running for the mesh overlay) and scores five
-// presentation-relevant states against each other. Good enough to be an
-// honest, real-time signal without pretending to be a full emotion model.
-type Blendshape = { categoryName: string; score: number };
-
-const MOOD_STATES = {
-  Engaged:     { color: "#3E6FB0" },
-  Confident:   { color: "#2F7A4F" },
-  Enthusiastic:{ color: "#A8620F" },
-  Tense:       { color: "#C2342C" },
-  Uncertain:   { color: "#6B4FC4" },
-} as const;
-type MoodLabel = keyof typeof MOOD_STATES;
-
-function inferMood(cats: Blendshape[]): { label: MoodLabel; score: number } {
-  const g = (name: string) => cats.find((c) => c.categoryName === name)?.score ?? 0;
-  const smile   = (g("mouthSmileLeft") + g("mouthSmileRight")) / 2;
-  const browUp  = (g("browOuterUpLeft") + g("browOuterUpRight") + g("browInnerUp")) / 3;
-  const browDn  = (g("browDownLeft") + g("browDownRight")) / 2;
-  const eyeWide = (g("eyeWideLeft") + g("eyeWideRight")) / 2;
-  const squint  = (g("eyeSquintLeft") + g("eyeSquintRight")) / 2;
-  const press   = (g("mouthPressLeft") + g("mouthPressRight")) / 2;
-  const jawOpen = g("jawOpen");
-  const frown   = (g("mouthFrownLeft") + g("mouthFrownRight")) / 2;
-
-  const scores: Record<MoodLabel, number> = {
-    Enthusiastic: smile * 0.7 + browUp * 0.3,
-    Confident:    (1 - press) * 0.35 + (1 - squint) * 0.25 + smile * 0.2 + (1 - browDn) * 0.2,
-    Tense:        browDn * 0.45 + press * 0.35 + frown * 0.2,
-    Uncertain:    eyeWide * 0.4 + browUp * 0.3 + jawOpen * 0.3,
-    Engaged:      0.32, // steady baseline — wins when nothing else is strongly expressed
-  };
-
-  const [label, raw] = (Object.entries(scores) as [MoodLabel, number][])
-    .sort((a, b) => b[1] - a[1])[0];
-  return { label, score: clamp(Math.round(30 + raw * 90)) };
-}
-
-function computeFluency(wc: number, fc: number, elapsed: number) {
-  if (elapsed < 2 || wc < 3) return { score: 70, wpm: 0 };
-  const wpm = Math.round((wc / elapsed) * 60);
-  const ws  = wpm < 60 ? 30 : wpm < 120 ? 30 + (wpm - 60) : wpm < 160 ? 90 + (wpm - 120) * 0.25
-    : wpm < 200 ? 100 - (wpm - 160) * 1.5 : Math.max(30, 100 - (wpm - 160) * 2);
-  const fs  = Math.max(0, 100 - (fc / Math.max(wc, 1)) * 300);
-  return { score: clamp(Math.round(ws * 0.6 + fs * 0.4)), wpm };
-}
-
-// ── The user's own message, with "Fix" for when speech recognition misheard ──
-function UserBubble({ text, className, style, onFix }: {
-  text: string; className: string; style: React.CSSProperties; onFix: (text: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(text);
-  if (editing) {
-    return (
-      <form className="flex-1 max-w-[85%] flex flex-col gap-1.5" onSubmit={(e) => { e.preventDefault(); onFix(draft); setEditing(false); }}>
-        <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} aria-label="What you actually said"
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onFix(draft); setEditing(false); } if (e.key === "Escape") setEditing(false); }}
-          className="w-full px-3 py-2 rounded-md text-sm outline-none" style={{ background: "var(--surface)", border: "1px solid var(--accent-ink)", color: "var(--ink)" }} />
-        <span className="flex gap-2 justify-end">
-          <button type="button" onClick={() => setEditing(false)} className="text-xs font-semibold px-3 py-1.5 rounded-md" style={{ color: "var(--muted)" }}>Cancel</button>
-          <button type="submit" className="text-xs font-semibold px-3 py-1.5 rounded-md text-white" style={{ background: "var(--accent)" }}>Save</button>
-        </span>
-      </form>
-    );
-  }
-  return (
-    <div className="group flex flex-row-reverse items-start gap-1.5 max-w-[85%]">
-      <div className={className} style={style}>{text}</div>
-      <button onClick={() => { setDraft(text); setEditing(true); }} title="Misheard? Correct what you said"
-        aria-label={`Fix this message: ${text}`}
-        className="mt-1 flex items-center gap-1 text-[11px] font-semibold px-1.5 py-1 rounded-md opacity-60 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-[var(--surface-3)]"
-        style={{ color: "var(--muted)" }}>
-        <Pencil className="w-3 h-3" /> Fix
-      </button>
-    </div>
-  );
-}
-
-// ── Header mic pulse — tiny live waveform next to the session timer ──────────
-function HeaderPulse({ level, active, color = "#3E6FB0" }: { level: number; active: boolean; color?: string }) {
-  return (
-    <div className="flex items-end gap-[2px]" style={{ height: 13 }}>
-      {[0.6, 1, 0.7, 1.2, 0.7].map((mult, i) => {
-        const h = active ? Math.max(3, Math.min(13, 3 + level * 34 * mult)) : 3;
-        return (
-          <div key={i} className="rounded-full" style={{ width: 2, height: h, background: color, transition: "height 0.1s ease-out" }} />
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Voice beam — a sound-reactive glow along the input bar's bottom edge (voice-glow) ──
-// Follows the user's own mic (low / mid / high bands) while they can speak, holds a soft
-// glow while the partner thinks, and fades out otherwise. The centre lobe is the mode colour.
-// The package stops its breathing, flow and hue drift under reduced motion.
-function VoiceBeam({ stream, listening, thinking, color, children }: {
-  stream: MediaStream | null; listening: boolean; thinking: boolean; color: string; children: ReactNode;
-}) {
-  const theme = useResolvedTheme();
-  return (
-    <VoiceGlow className="flex-1 min-w-0" theme={theme} colors={[color]}
-      stream={listening ? stream : null} level={thinking ? 0.35 : 0} active={listening || thinking}>
-      {children}
-    </VoiceGlow>
-  );
-}
-
-// ── Volume meter — how loud the user is, live, against a comfortable band ──────
-// ponytail: thresholds on the browser's average spectrum level (0–1), set by ear on a laptop mic;
-// calibrate per mic, or map to the analysis' loudness metric if the two need to agree.
-const VOL_FULL = 0.4, VOL_QUIET = 0.03, VOL_LOUD = 0.3;
-function VolumeMeter({ level, muted, speaking }: { level: number; muted: boolean; speaking: boolean }) {
-  const [label, color] =
-    muted ? ["Muted", "var(--muted)"] :
-    !speaking ? ["Waiting for you", "var(--muted)"] :
-    level < VOL_QUIET ? ["Too quiet", "var(--warn)"] :
-    level > VOL_LOUD ? ["Very loud", "var(--warn)"] : ["Good", "var(--ok)"];
-  const pct = (v: number) => `${Math.min(100, (v / VOL_FULL) * 100)}%`;
-  return (
-    <span className="flex items-center gap-2" role="status" aria-label={`Your volume: ${label}`}>
-      Volume
-      <span className="relative w-32 h-2 rounded-full overflow-hidden" style={{ background: "var(--line)" }}>
-        {/* the comfortable band */}
-        <span className="absolute inset-y-0" style={{ left: pct(VOL_QUIET), width: `calc(${pct(VOL_LOUD)} - ${pct(VOL_QUIET)})`, background: "color-mix(in srgb, var(--ok) 25%, transparent)" }} />
-        <span className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-100"
-          style={{ width: muted ? 0 : pct(level), background: color }} />
-      </span>
-      <b style={{ color }}>{label}</b>
-    </span>
-  );
-}
-
-// ── Live transcript — the user's words, phrase by phrase as they are transcribed ──
-// A two-line window pinned to the newest words: older lines slide up under a fade, and the
-// newest phrase fades in. The status ("Hearing you…", "Transcribing…") sits in the label.
-function LiveTranscript({ transcript, newest, status, color }: {
-  transcript: string; newest: { text: string; key: number } | null; status: string; color: string;
-}) {
-  const fresh = newest && transcript.endsWith(newest.text) ? newest : null;
-  const older = fresh ? transcript.slice(0, -fresh.text.length).trimEnd() : transcript;
-  return (
-    <div className="flex-shrink-0 px-4 py-2.5 rounded-xl" aria-live="polite"
-      style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}>
-      <p className="flex items-center gap-1.5 text-[10px] text-[var(--faint)] font-semibold uppercase tracking-wider mb-1">
-        {status === "Hearing you…" && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />}
-        Live transcript
-        {status && <span className="normal-case tracking-normal font-normal italic">· {status}</span>}
-      </p>
-      <div className="live-transcript-window text-sm leading-snug text-[var(--ink-2)]">
-        <p>
-          {older}
-          {fresh && <span key={fresh.key} className="live-phrase-in text-[var(--ink)]">{older ? " " : ""}{fresh.text}</span>}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Partner character (bot-avatars) ───────────────────────────────────────────
-// One character per mode. It sleeps before the session, looks around while you talk,
-// and hops while it thinks or speaks.
-const PARTNER_BOTS = {
-  Conversation: { type: "cat", face: "mouth", headphones: true },
-  Interview:    { type: "mech", face: "mouth", glasses: "square", bowTie: true },
-  Presentation: { type: "droid", face: "mouth", hat: "beret", glasses: "round" },
-} as const;
-
-function useResolvedTheme() {
-  return useSyncExternalStore(subscribeTheme, () => document.documentElement.dataset.theme === "dark" ? "dark" : "light", () => "light" as const);
-}
-
-function PartnerBot({ mode, state, started, size, theme }: {
-  mode: SessionType; state: OrbState; started: boolean; size: number; theme?: "light" | "dark";
-}) {
-  const appTheme = useResolvedTheme();
-  return (
-    <BotAvatar {...PARTNER_BOTS[mode]} size={size} theme={theme ?? appTheme}
-      state={!started ? "sleeping" : state === "speaking" || state === "thinking" ? "working" : "default"} />
-  );
-}
 
 // ── Session ───────────────────────────────────────────────────────────────────
 function SessionContent() {
@@ -389,10 +38,9 @@ function SessionContent() {
 
   const {
     isRecording, isCameraOn, duration, setRecording, setCameraOn, incrementDuration, resetDuration,
-    startSession: startLiveSession,
   } = useSessionStore();
   const {
-    updateLiveFeedback, transcript, appendTranscript, reset, setGazeTunneling, setAnalysisError,
+    transcript, appendTranscript, reset,
   } = useFeedbackStore();
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -466,6 +114,8 @@ function SessionContent() {
   // (docs/manglish-transcription-spec.md). Without a backend model the user types instead.
   const [sttAvailable,   setSttAvailable]   = useState(true);
   const sttAvailableRef  = useRef(true);
+  const sttFailsRef      = useRef(0);  // consecutive failed transcriptions
+  const [sttNotice,      setSttNotice]      = useState("");
   const voiceListenerRef = useRef<VoiceTurnListener | null>(null);
   const mpRef      = useRef<any>(null);
   const mediaRecorderRef    = useRef<MediaRecorder | null>(null);
@@ -491,13 +141,10 @@ function SessionContent() {
   const voiceEnabledRef     = useRef(true);
   const isRecordingRef      = useRef(false);
   const modeRef             = useRef(mode);
-  const eyeContactRef       = useRef(50);
-  const postureRef          = useRef(50);
   const moodRef             = useRef<{ label: MoodLabel; score: number } | null>(null);
   const moodBoxRef          = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   // Face box in normalised frame coordinates, for the lighting check
   const faceNormRef         = useRef<FaceBox | null>(null);
-  const pronounceRef        = useRef(72);
   // Response time: from the end of the AI's turn to the first sound of the user's answer
   const turnOpenedAtRef     = useRef<number | null>(null);
   const latenciesRef        = useRef<number[]>([]);
@@ -517,14 +164,8 @@ function SessionContent() {
   const autoReplyTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerAIReplyRef   = useRef<(t: string) => void | Promise<void>>(() => {});
 
-  // Gaze Tunneling — raw samples collected live, fused into one metric at
-  // session end (see computeGazeTunneling). gazeSamplesRef is eye-contact
-  // score sampled every ~500ms alongside the rest of live feedback;
-  // disfluencyEventsRef is timestamped the instant a filler word or an
-  // immediate word-repetition is recognised in speech.
-  const gazeSamplesRef      = useRef<{ t: number; eye: number }[]>([]);
-  const disfluencyEventsRef = useRef<{ t: number }[]>([]);
-  const lastWordRef         = useRef("");
+  // Audio seconds of every turn sent to speech recognition (each is billed ≥ 10 s): session usage
+  const sttAudioSecRef      = useRef<number[]>([]);
 
   // Backchannel refs
   const backchannelUrlsRef  = useRef<string[]>([]);
@@ -817,7 +458,6 @@ function SessionContent() {
             du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "#00E5FF", lineWidth: 1.5 });
             du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_LEFT_EYE,  { color: "#00E5FF", lineWidth: 1.5 });
             du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_LIPS, { color: "#FF804060", lineWidth: 1 });
-            eyeContactRef.current = Math.round(ema(eyeContactRef.current, computeEye(fl), 0.15));
 
             // Mood — inferred from the same detector's blendshape output.
             const shapes = fr.faceBlendshapes?.[0]?.categories as Blendshape[] | undefined;
@@ -875,23 +515,17 @@ function SessionContent() {
             setPoseDetected(true); const pl = pr.landmarks[0];
             du.drawConnectors(pl, mp.PoseLandmarker.POSE_CONNECTIONS, { color: "#5C729B60", lineWidth: 2.5 });
             du.drawLandmarks(pl.slice(0, 25), { color: "#60EFFF", fillColor: "#1060FF80", radius: 3 });
-            postureRef.current = Math.round(ema(postureRef.current, computePosture(pl), 0.1));
           } else { setPoseDetected(false); }
         } catch { /* transient */ }
       }
     }
     if (now - lastUpdateRef.current > 500) {
-      const elapsed = (now - startTimeRef.current) / 1000;
-      const { score: fluency, wpm: w } = computeFluency(wordListRef.current.length, fillerCntRef.current, elapsed);
-      setWpm(w);
-      const confidence = clamp(Math.round(eyeContactRef.current * 0.45 + postureRef.current * 0.55));
-      updateLiveFeedback({ fluency, pronunciation: pronounceRef.current, eye_contact: eyeContactRef.current, confidence, speaking_pace: w, posture: postureRef.current });
+      setWpm(paceWpm(wordListRef.current.length, (now - startTimeRef.current) / 1000));
       setMood(moodRef.current);
-      gazeSamplesRef.current.push({ t: elapsed, eye: eyeContactRef.current });
       lastUpdateRef.current = now;
     }
     animRef.current = requestAnimationFrame(runDetection);
-  }, [updateLiveFeedback]);
+  }, []);
 
   // ── Speech-to-text (backend) ─────────────────────────────────────────────
   const startSpeech = useCallback(() => {
@@ -906,27 +540,15 @@ function SessionContent() {
     };
 
     // One finished utterance
-    const onFinal = (text: string, conf: number, replyDelayMs: number) => {
+    const onFinal = (text: string, replyDelayMs: number) => {
       lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
       appendTranscript(text);
       const words = text.trim().split(/\s+/).filter(Boolean);
       wordListRef.current.push(...words);
-      const tNow = (performance.now() - startTimeRef.current) / 1000;
-      const cleanWords = words.map((w: string) => w.toLowerCase().replace(/[^a-z']/g, ""));
-      let fillerHits = 0;
-      cleanWords.forEach((cw: string, i: number) => {
-        if (!cw) return;
-        if (FILLER_WORDS.has(cw)) { fillerHits++; disfluencyEventsRef.current.push({ t: tNow }); }
-        // Immediate word repetition ("I I", "the the") — a classic
-        // stutter/repetition proxy, checked across the recognition
-        // batch boundary too via lastWordRef.
-        const prev = i === 0 ? lastWordRef.current : cleanWords[i - 1];
-        if (cw === prev) disfluencyEventsRef.current.push({ t: tNow });
-      });
-      if (cleanWords.length) lastWordRef.current = cleanWords[cleanWords.length - 1];
+      // Gaze Tunneling is computed on the server from the recording's word timings
+      const fillerHits = words.filter((w: string) => FILLER_WORDS.has(w.toLowerCase().replace(/[^a-z']/g, ""))).length;
       fillerCntRef.current += fillerHits;
       setFillerCount(fillerCntRef.current);
-      pronounceRef.current = Math.round(ema(pronounceRef.current, conf * 100, 0.3));
       pendingUserSpeechRef.current += (pendingUserSpeechRef.current ? " " : "") + text.trim();
       if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
       const replyWhenQuiet = () => {
@@ -953,7 +575,10 @@ function SessionContent() {
     };
     // Backend transcription (cloud Whisper) of each spoken turn
     if (!sttAvailableRef.current || !streamRef.current) return;
-    const listener: VoiceTurnListener = new VoiceTurnListener((wav) => conversationService.transcribe(wav, sttContextRef.current), {
+    const listener: VoiceTurnListener = new VoiceTurnListener((wav) => {
+        sttAudioSecRef.current.push(Math.round(Math.max(0, wav.size - 44) / 32000 * 10) / 10);  // 16 kHz 16-bit mono WAV
+        return conversationService.transcribe(wav, sttContextRef.current);
+      }, {
       onSpeechStart: () => {
         noteAnswerStarted();
         // The user is (still) talking: a pending reply now waits (see replyWhenQuiet)
@@ -963,11 +588,18 @@ function SessionContent() {
       onTranscribing: () => setInterimText("Transcribing…"),
       // A phrase (the user may still be talking) or the end of a turn (~1.6 s of silence)
       onText: (text) => {
+        sttFailsRef.current = 0; setSttNotice("");
         setInterimText(listener.isSpeaking ? "Hearing you…" : "");
-        if (text) { setNewestPhrase({ text: text.trim(), key: Date.now() }); onFinal(text, 0.85, 1200); }
+        if (text) { setNewestPhrase({ text: text.trim(), key: Date.now() }); onFinal(text, 1200); }
       },
-      onError: () => {
-        // Backend STT unavailable: the user types for the rest of the session
+      onError: (e) => {
+        // One failed phrase (already retried) isn't an outage: ask again and keep listening.
+        // Only no STT on the server (503) or three failures in a row switch to typing.
+        sttFailsRef.current++;
+        if (!(e instanceof ApiError && e.status === 503) && sttFailsRef.current < 3) {
+          setInterimText(""); setSttNotice("Sorry, I didn't catch that. Please say it again.");
+          return;
+        }
         listener.stop();
         if (voiceListenerRef.current === listener) voiceListenerRef.current = null;
         setSpeechActive(false); unavailable();
@@ -1100,10 +732,9 @@ function SessionContent() {
   // ── Session start / end ───────────────────────────────────────────────────
   const startSession = useCallback(async () => {
     wordListRef.current = []; fillerCntRef.current = 0;
-    eyeContactRef.current = 50; postureRef.current = 50; pronounceRef.current = 72;
     lastUpdateRef.current = 0; lastPrevRef.current = 0; lastTsRef.current = 0;
     lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
-    gazeSamplesRef.current = []; disfluencyEventsRef.current = []; lastWordRef.current = "";
+    sttAudioSecRef.current = [];
     activeRef.current = true; startTimeRef.current = performance.now(); sessionStartedAtRef.current = Date.now();
     turnOpenedAtRef.current = null; latenciesRef.current = [];
     pendingUserSpeechRef.current = "";
@@ -1122,10 +753,11 @@ function SessionContent() {
     ]);
     if (voiceEnabledRef.current) conversationService.preloadVoice();
     // Transcribe the user's turns on the backend when it has a speech model
-    const stt = Boolean(health && (health.providers?.openai));
+    // An unreachable /health isn't proof STT is down: try voice, /stt's own 503 settles it
+    const stt = health ? Boolean(health.providers?.openai) : true;
+    sttFailsRef.current = 0; setSttNotice("");
     sttAvailableRef.current = stt; setSttAvailable(stt);
     backendSessionIdRef.current = backendSession?.id ?? null;
-    if (backendSession) startLiveSession(backendSession, mode as SessionType);
 
     timerRef.current = setInterval(() => incrementDuration(), 1000);
     initMediaPipe().then(() => { if (activeRef.current) animRef.current = requestAnimationFrame(runDetection); });
@@ -1191,13 +823,8 @@ function SessionContent() {
     const recordedBlob = await stopRecording();
     stopCamera(); setRecording(false);
 
-    // Client-side Gaze Tunneling from this session's own samples
-    const tunneling = computeGazeTunneling(gazeSamplesRef.current, disfluencyEventsRef.current);
-    setGazeTunneling(tunneling);
-
     const sessionId = backendSessionIdRef.current;
     if (!sessionId) {
-      setAnalysisError("Sign in to have your session recorded and analysed.");
       router.push("/login");
       return;
     }
@@ -1210,18 +837,18 @@ function SessionContent() {
       await liveService.end(sessionId, duration, turns, {
         response_latency_sec: latenciesRef.current,
         ...(isTalkRef.current ? { slide_times: slideTimesRef.current } : {}),
-        ...(tunneling.label !== "Not enough data" ? { gaze_tunneling: tunneling.correlation } : {}),
+        stt_audio_sec: sttAudioSecRef.current,
       });
       if (!recordedBlob) throw new Error("No recording to analyse");
       await liveService.uploadRecording(sessionId, recordedBlob);
       // The analysis runs on the server; the results page shows its progress
       await liveService.startAnalysis(sessionId);
-    } catch (e) {
-      setAnalysisError(e instanceof Error ? e.message : "Analysis failed");
+    } catch {
+      // The results page shows what's missing (no recording / not analysed) with a retry
     }
     router.push(`/results/${sessionId}`);
   }, [
-    stopSpeech, stopRecording, stopCamera, setRecording, router, duration, setAnalysisError, setGazeTunneling,
+    stopSpeech, stopRecording, stopCamera, setRecording, router, duration,
   ]);
 
   // ── Lighting & contrast check: once a second while the camera runs (independent of
@@ -1398,9 +1025,9 @@ function SessionContent() {
     thinking ? { tone: "wait", icon: Loader2, title: `${partner} is thinking…`, hint: "Your answer was received. A reply is on its way." } :
     userSpeaking ? { tone: "you", icon: Mic, title: "Listening… keep going", hint: "When you've finished, pause for about 2 seconds, or press “I'm done”." } :
     transcribing || pendingSpeech ? { tone: "you", icon: Mic, title: "Got it. Writing down what you said…", hint: "Keep talking to add more, or press “I'm done” for the reply." } :
-    !sttAvailable ? { tone: "you", icon: Send, title: "Your turn: type your answer below", hint: "Voice input isn't available on the server right now." } :
+    !sttAvailable ? { tone: "you", icon: Send, title: "Your turn: type your answer below", hint: "Voice input stopped working (speech recognition didn't respond), so please type for now." } :
     !isRecording ? { tone: "off", icon: MicOff, title: "Your microphone is muted", hint: "Unmute it (bottom-left of the video) to answer by voice, or type below." } :
-    { tone: "you", icon: Mic, title: "Your turn: speak now", hint: "Talk naturally. Pause for about 2 seconds when you've finished." };
+    { tone: "you", icon: Mic, title: "Your turn: speak now", hint: sttNotice || "Talk naturally. Pause for about 2 seconds when you've finished." };
   const TURN_STYLE: Record<Turn["tone"], React.CSSProperties> = {
     you: { background: mc, color: "#fff" },
     ai: { background: "var(--surface-3)", color: "var(--ink)" },
@@ -1628,8 +1255,7 @@ function SessionContent() {
       <div className="flex flex-col gap-3 min-w-0">
         <div className="clay relative rounded-xl overflow-hidden bg-black aspect-video">
           {deckId && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={presentationService.slideImageUrl(deckId, slideIdx)} alt={`Slide ${slideIdx}${current?.title ? `: ${current.title}` : ""}`}
+            <SlideImage deckId={deckId} n={slideIdx} alt={`Slide ${slideIdx}${current?.title ? `: ${current.title}` : ""}`}
               className="absolute inset-0 w-full h-full object-contain" />
           )}
           {!sessionStarted && (
@@ -1666,8 +1292,7 @@ function SessionContent() {
               aria-label={`Go to slide ${t.index}${t.title ? `: ${t.title}` : ""}`}
               className="flex-shrink-0 w-28 rounded-md overflow-hidden" style={{ outline: t.index === slideIdx ? `3px solid ${mc}` : "1px solid var(--line)", outlineOffset: t.index === slideIdx ? 1 : 0 }}>
               {deckId && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={presentationService.slideImageUrl(deckId, t.index)} alt="" loading="lazy" className="w-full aspect-video object-contain" style={{ background: "var(--surface-2)" }} />
+                <SlideImage deckId={deckId} n={t.index} alt="" className="w-full aspect-video object-contain" style={{ background: "var(--surface-2)" }} />
               )}
             </button>
           ))}

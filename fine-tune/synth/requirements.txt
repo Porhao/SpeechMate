@@ -1,0 +1,8 @@
+# The Malaysian TTS (mesolitica/Malaysian-TTS-0.6B-v1) decodes audio with DistilCodec, whose package
+# imports these at load time (wandb/tensorboard are never used at runtime; pinned to versions that
+# accept protobuf 4, which MediaPipe 0.10.14 in the backend image needs). On top of requirements-ml.txt.
+https://github.com/mesolitica/DistilCodec/archive/3173efdf2ab212fa2c4a2f921d9d915bb8750e5b.zip
+einops==0.8.2
+vector-quantize-pytorch==1.17.3
+wandb==0.17.9
+tensorboard==2.17.1

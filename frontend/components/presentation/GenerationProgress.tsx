@@ -5,8 +5,8 @@ import type { DeckStatusResponse } from "@/types";
 
 // Named steps map 1:1 to the deck preparation's status values (services/pipeline.py).
 const STEPS = [
-  { status: "processing_slides", label: "Reading your slides", progress: "rendered" },
-  { status: "analyzing_content", label: "Understanding them: summary, key points, Q&A questions", progress: null },
+  { status: "processing_slides", label: "Reading your slides", counted: true },
+  { status: "analyzing_content", label: "Understanding them: summary, key points, Q&A questions", counted: false },
 ] as const;
 
 export default function GenerationProgress({
@@ -14,11 +14,9 @@ export default function GenerationProgress({
 }: { deck: DeckStatusResponse; onRetry: () => void; retrying: boolean }) {
   const failed = deck.status === "failed";
   const activeIdx = STEPS.findIndex((s) => s.status === deck.status);
-  // Where a failed run stopped: the first step whose per-slide count isn't full.
-  const p = deck.slides_progress;
-  const failedIdx = failed
-    ? (!p || p.rendered < p.total ? 0 : 1)
-    : -1;
+  // Where a failed run stopped: reading the slides, unless every slide was rendered
+  const total = deck.slide_count ?? 0;
+  const failedIdx = failed ? (!total || deck.slides_rendered < total ? 0 : 1) : -1;
 
   return (
     <div className="glass-card rounded-2xl p-6 max-w-[560px] mx-auto">
@@ -34,7 +32,7 @@ export default function GenerationProgress({
           const done = failed ? i < failedIdx : activeIdx > i;
           const active = !failed && activeIdx === i;
           const broke = failed && i === failedIdx;
-          const count = step.progress && p ? p[step.progress] : null;
+
           return (
             <li key={step.status} className="flex items-center gap-3">
               {done ? <CheckCircle2 className="w-5 h-5" style={{ color: "var(--ok)" }} />
@@ -44,8 +42,8 @@ export default function GenerationProgress({
               <span className="text-sm flex-1" style={{ color: done || active || broke ? "var(--ink)" : "var(--faint)", fontWeight: active ? 600 : 400 }}>
                 {step.label}
               </span>
-              {count != null && p && (active || done) && (
-                <span className="text-xs tabular-nums" style={{ color: "var(--muted)" }}>{count}/{p.total}</span>
+              {step.counted && total > 0 && (active || done) && (
+                <span className="text-xs tabular-nums" style={{ color: "var(--muted)" }}>{deck.slides_rendered}/{total}</span>
               )}
             </li>
           );

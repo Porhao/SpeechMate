@@ -24,9 +24,8 @@ from sqlalchemy import select  # noqa: E402
 
 from app.auth import hash_password  # noqa: E402
 from app.database import async_session_factory  # noqa: E402
-from app.models.live_session import LiveSession, ProgressRecord  # noqa: E402
+from app.models.live_session import LiveSession  # noqa: E402
 from app.services.live import extra_metrics  # noqa: E402
-from app.services.live.pipeline import PILLAR_METRICS  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.services.live import coaching, scoring  # noqa: E402
 
@@ -199,17 +198,6 @@ async def seed() -> None:
                     db.add(live)
                     await db.flush()
                     live.analysis = {"session_id": str(live.id), **analysis}
-                    for name, value in {
-                        "fluency_score": h["fluency"], "pronunciation_score": h["pron"],
-                        "eye_contact_score": h["eye"], "confidence_score": h["conf"],
-                        "posture_score": h["posture"],
-                        "overall_score": analysis["communication_score"]["overall_score"],
-                        **{name: analysis["pillars"][key]["score"] for key, name in PILLAR_METRICS.items()},
-                    }.items():
-                        db.add(ProgressRecord(
-                            user_id=user.id, live_session_id=live.id, metric_name=name,
-                            metric_value=value, recorded_at=when,
-                        ))
             print(f"  created {acc['email']}" + (" with 3 example sessions" if acc["with_history"] else ""))
         await db.commit()
 

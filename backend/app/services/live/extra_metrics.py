@@ -214,13 +214,79 @@ def _metric(key, label, value, display, score, good_range, unit_hint=""):
             "status": _status(score), "range": good_range, "hint": unit_hint}
 
 
+# ── Gaze Tunneling ──────────────────────────────────────────────────────────
+# Do you look away when you stumble? Pearson r between the share of each 5 s window spent
+# looking away and the number of disfluencies in it, computed from the recording itself:
+# word timings from speech recognition and a gaze sample every ~0.5 s from the video, so
+# both sit on one timeline (the earlier browser version stamped each stumble when its
+# transcript arrived, seconds late). Significance by circular shift: r is recomputed with
+# the disfluency series rotated against the gaze series by every possible offset, which
+# keeps both series' own clustering; p = share of offsets that match or beat the real r.
+
+GT_WINDOW_SEC = 5.0
+# The smallest possible p is 1/windows, so under 20 windows (100 s of the user's speech) no
+# link could ever reach p < 0.05: the metric is left out rather than shown undecidable.
+GT_MIN_WINDOWS, GT_MIN_EVENTS = 20, 3
+
+
+def disfluency_events(words: list[dict], stutter_events: list[dict]) -> list[dict]:
+    """[{type: filler|repetition|block|prolongation, t_sec, word}] in time order: hesitations (um, uh…)
+    at their word timings, and the disfluency detector's timed events."""
+    from app.services.live.speech import HESITATIONS
+
+    out = [{"type": "filler", "t_sec": round(w["start"], 2), "word": w["word"]} for w in words or []
+           if re.sub(r"[^\w']", "", w.get("word", "").lower()) in HESITATIONS]
+    out += [{"type": e["type"].lower(), "t_sec": e["start_time"], "word": e.get("word", "")}
+            for e in stutter_events or [] if e.get("start_time") is not None]
+    return sorted(out, key=lambda e: e["t_sec"])
+
+
+def disfluency_times(words: list[dict], stutter_events: list[dict]) -> list[float]:
+    """Seconds at which the speaker hesitated (um, uh…), repeated a word, blocked or prolonged a sound."""
+    return [e["t_sec"] for e in disfluency_events(words, stutter_events)]
+
+
+def _pearson(x: list[float], y: list[float]) -> float | None:
+    mx, my = statistics.mean(x), statistics.mean(y)
+    sxy = sum((a - mx) * (b - my) for a, b in zip(x, y))
+    sx = math.sqrt(sum((a - mx) ** 2 for a in x))
+    sy = math.sqrt(sum((b - my) ** 2 for b in y))
+    return sxy / (sx * sy) if sx > 0 and sy > 0 else None
+
+
+def gaze_tunneling(gaze: list[tuple[float, bool]], events: list[float], duration_sec: float) -> dict | None:
+    """{r, p, label, windows, events} or None when there is too little to judge (under 100 s,
+    under 3 disfluencies, gaze missing in most windows, or no variation)."""
+    n = max(1, math.ceil(duration_sec / GT_WINDOW_SEC))
+    if n < GT_MIN_WINDOWS or len(events) < GT_MIN_EVENTS:
+        return None
+    away = [[] for _ in range(n)]
+    for t, a in gaze:
+        away[min(int(t // GT_WINDOW_SEC), n - 1)].append(a)
+    seen = [w for w in away if w]
+    if len(seen) < n / 2:
+        return None
+    fill = statistics.mean(sum(w) / len(w) for w in seen)
+    x = [sum(w) / len(w) if w else fill for w in away]       # share of the window looking away
+    y = [0.0] * n
+    for t in events:
+        y[min(int(t // GT_WINDOW_SEC), n - 1)] += 1
+    r = _pearson(x, y)
+    if r is None:
+        return None
+    shifted = [_pearson(x, y[k:] + y[:k]) for k in range(1, n)]
+    p = (1 + sum(1 for v in shifted if v is not None and v >= r)) / n
+    label = ("Strong link" if r > 0.4 else "Some link") if p < 0.05 and r > 0.15 else "No clear link"
+    return {"r": round(r, 2), "p": round(p, 3), "label": label, "windows": n, "events": len(events)}
+
+
 def median_latency(client_metrics: dict | None) -> float | None:
     vals = [v for v in (client_metrics or {}).get("response_latency_sec") or [] if isinstance(v, (int, float)) and 0 <= v < 60]
     return round(statistics.median(vals), 2) if vals else None
 
 
 def build_pillars(analysis: dict, prosody: ProsodyResult | None, lang_use: LanguageUseResult | None,
-                  gestures: GestureResult | None, client_metrics: dict | None) -> dict:
+                  gestures: GestureResult | None, client_metrics: dict | None, tunneling: dict | None = None) -> dict:
     """The four pillars, each {score, status, metrics:[...]} — only measured metrics are listed."""
     sp, vi, det = analysis["speech"], analysis["vision"], analysis["details"]
     voice, lang, body, conf = [], [], [], []
@@ -232,9 +298,12 @@ def build_pillars(analysis: dict, prosody: ProsodyResult | None, lang_use: Langu
         voice.append(_metric("pace", "Speaking pace", sp["speaking_rate"], f"{sp['speaking_rate']:.0f} wpm",
                              pace_score(sp["speaking_rate"]), "120–160 wpm"))
     if sp.get("pronunciation_score") is not None:
+        pr = det.get("pronunciation") or {}
+        hint = ("clarity, Malaysian accent allowed" if pr.get("method") != "phone-gop" else
+                f"{len(pr.get('intelligibility') or [])} unclear sound(s); "
+                f"{len(pr.get('regional') or [])} Malaysian English feature(s) accepted")
         voice.append(_metric("pronunciation", "Pronunciation", sp["pronunciation_score"],
-                             f"{sp['pronunciation_score']:.0f}/100", sp["pronunciation_score"], "70+",
-                             "clarity, Malaysian accent allowed"))
+                             f"{sp['pronunciation_score']:.0f}/100", sp["pronunciation_score"], "70+", hint))
     if prosody:
         voice.append(_metric("vocal_variety", "Vocal variety", prosody.pitch_variation_st,
                              f"{prosody.pitch_variation_st:.1f} semitones", pitch_score(prosody.pitch_variation_st),
@@ -286,10 +355,12 @@ def build_pillars(analysis: dict, prosody: ProsodyResult | None, lang_use: Langu
     if lat is not None:
         conf.append(_metric("response_time", "Response time", lat, f"{lat:.1f} s", latency_score(lat), "under 2 s",
                             "from the end of a question to your first word"))
-    gt = (client_metrics or {}).get("gaze_tunneling")
-    if isinstance(gt, (int, float)):
-        conf.append(_metric("gaze_tunneling", "Gaze Tunneling", gt, f"r = {gt:.2f}", _clamp(100 - max(0.0, gt) * 100),
-                            "under 0.3", "looking away when you stumble"))
+    if tunneling:
+        # Only a link that beats chance (p < 0.05) costs points; a chance-level r is no evidence
+        r = tunneling["r"]
+        score = _clamp(100 - max(0.0, r) * 100) if tunneling["p"] < 0.05 else 100.0
+        conf.append(_metric("gaze_tunneling", "Gaze Tunneling", r, f"r = {r:.2f} · {tunneling['label'].lower()}", score,
+                            "no significant link", "looking away when you stumble"))
 
     def pillar(key, label, items, blurb):
         scores = [m["score"] for m in items if m["score"] is not None]
