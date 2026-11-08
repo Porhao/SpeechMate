@@ -25,6 +25,7 @@ from app.services import practice_plans
 from app.services.live import asr, coaching, extra_metrics, language, phone_gop, pronunciation, scoring, speech, vision
 from app.services.ai import track_llm_usage
 from app.services.live._ml import available
+from app.services.learner import learner_brief
 from app.services.live.talk import talk_feedback
 from app.services.notifications import notify
 from app.services.live.audio import to_16k_wav
@@ -42,6 +43,7 @@ async def analyze_recording(
     *,
     session_type: str = "Conversation",
     user_goal: str | None = None,
+    learner: str = "",
     previous: dict | None = None,
     context: dict | None = None,
     turns: list[dict] | None = None,
@@ -62,7 +64,7 @@ async def analyze_recording(
     # recording, so it runs alongside the speech and vision models instead of after them
     # A presentation talk is judged slide by slide from the transcript's word timings (after ASR)
     talk = (context or {}).get("kind") == "talk"
-    content_task = None if talk else asyncio.create_task(practice_plans.content_feedback(session_type, context, turns))
+    content_task = None if talk else asyncio.create_task(practice_plans.content_feedback(session_type, context, turns, learner))
     try:
         # Speech, then vision: running both model sets at once ran a 7.6 GB machine out of
         # memory (OOM-killed). Each stage still runs its own light parts in parallel.
@@ -374,6 +376,7 @@ async def run_live_analysis(live_id: uuid.UUID) -> None:
                     recording, recording.parent, history,
                     session_type=live.session_type,
                     user_goal=user.communication_goal if user else None,
+                    learner=learner_brief(user),
                     previous=previous,
                     context=live.context,
                     turns=live.turns,

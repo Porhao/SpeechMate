@@ -20,6 +20,7 @@ from app.schemas.live import ConversationMessage, ConversationRequest, TTSReques
 from app.limits import rate_limit, read_limited
 from app.services import practice_plans
 from app.services.ai import get_llm_client, get_openai_client, get_tts_client, track_llm_usage
+from app.services.learner import learner_brief, with_brief
 from app.services.live.asr import transcribe_turn
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,7 @@ async def partner_reply(
     client = _llm()
     if not body.messages:
         body.messages = [ConversationMessage(role="user", content="(The learner has just joined. Greet them warmly and open the conversation.)")]
-    system = PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"]) + SPOKEN_STYLE
+    system = with_brief(PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"]) + SPOKEN_STYLE, learner_brief(user))
     if body.topic:
         system += f"\n\nThe current conversation topic is: {body.topic}"
     try:

@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.config import settings
 from app.services.ai import count_words, get_llm_client, parse_json_object
+from app.services.learner import with_brief
 
 logger = logging.getLogger(__name__)
 
@@ -198,10 +199,11 @@ def _finish(plan: _Plan, name: str | None) -> dict:
     return {"intro": _compose_intro(plan.greeting, questions[0]["question"], name), "questions": questions, "source": "llm"}
 
 
-async def build_interview_plan(setup: dict, candidate_name: str | None = None) -> dict:
+async def build_interview_plan(setup: dict, candidate_name: str | None = None, learner: str = "") -> dict:
+    """`learner`: services/learner.py's brief, so the questions fit the candidate's level and field."""
     try:
         payload = {**setup, **({"candidate_name": candidate_name} if candidate_name else {})}
-        plan = await _llm_json(INTERVIEW_SYSTEM, payload, _Plan)
+        plan = await _llm_json(with_brief(INTERVIEW_SYSTEM, learner), payload, _Plan)
         if plan:
             result = _finish(plan, candidate_name)
             result["intro"] = f"{_interview_greeting(setup, candidate_name)} {result['questions'][0]['question']}"
@@ -228,12 +230,12 @@ def _fallback_qa_plan(deck_title: str, insights: dict | None) -> dict:
             "questions": qs, "source": "rules"}
 
 
-async def build_qa_plan(deck_title: str, insights: dict | None, requirement_prompt: str | None) -> dict:
+async def build_qa_plan(deck_title: str, insights: dict | None, requirement_prompt: str | None, learner: str = "") -> dict:
     payload = {"deck_title": deck_title, "audience": requirement_prompt or "general audience",
                "insights": {k: (insights or {}).get(k) for k in ("summary", "main_message", "structure", "slides", "likely_questions")}}
     try:
         if insights:
-            plan = await _llm_json(QA_SYSTEM, payload, _Plan)
+            plan = await _llm_json(with_brief(QA_SYSTEM, learner), payload, _Plan)
             if plan:
                 return _finish(plan, None)
     except Exception as e:  # noqa: BLE001
@@ -422,8 +424,9 @@ def _rule_answer(pair: dict, look_for: list[str] | None) -> dict:
     }
 
 
-async def content_feedback(session_type: str, context: dict | None, turns: list[dict] | None) -> dict | None:
-    """Judge what was said (not how): per-answer for Interview / Presentation Q&A, corrections for Conversation."""
+async def content_feedback(session_type: str, context: dict | None, turns: list[dict] | None, learner: str = "") -> dict | None:
+    """Judge what was said (not how): per-answer for Interview / Presentation Q&A, corrections for Conversation.
+    `learner` (services/learner.py) sets the depth and tone the learner asked for."""
     pairs = pair_turns(turns or [])
     if not pairs:
         return None
@@ -456,7 +459,7 @@ async def content_feedback(session_type: str, context: dict | None, turns: list[
                 bad = sorted({t for i, a in enumerate(r.answers) for t in invented_terms(a.stronger_answer, facts_for(i))})
                 return f"Your stronger answers invent details the candidate never said: {', '.join(bad)}" if bad else None
 
-            report = await _llm_json(system, payload, _AnswersReport, temperature=0.3, check=check)
+            report = await _llm_json(with_brief(system, learner), payload, _AnswersReport, temperature=0.3, check=check)
             if report:
                 for i, a in enumerate(report.answers):  # still inventing after the re-prompt: don't show a made-up answer
                     if invented_terms(a.stronger_answer, facts_for(i)):
@@ -473,7 +476,7 @@ async def content_feedback(session_type: str, context: dict | None, turns: list[
                                + ("Your answers had clear structure — now add more specifics." if avg >= 4
                                   else "Use situation → action → result to give your answers more structure.")}
         # Conversation
-        report = await _llm_json(CONVERSATION_SYSTEM, {"learner_turns": [p["answer"] for p in pairs],
+        report = await _llm_json(with_brief(CONVERSATION_SYSTEM, learner), {"learner_turns": [p["answer"] for p in pairs],
                                                       "partner_turns": [p["question"] for p in pairs]}, _ConversationReport, 0.3)
         if report:
             return {"kind": "conversation", **report.model_dump(), "source": "llm"}

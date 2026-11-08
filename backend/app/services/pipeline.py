@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_factory
 from app.models.session import Session
 from app.models.slide import Slide
+from app.models.user import User
 from app.services import practice_plans
 from app.services.deck_insights import analyse_deck
+from app.services.learner import learner_brief
 from app.services.media import MediaError
 from app.services.notifications import notify
 from app.services.slide_processor import SlideProcessorError, slide_processor
@@ -127,7 +129,8 @@ async def _stage_analyze_content(db: AsyncSession, session: Session, slides: lis
     if insights:
         try:
             title = session.original_filename.rsplit(".", 1)[0]
-            plan = await practice_plans.build_qa_plan(title, insights, session.requirement_prompt)
+            owner = await db.get(User, session.user_id) if session.user_id else None
+            plan = await practice_plans.build_qa_plan(title, insights, session.requirement_prompt, learner_brief(owner))
             session.insights = {**insights, "qa_plan": plan}  # a new dict, so the JSON column is saved
             await db.commit()
         except Exception:  # noqa: BLE001 — the Q&A start builds it on demand instead

@@ -22,6 +22,7 @@ from app.schemas.live import (
     PracticePlan,
 )
 from app.services import practice_plans, tasks
+from app.services.learner import learner_brief
 from app.services.live.pipeline import run_live_analysis
 from app.limits import MB, rate_limit, read_limited
 from app.services.storage import storage_service
@@ -93,7 +94,7 @@ async def read_resume(
 @router.post("/interview/plan", response_model=PracticePlan, dependencies=[Depends(rate_limit("plan", 6))])
 async def interview_plan(body: InterviewSetup, user: User = Depends(require_cloud_consent)):
     """Curate the mock-interview questions from the candidate's setup (and resume) for preview."""
-    return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user))
+    return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user), learner_brief(user))
 
 
 async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: str = "qa") -> dict:
@@ -116,7 +117,7 @@ async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: 
     # Built once (normally by the deck pipeline, right after the insights) and reused for every rehearsal
     plan = deck.insights.get("qa_plan")
     if not plan:
-        plan = await practice_plans.build_qa_plan(title, deck.insights, deck.requirement_prompt)
+        plan = await practice_plans.build_qa_plan(title, deck.insights, deck.requirement_prompt, learner_brief(user))
         deck.insights = {**deck.insights, "qa_plan": plan}
     return {**base, "kind": "qa", "plan": plan}
 
@@ -134,7 +135,7 @@ async def start_live_session(
         setup = body.interview.model_dump(exclude_none=True)
         resume_text = setup.pop("resume_text", None)
         plan = body.plan.model_dump() if body.plan else await practice_plans.build_interview_plan(
-            {**setup, **({"resume_text": resume_text} if resume_text else {})}, _first_name(user))
+            {**setup, **({"resume_text": resume_text} if resume_text else {})}, _first_name(user), learner_brief(user))
         context = {"setup": setup, "resume_text": resume_text, "plan": plan}
     elif body.session_type == "Presentation":
         if not body.deck_id:
