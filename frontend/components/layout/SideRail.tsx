@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 const PAGES: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/profile", label: "Profile", icon: UserRound },
   { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/settings#privacy", label: "Your data & privacy", icon: ShieldCheck },
+  { href: "/privacy", label: "Privacy & security", icon: ShieldCheck },
   { href: "/methodology", label: "How it's measured", icon: BookOpen },
 ];
 
@@ -62,8 +62,7 @@ export default function SideRail() {
 
         <ul className={group} aria-label="Your pages">
           {PAGES.map(({ href, label, icon: Icon }) => {
-            // "Your data" is a section of Settings, so only the Settings button lights up there
-            const active = !href.includes("#") && (pathname === href || pathname.startsWith(href + "/"));
+            const active = pathname === href || pathname.startsWith(href + "/");
             return (
               <RailItem key={href} label={label} active={active}>
                 {(cls) => (

@@ -17,6 +17,7 @@ import { VoiceTurnListener } from "@/lib/voiceTurns";
 import SlideImage from "@/components/presentation/SlideImage";
 import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
 import type { SessionType, LiveSession } from "@/types";
+import { formatDuration } from "@/utils/format";
 import {
   BACKCHANNEL_TEXTS, CHECKIN_MESSAGES, FILLER_WORDS, MODE_ACKS, MODE_PROMPTS, MODE_TITLES, MOOD_STATES, RANDOM_TOPICS,
   clamp, ema, inferMood, paceWpm, type Blendshape, type MoodLabel,
@@ -111,7 +112,7 @@ function SessionContent() {
   const animRef    = useRef<number>(0);
   // Speech-to-text for the user's turns is the backend's (cloud Whisper, e.g. Groq).
   // No browser fallback: Chrome's recogniser sends audio to Google and is English-only
-  // (docs/manglish-transcription-spec.md). Without a backend model the user types instead.
+  // (fine-tune/docs/manglish-transcription-spec.md). Without a backend model the user types instead.
   const [sttAvailable,   setSttAvailable]   = useState(true);
   const sttAvailableRef  = useRef(true);
   const sttFailsRef      = useRef(0);  // consecutive failed transcriptions
@@ -405,8 +406,9 @@ function SessionContent() {
     try {
       const { FaceLandmarker, PoseLandmarker, FilesetResolver, DrawingUtils } =
         await import("@mediapipe/tasks-vision");
+      // The WASM must be the same version as the JS package (pinned exactly in package.json)
       const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
       const [fl, pl] = await Promise.all([
         FaceLandmarker.createFromOptions(vision, {
           baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
@@ -1279,9 +1281,13 @@ function SessionContent() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setShowCue((v) => !v)} aria-pressed={showCue} className="nav-pill px-3 py-1.5 rounded-full text-xs font-semibold">
-            {showCue ? "Hide my cue" : "Show my cue"}
+            {showCue ? "Hide my " : "Show my "}{current?.script ? "script" : "cue"}
           </button>
-          {showCue && current?.key_point && (
+          {showCue && current?.script ? (
+            <p className="text-sm whitespace-pre-line max-h-40 overflow-y-auto" style={{ color: "var(--ink-2)" }}>
+              {current.budget_sec ? <span style={{ color: "var(--muted)" }}>About {formatDuration(current.budget_sec)}: </span> : null}{current.script}
+            </p>
+          ) : showCue && current?.key_point && (
             <p className="text-sm" style={{ color: "var(--ink-2)" }}><span style={{ color: "var(--muted)" }}>This slide&apos;s point:</span> {current.key_point}</p>
           )}
         </div>

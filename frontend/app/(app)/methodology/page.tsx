@@ -240,7 +240,7 @@ type AIRow = { fn: string; used: string; model: string; input: string; output: s
 // Every AI function in the system: what runs it, and how its quality is checked
 const AI_FUNCTIONS: AIRow[] = [
   { fn: "Speech recognition", used: "All three", model: "Whisper large-v3 (Groq API)",
-    input: "16 kHz audio", output: "Transcript + word timings", fallback: "Typed input (live turns)", quality: "WER by language (not yet benchmarked)" },
+    input: "16 kHz audio", output: "Transcript + word timings", fallback: "Typed input (live turns)", quality: "WER by language: 4.9% English, 7.3% Malay, 16.5% synthetic Manglish" },
   { fn: "AI partner (conversation)", used: "Conversation", model: "Gemini 3.5 Flash-Lite",
     input: "Last 12 turns + topic", output: "2–3 spoken sentences", fallback: "Scripted prompts", quality: "UAT naturalness rating" },
   { fn: "Interview question plan", used: "Interview", model: "Gemini 3.5 Flash-Lite (JSON, validated)",
@@ -266,7 +266,7 @@ const AI_FUNCTIONS: AIRow[] = [
 
 const EVALUATION = [
   { component: "Speech recognition", metric: "Word error rate (WER), split by Malay / English / mixed", truth: "FLEURS ms_my (real speakers) + Malaysian-accented and Manglish clips",
-    target: "Clear WER reduction vs. a standard Whisper baseline", result: "Done — 6.1% vs 51.3% (docs/benchmarks)" },
+    target: "Clear WER reduction vs. a standard Whisper baseline", result: "Done (deployed Groq): 4.9% English, 7.3% Malay, 16.5% synthetic Manglish; real speakers pending" },
   { component: "Pronunciation", metric: "Pearson / Spearman correlation with human ratings; precision/recall of unclear words", truth: "2–3 raters on ~20 clips",
     target: "Correlation ≥ 0.7", result: "Planned" },
   { component: "Stutter & filler detection", metric: "Precision, recall, F1; false-positive rate reported separately", truth: "Manually annotated repetitions, blocks, prolongations, fillers",
@@ -321,7 +321,7 @@ export default function MethodologyPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("live");
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-[1200px] mx-auto space-y-6">
+    <div className="px-4 sm:px-6 py-6 max-w-[1200px] mx-auto space-y-5">
       <PageHeader eyebrow="Reference" title="How it’s measured">
         Every number in SpeechMate in plain words, with how it&rsquo;s worked out, a worked example and the research behind
         it one click away. Anything a model couldn&rsquo;t measure is shown as unavailable in your results, never estimated.

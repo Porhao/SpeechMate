@@ -2,7 +2,9 @@
 
 Why: every fine-tune so far learned from synthetic TTS voices and read speech. To show the model works on **real Malaysian speakers**, which is the open go/no-go check in the plan (§11), you need recordings of real people. This guide is everything needed, from consent to training.
 
-**Target:** 10 speakers × 25 minutes ≈ 2 hours of speech. Start with 3–5 speakers to test the pipeline end to end.
+**Target:** for the evaluation only (the deployed app), about 30 speakers × 10 minutes with the short `EVAL_SPEAKER_SCRIPT.md`; all of them are test speakers. To also train a fine-tune, add about 10 speakers × 25 minutes with the full `SPEAKER_SCRIPT.md`. Start with 2–3 speakers to test the pipeline end to end.
+
+Consent: use `CONSENT_FORM.md`.
 
 ## What I need from you, per speaker
 
@@ -79,23 +81,28 @@ From `fine-tune/`:
 
 Lines starting with `!` are clips that were skipped (missing file, no transcript, over 30 s, ...). Fix them and run it again.
 
-## Step 6. Measure the shipped model on real speakers (before training)
+## Step 6. Measure the app on real speakers
+
+The app now uses Groq's Whisper large-v3 in the cloud; the local model and `bench_stt.py` were removed (`docs/project/local-stt-removal.md`). Measure the deployed app instead:
 
 ```bash
-docker compose cp fine-tune/eval/real backend:/models/eval/
-docker compose exec backend python scripts/benchmark/bench_stt.py --real
+python fine-tune/scripts/run_app_on_clips.py --clips fine-tune/eval/real --out fine-tune/eval/real/app
+python fine-tune/scripts/study_stats.py asr --refs fine-tune/eval/real/refs.json \
+    --hyps fine-tune/eval/real/app/app_outputs.csv --groups fine-tune/eval/real/groups.csv
 ```
 
-This is your **baseline**: word error rate of the current app on your real speakers. Write it in `RESULTS.md`.
+This is the real-speaker WER for the paper. Write it in `RESULTS.md`. The other studies are in `EVALUATION.md`.
 
-## Step 7. Train and compare
+## Step 7. (Optional) Train and compare
+
+Only if you also want to test the fine-tune (not deployed) on real speakers. That needs training speakers, so record them with the full `SPEAKER_SCRIPT.md` and leave them out of `--test`:
 
 ```bash
 cd fine-tune
 LR=1e-4 .venv/bin/python scripts/train_lora.py mesolitica/Malaysian-whisper-large-v3-turbo-v3
 ```
 
-Then score the fine-tune on the same `eval/real` clips and add a row to `RESULTS.md`. If it beats the baseline from step 6 on real speakers, you have the evidence the plan asks for. (`scripts/eval_finetune.py` currently scores `eval/paper`; pointing it at `eval/real` is a small change to make once you have the recordings.)
+Then score it on the same `eval/real` clips (`scripts/eval_finetune.py` scores `eval/paper`; pointing it at `eval/real` is a small change).
 
 ---
 
@@ -106,4 +113,4 @@ Then score the fine-tune on the same `eval/real` clips and add a row to `RESULTS
 - [ ] Each speaker: 36 recordings + `clips.csv` in `data/own/sXX/`
 - [ ] Transcripts follow `STYLE_GUIDE.md`; a second person re-checks 10%
 - [ ] `prepare_own.py` runs with no `!` lines
-- [ ] Baseline measured (step 6) **before** training
+- [ ] Real-speaker WER measured on the deployed app (step 6)

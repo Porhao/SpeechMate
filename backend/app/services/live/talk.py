@@ -15,6 +15,8 @@ from collections import Counter
 
 from pydantic import BaseModel, Field
 
+from app.services.learner import with_brief
+
 STOPWORDS = set("""
 a about above after again against all am an and any are as at be because been before being below
 between both but by can could did do does doing down during each few for from further had has have
@@ -108,12 +110,16 @@ def _rule_rows(slides: list[dict], parts: dict[int, dict]) -> list[dict]:
             coverage, missed = script_coverage(part["said"], reference)
             status = ("covered" if coverage is None or coverage >= COVERED
                       else "partly" if coverage >= PARTLY else "missed")
-        rows.append({
+        row = {
             "slide_index": idx, "title": s.get("title", ""), "key_point": s.get("key_point", ""),
             "seconds": part["seconds"] if part else 0.0, "said": (part["said"] if part else "")[:600],
             "coverage": coverage, "missed_terms": missed[:5], "status": status,
             "alignment": None, "covered": "", "missing": "", "tip": "",
-        })
+        }
+        if s.get("script"):  # practising a written script: how much of it they kept, and the time it planned
+            row["script_coverage"] = script_coverage(part["said"], s["script"])[0] if part and part["said"] else 0.0
+            row["budget_sec"] = s.get("budget_sec")
+        rows.append(row)
     return rows
 
 
@@ -127,7 +133,8 @@ def _rule_summary(rows: list[dict]) -> str:
     return text
 
 
-async def talk_feedback(context: dict, words: list[dict], slide_times: list[dict] | None, duration_sec: float) -> dict | None:
+async def talk_feedback(context: dict, words: list[dict], slide_times: list[dict] | None, duration_sec: float,
+                        learner: str = "") -> dict | None:
     """Per-slide alignment of the talk with the deck (`kind: "slides"`), or None without slides or timings."""
     from app.services.practice_plans import _llm_json  # validated, re-prompted JSON from the local LLM
 
@@ -143,7 +150,7 @@ async def talk_feedback(context: dict, words: list[dict], slide_times: list[dict
             {"slide_index": r["slide_index"], "title": r["title"], "key_point": r["key_point"],
              "slide_text": next((s.get("text", "") for s in slides if s["index"] == r["slide_index"]), "")[:600],
              "presenter_said": r["said"]} for r in spoken]}
-        report = await _llm_json(TALK_SYSTEM, payload, _TalkReport, temperature=0.3)
+        report = await _llm_json(with_brief(TALK_SYSTEM, learner), payload, _TalkReport, temperature=0.3)
     if report:
         by_idx = {j.slide_index: j for j in report.slides}
         for r in rows:
@@ -154,4 +161,8 @@ async def talk_feedback(context: dict, words: list[dict], slide_times: list[dict
         "summary": report.summary if report else _rule_summary(rows),
         "slides": rows,
         "total_sec": round(sum(r["seconds"] for r in rows), 1),
+        **({"script": {
+            "coverage": round(sum(r["script_coverage"] for r in scripted) / len(scripted), 3),
+            "planned_sec": sum(r["budget_sec"] or 0 for r in scripted),
+        }} if (scripted := [r for r in rows if "script_coverage" in r]) else {}),
     }

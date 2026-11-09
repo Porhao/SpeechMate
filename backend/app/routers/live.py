@@ -12,7 +12,6 @@ from app.auth import get_current_user, require_cloud_consent
 from app.database import get_db
 from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
 from app.models.session import Session as Deck
-from app.models.slide import Slide
 from app.models.user import User
 from app.schemas.live import (
     InterviewSetup,
@@ -26,6 +25,7 @@ from app.services.learner import learner_brief
 from app.services.live.pipeline import run_live_analysis
 from app.limits import MB, rate_limit, read_limited
 from app.services.storage import storage_service
+from app.routers.sessions import deck_slides
 
 router = APIRouter(tags=["live sessions"])
 
@@ -97,7 +97,7 @@ async def interview_plan(body: InterviewSetup, user: User = Depends(require_clou
     return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user), learner_brief(user))
 
 
-async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: str = "qa") -> dict:
+async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: str = "qa", use_script: bool = False) -> dict:
     deck = await db.get(Deck, deck_id)
     if not deck or (deck.user_id is not None and deck.user_id != user.id):
         raise HTTPException(status_code=404, detail="Deck not found")
@@ -107,13 +107,16 @@ async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: 
     base = {"deck_id": str(deck.id), "deck_title": title, "deck_summary": deck.insights.get("summary", ""),
             "audience": deck.requirement_prompt}
     if mode == "talk":
-        # What each slide is about, to check the talk against: its title, text and key point
-        points = {p.get("slide_index"): p.get("key_point") for p in deck.insights.get("slides") or []}
-        titles = {p.get("slide_index"): p.get("title") for p in (deck.insights.get("stats") or {}).get("per_slide") or []}
-        rows = (await db.execute(select(Slide).where(Slide.session_id == deck.id).order_by(Slide.slide_index))).scalars()
-        return {**base, "kind": "talk", "slides": [
-            {"index": s.slide_index, "title": titles.get(s.slide_index) or "", "text": (s.slide_text or "")[:1500],
-             "key_point": points.get(s.slide_index) or ""} for s in rows]}
+        # What each slide is about, to check the talk against; with the script, what it planned too
+        slides = await deck_slides(db, deck)
+        if use_script:
+            if not deck.script:
+                raise HTTPException(status_code=409, detail="Write a script for this deck first")
+            plan = {p["slide_index"]: p for p in deck.script["slides"]}
+            for s in slides:
+                if p := plan.get(s["index"]):
+                    s.update(script=p["text"], budget_sec=p["seconds"])
+        return {**base, "kind": "talk", "slides": slides, **({"script": True} if use_script else {})}
     # Built once (normally by the deck pipeline, right after the insights) and reused for every rehearsal
     plan = deck.insights.get("qa_plan")
     if not plan:
@@ -140,7 +143,7 @@ async def start_live_session(
     elif body.session_type == "Presentation":
         if not body.deck_id:
             raise HTTPException(status_code=422, detail="Choose the deck to rehearse the Q&A for")
-        context = await _deck_context(db, user, body.deck_id, body.presentation_mode)
+        context = await _deck_context(db, user, body.deck_id, body.presentation_mode, body.use_script)
     elif body.topic:
         context = {"topic": body.topic}
     if context and context.get("plan"):

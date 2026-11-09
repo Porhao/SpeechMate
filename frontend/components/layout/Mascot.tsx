@@ -1,7 +1,7 @@
 "use client";
 
-// The companion character in the corner: "Mate". Its eyes follow the pointer and a click makes
-// it hop (bot-avatars' own pointer play); it reacts to what you do (lib/mascot.ts) with a hop,
+// The companion character in the corner: "Mate". Its eyes follow the pointer; a click opens its
+// chat box (MateChat: ask about the app, your results or speaking). It reacts to what you do (lib/mascot.ts) with a hop,
 // wobble, peek, spin or shake and a short speech bubble, works along while something runs,
 // and dozes off after a minute of nothing. It hides on the live session page, which has the
 // AI partner instead, and can be tucked away (remembered on this device).
@@ -11,22 +11,16 @@ import { usePathname } from "next/navigation";
 import { BotAvatar } from "bot-avatars";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { MASCOT_EVENT, type MascotAction } from "@/lib/mascot";
+import MateChat from "./MateChat";
 
-const TIPS = [
-  "Pause for about 2 seconds when you finish an answer: that's my cue.",
-  "Your three drills on each results page are the fastest way to improve.",
-  "Tick off a task on Home when you've practised it.",
-  "Manglish particles like 'lah' never count as fillers here.",
-  "Present your deck first, then rehearse the Q&A from it.",
-  "Short daily practice beats one long session a week.",
-];
 const SAYS: Partial<Record<MascotAction, string>> = {
   success: "Done!", deleted: "Gone. Tidy!", done: "Nice one!", error: "Hmm, that didn't work.", empty: "Nothing matches that.",
 };
 const MOVE: Record<MascotAction, string> = {
   busy: "", success: "mascot-hop", deleted: "mascot-wobble", search: "mascot-peek",
-  empty: "mascot-tilt", done: "mascot-spin", error: "mascot-shake",
+  empty: "mascot-tilt", done: "mascot-spin", error: "mascot-shake", eat: "mascot-chomp",
 };
+const EAT_MS = 1300;   // .mascot-mouth's chomp; other reactions wait so it isn't cut short
 const IDLE_MS = 60_000;
 const HIDE_KEY = "speechmate:mascot-hidden";
 
@@ -45,7 +39,10 @@ export default function Mascot() {
   const [bubble, setBubble] = useState<{ text: string; key: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [asleep, setAsleep] = useState(false);
-  const tip = useRef(0);
+  const [eating, setEating] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [thinking, setThinking] = useState(false);
+  const eatingUntil = useRef(0);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bubbleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,7 +61,9 @@ export default function Mascot() {
       const { action, say: text } = (e as CustomEvent<{ action: MascotAction; say?: string }>).detail;
       wake();
       setBusy(action === "busy");
-      if (MOVE[action]) setMove({ cls: MOVE[action], key: Date.now() });
+      if (action === "eat") { setEating(Date.now()); eatingUntil.current = Date.now() + EAT_MS; }
+      const chewing = action !== "eat" && Date.now() < eatingUntil.current;
+      if (MOVE[action] && !chewing) setMove({ cls: MOVE[action], key: Date.now() });
       const line = text ?? SAYS[action];
       if (line) say(line);
     };
@@ -92,15 +91,12 @@ export default function Mascot() {
     );
   }
 
-  const onClick = () => {
-    setBubble({ text: TIPS[tip.current++ % TIPS.length], key: Date.now() });
-    if (bubbleTimer.current) clearTimeout(bubbleTimer.current);
-    bubbleTimer.current = setTimeout(() => setBubble(null), 5000);
-  };
+  const onClick = () => { setBubble(null); setChatOpen((o) => !o); };
 
   return (
     <div className="fixed right-4 bottom-4 z-40 flex flex-col items-end gap-1 pointer-events-none">
-      {bubble && (
+      {chatOpen && <MateChat onClose={() => setChatOpen(false)} onThinking={setThinking} />}
+      {bubble && !chatOpen && (
         <p key={bubble.key} role="status" className="mascot-bubble pointer-events-auto max-w-[220px] text-xs leading-snug px-3 py-2 rounded-xl rounded-br-sm"
           style={{ background: "var(--surface)", color: "var(--ink)", border: "1px solid var(--line)", boxShadow: "var(--shadow-card)" }}>
           {bubble.text}
@@ -112,10 +108,14 @@ export default function Mascot() {
           style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--muted)" }}>
           <ChevronDown className="w-3 h-3" />
         </button>
-        <button key={move.key} onClick={onClick} aria-label="Mate, your companion: click for a tip"
-          className={`block rounded-full ${move.cls}`}>
+        <button key={move.key} onClick={onClick} aria-label={chatOpen ? "Close the chat with Mate" : "Chat with Mate, your companion"} aria-expanded={chatOpen}
+          className={`relative block rounded-full ${move.cls}`}>
           <BotAvatar type="blob" face="eyes" headphones size={72}
-            state={busy ? "working" : asleep ? "sleeping" : "default"} />
+            state={busy || thinking ? "working" : asleep && !chatOpen ? "sleeping" : "default"} />
+          {/* The mouth that opens for a tossed, deleted item (where lib/crumple.ts aims) */}
+          <span data-mascot-mouth aria-hidden className="absolute left-1/2 pointer-events-none" style={{ top: "62%", width: 0, height: 0 }}>
+            {eating > 0 && <span key={eating} className="mascot-mouth" />}
+          </span>
         </button>
       </div>
     </div>

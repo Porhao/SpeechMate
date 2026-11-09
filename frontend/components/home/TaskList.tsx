@@ -17,6 +17,7 @@ import { DECK_IN_PROGRESS } from "@/services/presentation";
 import type { DeckListItem, LiveSession } from "@/types";
 
 type Priority = "Urgent" | "High" | null;
+// Titles are dictionary keys plus their details, translated when shown
 interface Task { id: string; title: string; tag: keyof typeof TAGS; due: Date; priority: Priority; href: string }
 interface Pending { id: string; title: string; tag: keyof typeof TAGS; status: string; href: string }
 

@@ -1,78 +1,134 @@
-# Deploying SpeechMate to Vercel
+# Deploying SpeechMate (frontend on Vercel)
 
-Pipeline: `.github/workflows/deploy-vercel.yml`, run by hand from GitHub → Actions → "Production Deployment to Vercel" → Run workflow.
-It runs three jobs in order: Alembic migrations against Supabase, then the backend, then the frontend.
+**Recommended:** the Next.js frontend on Vercel, and the backend (FastAPI, Postgres, Kokoro voice) on one Linux server with Docker.
 
-## One-time setup
+- **Why not the backend on Vercel too?** A Vercel function has:
+  - no ffmpeg or LibreOffice;
+  - no lasting disk;
+  - a 500 MB size cap (the analysis models alone are about 2 GB);
+  - nothing that runs after the response is sent, which is how session analysis works.
 
-### 1. Supabase (Postgres)
-1. Create a free project at supabase.com.
-2. Project Settings → Database → Connection string. Use the **session pooler** or **direct** string (port 5432),
-   not the transaction pooler (6543), and change the scheme to `postgresql+asyncpg://`:
-   `postgresql+asyncpg://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`
-3. Free projects pause after about a week without traffic; un-pause from the dashboard.
+  Moving the backend there would lose pronunciation, eye contact, posture and emotion scoring, and .pptx upload (Option B below).
+- **The server keeps every feature as it runs today:** it is the same `docker compose` stack.
 
-### 2. Vercel (two projects from this one repo)
-1. Import the GitHub repo twice at vercel.com/new:
-   - `speechmate-frontend`: Root Directory `frontend`, framework Next.js.
-   - `speechmate-backend`: Root Directory `backend`, framework FastAPI (only after the port below).
-2. In each project, turn **off** automatic Git deployments if you only want the pipeline to deploy
-   (Settings → Git → Ignored Build Step: `exit 0`).
-3. Create a token: vercel.com/account/tokens.
-4. Find the IDs: run `vercel link` in each folder and read `.vercel/project.json` (`orgId`, `projectId`).
+```
+Browser ──► speechmate.vercel.app      (Vercel: Next.js)
+        └─► api.<your-domain>          (your server: Caddy HTTPS → backend → Postgres, Kokoro)
+                 └─► Groq (speech-to-text), Gemini (LLM)
+```
 
-### 3. Environment variables (Vercel → Project → Settings → Environment Variables, "Production")
+## 1. The server
 
-Frontend:
+### Size
 
-| Name | Value |
+You need **2 vCPU, 4 GB RAM (8 GB is more comfortable), 40 GB disk, Ubuntu 24.04, x86-64**. The analysis models load on first use and need about 2–3 GB while a session is analysed.
+
+| Option | Cost for an FYP |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | `https://speechmate-backend.vercel.app/api` (your backend's production domain) |
+| DigitalOcean (GitHub Student Developer Pack: US$200 credit) | 4 GB droplet ≈ US$24/month: about 8 months free |
+| Azure for Students (US$100 credit, no card) | B2s VM ≈ US$30/month: about 3 months free |
+| Oracle Cloud Always Free (ARM, 24 GB) | free, but ARM: the image is untested there |
 
-Backend (same values as `backend/.env`):
+### Setup
 
-| Name | Value |
-|---|---|
-| `DATABASE_URL` | the Supabase string from step 1 |
-| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `CORS_ORIGINS` | `["https://speechmate-frontend.vercel.app"]` |
-| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `TRANSCRIPTION_MODEL` | Groq key, `https://api.groq.com/openai/v1`, `whisper-large-v3` |
-| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | Gemini endpoint, key, `gemini-3.5-flash-lite` |
-| `USE_LOCAL_ML` | `false` |
+1. **Open the ports.** In the provider's firewall, open 22, 80 and 443 only.
+2. **Install Docker.** SSH in, then:
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER   # log out and back in
+   ```
+3. **Copy the project to the server** (from your machine):
+   ```bash
+   rsync -av --exclude node_modules --exclude .next --exclude fine-tune --exclude .venv ./ user@SERVER_IP:speechmate/
+   ```
+4. **Create `backend/.env`** on the server from `backend/.env.example`:
+   - your Groq and Gemini keys;
+   - a new secret from `python3 -c "import secrets; print(secrets.token_hex(32))"`;
+   - `TTS_BASE_URL=http://kokoro:8880/v1`.
 
-### 4. GitHub (repo → Settings → Secrets and variables → Actions)
+   Never copy `.env` into Git.
+5. **Change the database password.** It is hard-coded in `docker-compose.yml` (`speechmate_password`): change it in both `POSTGRES_PASSWORD` and `DATABASE_URL`. With the production override, Postgres can't be reached from outside, but use a real password anyway.
 
-| Secret | Value |
-|---|---|
-| `VERCEL_TOKEN` | the token from 2.3 |
-| `VERCEL_ORG_ID` | `orgId` |
-| `VERCEL_FRONTEND_PROJECT_ID` | frontend `projectId` |
-| `VERCEL_BACKEND_PROJECT_ID` | backend `projectId` |
-| `DATABASE_URL` | the Supabase string (used by the migration job) |
+## 2. A domain for the API
 
-Variable (Variables tab, not Secrets): `DEPLOY_BACKEND=true` once the backend port is done. Until then
-the backend job is skipped and only migrations and the frontend run.
+HTTPS needs a domain name pointing at the server. Caddy then gets and renews the certificate by itself.
 
-## The backend port (needed before `DEPLOY_BACKEND=true`)
-
-The backend runs in a Docker container today. A Vercel Python function has no system programs,
-no lasting disk, a 500 MB size cap and a 300 s time limit on Hobby, and work started after the
-response is not guaranteed to finish. What has to change:
-
-| Today | On Vercel | Change |
+| Choice | How | Trade-off |
 |---|---|---|
-| `tasks.spawn(...)` runs the session analysis, coach feedback and example-video pipelines after the response | Frozen after the response | Run the job inside its own request (a "process" call the frontend makes and waits on), within 300 s |
-| `ffmpeg` (every recording is converted to 16 kHz WAV; example videos) | Not installed | `imageio-ffmpeg` ships a static ffmpeg binary as a pip package; point `FFMPEG_BIN` at it |
-| LibreOffice + `pdftoppm` (.pptx → slide images) | Not installed | Accept PDF only and render pages with PyMuPDF |
-| `./storage` (recordings, slides, videos) | Lost between requests | Vercel Blob (free on Hobby within its limits) |
-| Kokoro container (partner voice) | No containers | Kokoro in the browser (`kokoro-js`), below |
-| `requirements-ml.txt` (torch, MediaPipe, wav2vec2, librosa: 4.7 GB image) | Too big | Dropped. Pronunciation, eye contact, posture, emotion and prolongation metrics then report "unavailable" (the code already handles this), and the Malaysian TTS narrator is gone |
+| **Your own domain** (recommended; free `.me` with the GitHub Student Pack via Namecheap) | DNS `A` record: `api` → server IP. Optionally add the frontend on Vercel as `app.<domain>` | `app.` and `api.` are the *same site*, so the sign-in cookie works in every browser, Safari included. Set `COOKIE_SAMESITE=lax` |
+| **No domain:** `SERVER-IP.sslip.io` (for example `203-0-113-5.sslip.io`) | Nothing to set up | Vercel and the API are *different sites*. The sign-in cookie needs `SameSite=None`, and Safari (and browsers that block third-party cookies) drop it: users are signed out when their 30-minute access token expires |
 
-## AI partner's voice: Kokoro in the browser
+## 3. Start the backend
 
-Kokoro-82M (Apache-2.0, the model you use now) also runs in the user's browser through
-`kokoro-js` (Transformers.js, WebGPU or WASM). No server: the model (~80 MB at q8) downloads
-once and the browser caches it. The same voices work (`af_heart`, `bf_emma`, …). WebGPU needs a
-Chromium browser with a real GPU; others use WASM (q8), which is slower. Implemented in
-`frontend/services/live.ts` (`conversationService.speak`): until the model has loaded, replies use the
-backend's `/api/tts/speak`, and failing that the browser's built-in voice.
+On the server:
+
+```bash
+cd speechmate
+export API_DOMAIN=api.example.com                    # or 203-0-113-5.sslip.io
+export FRONTEND_ORIGIN=https://speechmate.vercel.app # your Vercel URL (or https://app.example.com)
+export COOKIE_SAMESITE=lax                           # only with your own domain; leave unset otherwise
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tts up -d --build db backend kokoro caddy
+```
+
+`docker-compose.prod.yml` does four things:
+- it exposes only Caddy (80 and 443);
+- it turns off the demo accounts;
+- it sets the cookie to HTTPS-only;
+- it allows only your frontend's origin (CORS).
+
+Migrations run automatically when the backend starts.
+
+**Check:** `curl https://$API_DOMAIN/health` should answer.
+
+**To update later:** rsync again, then run the same `up -d --build` command.
+
+## 4. The frontend on Vercel
+
+1. **Push the code.** Vercel deploys from GitHub, so the code has to be on GitHub first.
+2. **Import the project.** At vercel.com/new, import the repo:
+   - **Root Directory:** `frontend`;
+   - **Framework:** Next.js (detected; pnpm comes from `packageManager`).
+3. **Set the environment variables** (Production):
+
+   | Name | Value |
+   |---|---|
+   | `NEXT_PUBLIC_API_URL` | `https://<API_DOMAIN>/api` |
+   | `NEXT_PUBLIC_SHOW_DEMO_LOGIN` | `false` (the demo accounts don't exist in production) |
+
+4. **Deploy.** Every push to the main branch then redeploys automatically.
+
+   `NEXT_PUBLIC_*` values are built into the bundle, so after changing one, use **Redeploy**.
+5. **Optional custom domain.** Under Settings → Domains, add `app.<domain>` (a `CNAME` to `cname.vercel-dns.com`), then:
+   - set `FRONTEND_ORIGIN=https://app.<domain>` on the server;
+   - restart the backend.
+
+**Check:** open the site, register, then do a short conversation session. The results should appear in about a minute.
+
+`.github/workflows/deploy-vercel.yml` is an optional manual pipeline: Supabase migrations, then Vercel. It isn't needed with the Git integration above and a server-side database.
+
+## 5. Before inviting participants
+
+- [ ] `SEED_DEMO_DATA=false` (the production override sets it).
+- [ ] A new `SECRET_KEY` and database password.
+- [ ] Back up the database:
+  ```bash
+  docker compose exec db pg_dump -U speechmate speechmate_db > backup-$(date +%F).sql
+  ```
+  A daily cron job is enough.
+- [ ] Watch Groq and Gemini usage (`details.usage` on each session). A short conversation session costs about US$0.001.
+- [ ] Check that the privacy page and consent gate match the consent form (`fine-tune/docs/CONSENT_FORM.md`).
+
+---
+
+## Option B: everything on Vercel (not recommended)
+
+Running the backend as a Vercel Python function would need:
+- **Analysis:** the analysis jobs would move into requests (a 300 s cap).
+- **ffmpeg:** it would come from `imageio-ffmpeg`.
+- **Slides:** .pptx would be dropped (PDF only, through PyMuPDF).
+- **Storage:** files would go to Vercel Blob.
+- **Partner voice:** Kokoro would run only in the browser (`kokoro-js`, already used once loaded).
+- **Analysis models:** all of them would be dropped, so pronunciation, eye contact, posture and emotion would report "unavailable".
+- **Database:** Postgres would run on Supabase, using the session pooler on port 5432 with `postgresql+asyncpg://`, not the 6543 transaction pooler.
+
+The manual workflow already has its jobs, and the backend job stays switched off until `DEPLOY_BACKEND=true`.

@@ -1,7 +1,7 @@
 """Turn your own recording sessions (RECORDING_PROMPTS.md) into training and test data.
 
     data/own/<speaker>/clips.csv + the audio files it names (wav, m4a, mp3, webm, ... anything ffmpeg reads)
-      → test speakers: eval/real/001.wav ... + refs.json  (for bench_stt.py --real; never trained on)
+      → test speakers: eval/real/001.wav ... + refs.json + groups.csv  (for study_stats.py asr; never trained on)
       → everyone else: data/clips/<speaker>_<clip>.wav + rows in data/train.csv / data/dev.csv
                        (source "own-recording")
 
@@ -33,6 +33,14 @@ FIELDS = ["file_name", "transcript", "language", "speaker", "source"]
 
 def default_language(prompt: str) -> str:
     return "ms" if prompt.strip().upper().startswith("D") else "en"
+
+
+# The groups study_stats.py reports WER by (groups.csv), from the prompt's block in SPEAKER_SCRIPT.md
+GROUPS = {"A": "mixed", "D": "malay", "F": "noisy", "G": "silent"}
+
+
+def group(prompt: str) -> str:
+    return GROUPS.get(prompt.strip()[:1].upper(), "english")
 
 
 def is_silence(prompt: str) -> bool:
@@ -86,7 +94,8 @@ def read_speaker(folder: Path, problems: list[str]) -> list[dict]:
             if secs < MIN_SEC:
                 problems.append(f"{where}: shorter than {MIN_SEC} s")
                 continue
-            clips.append({"wav": wav, "secs": secs, "transcript": text, "language": lang, "speaker": speaker})
+            clips.append({"wav": wav, "secs": secs, "transcript": text, "language": lang, "speaker": speaker,
+                          "group": group(prompt)})
     return clips
 
 
@@ -122,7 +131,7 @@ def prepare(own: Path, data: Path, real: Path, test: set[str], dev: set[str]) ->
                 real.mkdir(parents=True, exist_ok=True)
                 (real / f"{key}.wav").write_bytes(c["wav"].read_bytes())
                 refs[key] = c["transcript"]
-                sources.append({"id": key, "file": c["wav"].name})
+                sources.append({"id": key, "file": c["wav"].name, "group": c["group"]})
                 hours["test"] += c["secs"] / 3600
                 continue
             (data / "clips").mkdir(parents=True, exist_ok=True)
@@ -140,7 +149,11 @@ def prepare(own: Path, data: Path, real: Path, test: set[str], dev: set[str]) ->
         with open(real / "sources.csv", "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=["id", "file"])
             w.writeheader()
-            w.writerows(sources)
+            w.writerows({"id": s["id"], "file": s["file"]} for s in sources)
+        with open(real / "groups.csv", "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["clip_id", "group"])
+            w.writerows((s["id"], s["group"]) for s in sources)
     print(f"train: {len(train_rows)} clips ({hours['train']:.2f} h)   dev: {len(dev_rows)} clips ({hours['dev']:.2f} h)   "
           f"test: {len(refs)} clips ({hours['test']:.2f} h)")
     return problems
@@ -182,6 +195,7 @@ def selftest() -> None:
         assert soundfile.info(str(data / "clips" / "s02_001.wav")).samplerate == 16000
         refs = json.loads((real / "refs.json").read_text(encoding="utf-8"))
         assert refs == {"001": "Um, I went to KL lah.", "002": ""}, refs         # m4a converted; silence allowed
+        assert (real / "groups.csv").read_text().split() == ["clip_id,group", "001,mixed", "002,silent"]
         assert any("no transcript" in p for p in problems) and any("over 30 s" in p for p in problems), problems
         assert any("language must be" in p for p in problems), problems
     print("selftest ok")

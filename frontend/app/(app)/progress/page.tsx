@@ -190,7 +190,7 @@ export default function ProgressPage() {
   const listed = shown.filter((s) => matches(query, rowTitle(s), new Date(s.created_at).toLocaleDateString("en-MY", { dateStyle: "medium" })));
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto space-y-6">
+    <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto space-y-5">
       <PageHeader eyebrow="Progress" title="How you're improving">
         Every number here comes from your own analysed sessions.
       </PageHeader>

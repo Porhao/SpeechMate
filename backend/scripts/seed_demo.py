@@ -36,7 +36,6 @@ ACCOUNTS = [
     {
         "email": "demo@speechmate.dev",
         "full_name": "Aisyah Rahman",
-        "language": "Bilingual",
         "age_group": "18-24",
         "communication_goal": "Improve Presentations",
         "skill_level": "Intermediate",
@@ -46,7 +45,6 @@ ACCOUNTS = [
     {
         "email": "new@speechmate.dev",
         "full_name": "Farid Hakim",
-        "language": "en",
         "age_group": None,
         "communication_goal": None,
         "skill_level": "Beginner",
@@ -179,7 +177,7 @@ async def seed() -> None:
                 continue
             user = User(
                 email=acc["email"], full_name=acc["full_name"], password_hash=hash_password(PASSWORD),
-                language=acc["language"], age_group=acc["age_group"],
+                age_group=acc["age_group"],
                 communication_goal=acc["communication_goal"], skill_level=acc["skill_level"],
                 challenges=acc["challenges"],
             )

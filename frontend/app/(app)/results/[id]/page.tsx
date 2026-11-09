@@ -166,6 +166,9 @@ function SlidesFeedbackCard({ fb, deckId }: { fb: Extract<ContentFeedback, { kin
       <p className="text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>{fb.summary}</p>
       <p className="text-xs mt-2 flex flex-wrap gap-x-4 gap-y-1" style={{ color: "var(--muted)" }}>
         <span>{shown.length} of {fb.slides.length} slides presented · {formatDuration(Math.round(fb.total_sec))}</span>
+        {fb.script && (
+          <span>Script: kept {Math.round(fb.script.coverage * 100)}% of its key words · planned {formatDuration(fb.script.planned_sec)}</span>
+        )}
         {counts.map(([k, n]) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full" style={{ background: SLIDE_STATUS[k].color }} />{n} {SLIDE_STATUS[k].label.toLowerCase()}
@@ -190,6 +193,13 @@ function SlidesFeedbackCard({ fb, deckId }: { fb: Extract<ContentFeedback, { kin
                   {sl.status !== "skipped" && <span className="text-xs tabular-nums" style={{ color: "var(--muted)" }}>{formatDuration(Math.round(sl.seconds))} on screen</span>}
                   {sl.alignment != null && <Dots label="Match" value={sl.alignment} />}
                 </p>
+                {sl.script_coverage != null && sl.status !== "skipped" && (
+                  <p className="text-xs tabular-nums" style={{ color: "var(--muted)" }}>
+                    Script: kept {Math.round(sl.script_coverage * 100)}% of its key words
+                    {sl.budget_sec ? <> · {formatDuration(Math.round(sl.seconds))} of {formatDuration(sl.budget_sec)} planned
+                      {sl.seconds > sl.budget_sec * 1.3 ? " (too long)" : sl.seconds < sl.budget_sec * 0.6 ? " (rushed)" : ""}</> : null}
+                  </p>
+                )}
                 {sl.key_point && <p style={{ color: "var(--ink-2)" }}><span style={{ color: "var(--muted)" }}>The slide&apos;s point:</span> {sl.key_point}</p>}
                 {sl.said && (
                   <p className="pl-3 italic line-clamp-3" title={sl.said} style={{ borderLeft: "3px solid var(--line-strong)", color: "var(--ink-2)" }}>
@@ -352,7 +362,7 @@ export default function ResultsPage() {
   const stage = Math.min(STAGES.length - 1, Math.floor(elapsed / 12));
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto space-y-6">
+    <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto space-y-5">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

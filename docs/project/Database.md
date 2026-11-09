@@ -24,10 +24,13 @@ All foreign keys cascade on delete, except `sessions.user_id` (SET NULL).
 | email | varchar(255) | unique, indexed |
 | password_hash | text | bcrypt |
 | role | varchar(50) | default `user` |
-| language | varchar(50) | default `en` |
+| language | varchar(50) | default `en`; unused (no longer set or shown) |
 | age_group, communication_goal | varchar | optional |
 | skill_level | varchar(50) | default `Beginner` |
 | challenges | json | list of strings |
+| study_level | varchar(50) | `Secondary` · `Pre-university` · `Undergraduate` · `Postgraduate` · `Working professional` (0009) |
+| field_of_study | varchar(100) | free text (0009) |
+| feedback_style | varchar(20) | `encouraging` · `balanced` · `direct` (0009) |
 | created_at | timestamptz | |
 
 ### `live_sessions` (Conversation / Interview / Presentation Q&A)

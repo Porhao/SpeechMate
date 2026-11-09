@@ -1,6 +1,6 @@
 # Speech recognition: one Manglish verbatim prompt for every path (2026-10-02)
 
-**Change** (from `docs/manglish-transcription-spec.md` §6–7). All three local Whisper paths now go through `asr.whisper_segments()`. Before this change they used different settings:
+**Change** (from `fine-tune/docs/manglish-transcription-spec.md` §6–7). All three local Whisper paths now go through `asr.whisper_segments()`. Before this change they used different settings:
 
 | Path | Before | Now |
 |---|---|---|

@@ -5,9 +5,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import settings
-from app.routers import auth, conversation, health, live, notifications, sessions
+from app.routers import assistant, auth, conversation, health, live, notifications, sessions
 from app.services import tasks
 
 # Configure logging
@@ -39,6 +40,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Gzip responses over 1 KB when the browser accepts it (results and history JSON shrink several-fold)
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 # CORS middleware for frontend
 app.add_middleware(
     CORSMiddleware,
@@ -53,5 +56,6 @@ app.include_router(health.router)
 app.include_router(sessions.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(live.router, prefix="/api")
+app.include_router(assistant.router, prefix="/api")
 app.include_router(conversation.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")

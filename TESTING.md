@@ -134,7 +134,7 @@ Nothing crashes. Put the key back and restart to undo.
 ### Automated tests
 ```bash
 docker compose exec backend sh -c "pip install -r requirements-dev.txt && pytest"   # 63 backend tests
-cd frontend && npx tsc --noEmit && npm run lint                                    # frontend
+cd frontend && pnpm exec tsc --noEmit && pnpm lint                                 # frontend
 ```
 
 ---

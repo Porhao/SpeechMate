@@ -9,7 +9,7 @@ This document tracks the action items for Phases 5–8 of the SpeechMate project
 
 The separate Pronunciation mode, general AI Coach chat, Dashboard and Reports pages were removed. Pronunciation remains a metric in every session. Every AI function is listed in [`docs/AI_MATRIX.md`](docs/AI_MATRIX.md).
 
-Legend: `[x]` done · `[~]` partly done (the note says what's left) · `[ ]` not started
+Legend: `[x]` done · `[~]` partly done (the note says what's left) · `[ ]` not started  · `[R]` removed
 
 ---
 
@@ -28,7 +28,7 @@ Every stage has an offline fallback, so the app runs with no keys and no local m
 | AI partner, interview / Q&A plans, answer feedback, deck insights, talk feedback | Gemini `gemini-3.5-flash-lite` (validated JSON; plans enforced in code) | question bank, fixed reactions, rule-based feedback, text outline |
 | Partner's voice | Kokoro-82M in the browser (Kokoro server or OpenAI TTS as backup) | browser speech synthesis |
 
-The example narration (Malaysian TTS, voice cloning), slide scripts and the upload-a-rehearsal coach were removed (2026-10-07 and 2026-10-16); a local LLM (Ollama) still works by setting `LLM_BASE_URL`.
+The example narration (Malaysian TTS, voice cloning), slide scripts and the upload-a-rehearsal coach were removed (2026-10-07 and 2026-10-16). The LLM is Gemini (`gemini-3.5-flash-lite`); any OpenAI-compatible server works by setting `LLM_BASE_URL`.
 
 ---
 
@@ -44,8 +44,8 @@ The example narration (Malaysian TTS, voice cloning), slide scripts and the uplo
   - [~] Stuttering/disfluency detection. *Done:* a signal-processing heuristic (repetitions from the transcript, mid-utterance blocks from silence detection, energy-based prolongations with librosa) in `backend/app/services/live/speech.py`. *Left:* train the CNN + BiLSTM + attention classifier on UCLASS, SEP-28K and locally augmented data, and plug it in where the heuristic runs.
   - [~] Accent-fair pronunciation. *Done:* Wav2Vec2 CTC-confidence scoring over proportional word spans, plus a +5% Malaysian-English allowance (`pronunciation.py`, `language.py`). *Left:* real GOP forced-alignment scoring with relaxed thresholds, and splitting deviations into "regional" vs. "intelligibility" (the assessment page's `pronunciation_flags` still shows sample data).
   - [~] Gaze tracking. *Done:* MediaPipe iris-based gaze classification (camera / left / right / down) on the backend, and live face and pose tracking in the browser. *Left:* map it to the tri-zone (left / right / slide) distribution metric.
-  - [~] Code-switching ASR routing: faster-whisper, re-run through Mesolitica's mixed-language model when the speech isn't confidently English, plus a Bahasa Malaysia / Manglish lexicon for the language ratio and particle detection. *Fixed 2026-10-06:* the torch 2.4.1 pin made the mixed-language model fail to load, so routing silently fell back to Whisper (now torch 2.6.0; **rebuild the backend to apply**). *Measured:* routing detects mixed speech but doubles WER (15.4% → 36.7%). *Left:* drop or replace the second engine.
-  - [~] Speech-recognition fine-tune (`fine-tune/`, plan in `fine-tune/docs/manglish-finetune-plan.md`): LoRA on Mesolitica turbo-v3 with 10.3 h public data. English 9.4% → 6.7%, mixed 14.5% → 6.7% WER, silence still empty. *Left:* go/no-go on real recordings (`bench_stt.py --real`), Mesolitica licence answer, then deploy via `WHISPER_MODEL_SIZE`.
+  - [R] Code-switching ASR routing (removed 2026-10-14 with the local model, see `docs/project/local-stt-removal.md`): faster-whisper, re-run through Mesolitica's mixed-language model when the speech isn't confidently English, plus a Bahasa Malaysia / Manglish lexicon for the language ratio and particle detection. *Fixed 2026-10-06:* the torch 2.4.1 pin made the mixed-language model fail to load, so routing silently fell back to Whisper (now torch 2.6.0; **rebuild the backend to apply**). *Measured:* routing detects mixed speech but doubles WER (15.4% → 36.7%). *Left:* drop or replace the second engine.
+  - [R] Speech-recognition fine-tune (on hold: the app now uses Groq `whisper-large-v3`) (`fine-tune/`, plan in `fine-tune/docs/manglish-finetune-plan.md`): LoRA on Mesolitica turbo-v3 with 10.3 h public data. English 9.4% → 6.7%, mixed 14.5% → 6.7% WER, silence still empty. *Left:* go/no-go on real recordings (`bench_stt.py --real`), Mesolitica licence answer, then deploy via `WHISPER_MODEL_SIZE`.
 - [~] **Initial Benchmarking**
   - [x] ASR baseline (`docs/benchmarks/stt-benchmark-2026-09-30.md`): Whisper medium vs. Mesolitica Malaysian Whisper small-v3 / large-v3-turbo-v3 on FLEURS Malay (real speakers) + Malaysian-accented English and Manglish. Turbo-v3 won with 7.9% WER overall (vs 51.3% for the previous medium setup) and is now the default.
   - [x] Language token (`docs/benchmarks/stt-benchmark-2026-10-01.md`): forcing `ms` translated US/UK-accented English answers into Malay. Auto-detect fixed it and improved real Malay to 6.4% WER (6.1% overall), so it is now the default.
@@ -96,7 +96,7 @@ The example narration (Malaysian TTS, voice cloning), slide scripts and the uplo
 - [ ] **Final Tuning & Deployment**
   - Adjust parameters and fix issues based on the evaluation results (e.g., pronunciation scoring inconsistencies).
   - [x] Documentation: README, backend README and PROJECT.md match the code; TESTING.md has demo accounts, a test guide and a glossary.
-  - [x] Local-first AI: Ollama for LLM + vision, local Malaysian TTS for narration, demo accounts seeded for testing.
+  - [x] Cloud AI: Groq speech-to-text, Gemini LLM, Kokoro voice in the browser (`kokoro-js`); demo accounts seeded for testing.
   - [x] UI: single plain top bar (Home · Conversation · Interview · Presentation · Progress · How it's measured), near-square corners; dark mode with WCAG AA contrast; notifications; reference matrix with an AI-functions tab; real stats only (no invented numbers).
   - [x] Live sessions: large clean camera view and a separate MediaPipe tracking inset; lighting & contrast advice.
   - [x] Recommendations grounded in measured evidence with drills and relative targets (LLM picks/words them, can't invent issues).

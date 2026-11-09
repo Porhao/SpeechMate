@@ -6,7 +6,8 @@
 //
 // - Matte "clay" materials, a warm key light and a soft contact shadow; no image assets.
 // - Leans towards the pointer; a click squashes the hero object like clay.
-// - Pauses while the tab is hidden; a single still frame for prefers-reduced-motion;
+// - Draws only while visible (on screen, tab shown); the logo only when hovered after a short
+//   intro; a single still frame for prefers-reduced-motion;
 //   every GPU resource is disposed on unmount. Load it with next/dynamic (ssr: false).
 
 import { useEffect, useRef, useState } from "react";
@@ -253,6 +254,13 @@ export default function ClayScene({ variant = "mic", className }: { variant?: Cl
     const timer = new THREE.Timer();
     const heroBase = hero.rotation.clone();
     let raf = 0;
+    // Draw only while it can be seen: on screen, tab visible, motion allowed. The small logo
+    // turns for a moment when it appears, then only while the pointer is on it (it sits on
+    // every page, and a scene redrawn 60 times a second for a 44 px icon is wasted GPU time).
+    let onScreen = true;
+    let hovering = false;
+    let intro = logo;
+    const shouldRun = () => onScreen && !document.hidden && !reduceMotion && (!logo || hovering || intro);
 
     const frame = (now?: number) => {
       timer.update(now);
@@ -272,21 +280,37 @@ export default function ClayScene({ variant = "mic", className }: { variant?: Cl
       }
       renderer.render(scene, camera);
     };
-    const loop = (now: number) => { frame(now); raf = requestAnimationFrame(loop); };
-    const onVisibility = () => {
-      cancelAnimationFrame(raf);
-      if (!document.hidden && !reduceMotion) { timer.reset(); raf = requestAnimationFrame(loop); }
+    const loop = (now: number) => { frame(now); raf = shouldRun() ? requestAnimationFrame(loop) : 0; };
+    const update = () => {
+      if (shouldRun() && !raf) { timer.reset(); raf = requestAnimationFrame(loop); }
+      else if (!shouldRun() && raf) { cancelAnimationFrame(raf); raf = 0; }
     };
-    if (reduceMotion) frame();
-    else raf = requestAnimationFrame(loop);
-    document.addEventListener("visibilitychange", onVisibility);
+    frame();  // one still frame right away, whatever happens next
+    update();
+    document.addEventListener("visibilitychange", update);
+    const seen = new IntersectionObserver(([e]) => { onScreen = e.isIntersecting; update(); });
+    seen.observe(mount);
+    const hoverTarget = logo ? mount.closest("a") ?? mount : null;
+    const onEnter = () => { hovering = true; update(); };
+    const onLeave = () => { hovering = false; update(); };
+    hoverTarget?.addEventListener("pointerenter", onEnter);
+    hoverTarget?.addEventListener("pointerleave", onLeave);
+    hoverTarget?.addEventListener("focusin", onEnter);
+    hoverTarget?.addEventListener("focusout", onLeave);
+    const introTimer = logo ? setTimeout(() => { intro = false; update(); }, 2500) : undefined;
 
     return () => {
       cancelAnimationFrame(raf);
+      clearTimeout(introTimer);
       observer.disconnect();
+      seen.disconnect();
       window.removeEventListener("pointermove", onPointer);
       renderer.domElement.removeEventListener("pointerdown", onPress);
-      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("visibilitychange", update);
+      hoverTarget?.removeEventListener("pointerenter", onEnter);
+      hoverTarget?.removeEventListener("pointerleave", onLeave);
+      hoverTarget?.removeEventListener("focusin", onEnter);
+      hoverTarget?.removeEventListener("focusout", onLeave);
       scene.traverse((o) => {
         if (o instanceof THREE.Mesh) {
           o.geometry.dispose();

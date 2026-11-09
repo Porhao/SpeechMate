@@ -15,3 +15,4 @@ def notify(db: AsyncSession, user_id: uuid.UUID | None, kind: str, title: str, b
     if user_id is None:
         return
     db.add(Notification(user_id=user_id, kind=kind, title=title[:200], body=body, link=link))
+

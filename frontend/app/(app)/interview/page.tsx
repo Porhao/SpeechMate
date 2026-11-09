@@ -121,8 +121,8 @@ export default function InterviewSetupPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto">
-      <PageHeader eyebrow="Mock interview" title="Tell us about the interview" art={<ClayArt variant="interview" className="h-[260px]" />}>
+    <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto">
+      <PageHeader eyebrow="Mock interview" title="Tell us about the interview" art={<ClayArt variant="interview" className="h-[200px]" />}>
         The interviewer prepares questions for this role, your level and your background. Add your resume and
         they&apos;ll ask about your real experience. You&apos;ll get feedback on every answer afterwards.
       </PageHeader>

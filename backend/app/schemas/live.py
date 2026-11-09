@@ -45,6 +45,8 @@ class LiveStartRequest(BaseModel):
     # checked against each slide); "qa" = the audience Q&A rehearsal (questions from the insights)
     deck_id: uuid.UUID | None = None
     presentation_mode: Literal["talk", "qa"] = "qa"
+    # "talk" only: practise the deck's script (Script page); the results add script coverage and timing
+    use_script: bool = False
 
 
 class Turn(BaseModel):

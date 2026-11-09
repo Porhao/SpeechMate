@@ -1,0 +1,4 @@
+# HTTPS for the API (certificate from Let's Encrypt, renewed automatically). docker-compose.prod.yml
+{$API_DOMAIN} {
+	reverse_proxy backend:8000
+}

@@ -1,0 +1,10 @@
+file_name,prompt,device,condition,transcript,language,notes
+001.m4a,A1,phone,quiet,,,
+002.m4a,A2,phone,quiet,,,
+009.m4a,B1,phone,quiet,,,
+014.m4a,B6,phone,quiet,,,
+017.m4a,C1 part 1,phone,quiet,,,
+023.m4a,D1,phone,quiet,,,
+025.m4a,D3,phone,quiet,,,
+032.m4a,F1,phone,background-noise,,,
+035.m4a,G1,phone,quiet,,,

@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, MessagesSquare, Presentation, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, MessagesSquare, PenLine, Presentation, RotateCcw } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
 import { authService } from "@/services/auth";
 import { liveService } from "@/services/live";
@@ -85,7 +85,7 @@ export default function PresentationWorkspace() {
   const slides = Array.from({ length: deck.slide_count ?? 0 }, (_, i) => i + 1);
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-[1200px] mx-auto space-y-6">
+    <div className="px-4 sm:px-6 py-6 max-w-[1200px] mx-auto space-y-5">
       <div className="flex items-center gap-3 flex-wrap">
         <Link href="/presentations" className="nav-pill w-10 h-10 rounded-full flex items-center justify-center" aria-label="Back to presentations">
           <ArrowLeft className="w-4 h-4" />
@@ -97,6 +97,11 @@ export default function PresentationWorkspace() {
             {deck.insights?.stats && ` · aim for about ${deck.insights.stats.estimated_minutes[0]}–${deck.insights.stats.estimated_minutes[1]} min`}
           </p>
         </div>
+        {ready && (
+          <Link href={`/script?deck=${id}`} className="nav-pill flex items-center gap-1.5 text-xs px-3 py-2 rounded-full">
+            <PenLine className="w-3.5 h-3.5" /> {deck.script ? "Your script" : "Write a script"}
+          </Link>
+        )}
         {deck.status === "complete" && (
           <button onClick={retry} disabled={retrying} className="nav-pill flex items-center gap-1.5 text-xs px-3 py-2 rounded-full disabled:opacity-50">
             {retrying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Re-read the deck

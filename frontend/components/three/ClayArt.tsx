@@ -6,6 +6,7 @@
 import dynamic from "next/dynamic";
 import { useIsDesktop } from "@/components/auth/AuthShell";
 import { cn } from "@/lib/utils";
+import { useIdle } from "@/hooks/useIdle";
 import type { ClayVariant } from "./ClayScene";
 
 const ClayScene = dynamic(() => import("./ClayScene"), { ssr: false });
@@ -19,11 +20,12 @@ const BG: Record<ClayVariant, string> = {
 
 export default function ClayArt({ variant, className }: { variant: ClayVariant; className?: string }) {
   const isDesktop = useIsDesktop();
+  const idle = useIdle();  // the panel shows at once; three.js loads once the page is done
   if (!isDesktop) return null;
   return (
     <div className={cn("clay relative rounded-xl overflow-hidden cursor-pointer", className)} style={{ background: BG[variant] }}
       title="Click me">
-      <ClayScene variant={variant} className="absolute inset-0" />
+      {idle && <ClayScene variant={variant} className="absolute inset-0" />}
     </div>
   );
 }

@@ -29,7 +29,7 @@ export const liveService = {
   start: (body: {
     session_type: SessionType; topic?: string;
     interview?: InterviewSetup; plan?: PracticePlan; deck_id?: string;
-    presentation_mode?: "talk" | "qa";
+    presentation_mode?: "talk" | "qa"; use_script?: boolean;
   }) => api.post<LiveSession>("/live", body),
 
   end: (id: string, durationSec: number, turns: Turn[] = [], clientMetrics?: Record<string, unknown>) =>

@@ -6,12 +6,6 @@ import { Eye, EyeOff } from "lucide-react";
 import AuthShell from "@/components/auth/AuthShell";
 import { useAuth } from "@/hooks/useAuth";
 
-const LANGUAGE_OPTIONS = [
-  { value: "English", label: "English" },
-  { value: "Bahasa Malaysia", label: "Bahasa Malaysia" },
-  { value: "Bilingual (EN + BM)", label: "Bilingual (EN + BM)" },
-];
-
 const GOAL_OPTIONS = [
   { value: "Public Speaking", label: "Public Speaking" },
   { value: "Job Interview", label: "Job Interview Preparation" },
@@ -30,7 +24,6 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirm_password: "",
-    language: "English",
     communication_goal: "Public Speaking",
   });
 
@@ -52,7 +45,6 @@ export default function RegisterPage() {
       full_name: form.full_name,
       email: form.email,
       password: form.password,
-      language: form.language,
       communication_goal: form.communication_goal,
     });
   };
@@ -144,22 +136,8 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Row 3: Language + Goal */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-[var(--ink)] mb-1.5">
-                  Preferred language
-                </label>
-                <select
-                  value={form.language}
-                  onChange={(e) => update("language", e.target.value)}
-                  className={inputClass}
-                >
-                  {LANGUAGE_OPTIONS.map(({ value, label }) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </div>
+            {/* Row 3: Goal */}
+            <div>
               <div>
                 <label className="block text-sm font-medium text-[var(--ink)] mb-1.5">
                   Communication goal

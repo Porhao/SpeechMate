@@ -3,11 +3,14 @@ export interface User {
   full_name: string;
   email: string;
   role: string;
-  language: string;
   age_group: string | null;
   communication_goal: string | null;
   skill_level: string;
   challenges: string[];
+  // Who the AI is talking to: it pitches questions, vocabulary and feedback at these
+  study_level: StudyLevel | null;
+  field_of_study: string | null;
+  feedback_style: FeedbackStyle | null;
   cloud_consent_at: string | null;   // when they agreed to cloud processing (Groq, Gemini); null = not yet
   keep_recordings: boolean;          // keep raw recordings after analysis (default: deleted)
   created_at: string;
@@ -15,13 +18,18 @@ export interface User {
 
 export interface UserProfileUpdate {
   full_name?: string;
-  language?: string;
   age_group?: string;
   communication_goal?: string;
   skill_level?: string;
   challenges?: string[];
+  study_level?: StudyLevel;
+  field_of_study?: string;
+  feedback_style?: FeedbackStyle;
   keep_recordings?: boolean;
 }
+
+export type StudyLevel = "Secondary" | "Pre-university" | "Undergraduate" | "Postgraduate" | "Working professional";
+export type FeedbackStyle = "encouraging" | "balanced" | "direct";
 
 export interface UserProfile {
   id: string;
@@ -71,10 +79,11 @@ export interface LiveContext {
   // Presentation: "talk" = the user presents the deck; "qa" = audience Q&A rehearsal
   kind?: "talk" | "qa";
   slides?: TalkSlide[];
+  script?: boolean;   // talk: practising the deck's written script
 }
 
 /** One slide of a deck being presented: what the talk is checked against. */
-export interface TalkSlide { index: number; title: string; text: string; key_point: string }
+export interface TalkSlide { index: number; title: string; text: string; key_point: string; script?: string; budget_sec?: number }
 
 /** How the talk matched one slide (analysis.content_feedback.kind === "slides"). */
 export interface SlideFeedback {
@@ -83,6 +92,7 @@ export interface SlideFeedback {
   coverage: number | null; missed_terms: string[];
   status: "covered" | "partly" | "missed" | "silent" | "skipped";
   alignment: number | null; covered: string; missing: string; tip: string;
+  script_coverage?: number; budget_sec?: number | null;   // practising a script
 }
 
 export interface Turn {
@@ -143,7 +153,8 @@ export type ContentFeedback =
   | { kind: "answers"; source: string; summary: string; answers: AnswerFeedback[] }
   | { kind: "conversation"; source: string; summary: string; tips: string[];
       corrections: { said: string; better: string; why: string }[] }
-  | { kind: "slides"; source: string; summary: string; slides: SlideFeedback[]; total_sec: number };
+  | { kind: "slides"; source: string; summary: string; slides: SlideFeedback[]; total_sec: number;
+      script?: { coverage: number; planned_sec: number } };
 
 export interface AuthTokens {
   access_token: string;
@@ -255,9 +266,19 @@ export interface DeckStatusResponse {
   error_detail: string | null;
   warnings: string[];
   insights: DeckInsights | null;
+  script: DeckScript | null;
   original_filename: string;
   created_at: string;
   updated_at: string;
+}
+
+// A practice script for a deck, sized to a talk length (backend script_writer.py)
+export type ScriptStyle = "full" | "points";
+export interface DeckScript {
+  minutes: number; style: ScriptStyle; wpm: number; source: "llm" | "rules"; created_at: string;
+  unverified_terms: string[];
+  read_sec?: number;   // how long the script takes to say at `wpm`
+  slides: { slide_index: number; seconds: number; text: string }[];
 }
 
 // Understanding of the deck (backend deck_insights.py)

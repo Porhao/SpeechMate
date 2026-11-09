@@ -1,6 +1,6 @@
 # Fine-Tuning Plan: Your Own Manglish Speech Model (8 GB VRAM)
 
-Companion to `docs/manglish-transcription-spec.md`. Status: draft v2, 2 Oct 2026; phase status updated 8 Oct 2026 (§3).
+Companion to `fine-tune/docs/manglish-transcription-spec.md`. Status: draft v2, 2 Oct 2026; phase status updated 8 Oct 2026 (§3).
 Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcribes your users better than **the model SpeechMate already ships**, and you own the resulting weights.
 
 **Read this first:** the code blocks in this file are the original skeleton. The tested versions are in `fine-tune/scripts/` (`prepare_public.py`, `train_lora.py`, `export.py`, `eval_finetune.py`); results are in `fine-tune/RESULTS.md`. Library versions change (`transformers`, `peft`, `bitsandbytes`), so expect to fix small API differences. Everything is gated on measured results, not on hope.
@@ -428,7 +428,7 @@ Ethics approval and labelling are usually the slowest steps. Start both first.
 
 ## 13. How to use this file
 
-Give your coding assistant this file together with `docs/manglish-transcription-spec.md` and ask for one phase at a time, for example: "Implement F3: write `scripts/prepare_data.py` that builds train/dev/test CSVs split by speaker, following section 4 of fine-tune/docs/manglish-finetune-plan.md." Commit after each phase.
+Give your coding assistant this file together with `fine-tune/docs/manglish-transcription-spec.md` and ask for one phase at a time, for example: "Implement F3: write `scripts/prepare_data.py` that builds train/dev/test CSVs split by speaker, following section 4 of fine-tune/docs/manglish-finetune-plan.md." Commit after each phase.
 
 ---
 

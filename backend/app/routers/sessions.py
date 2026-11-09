@@ -11,13 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, require_cloud_consent
 from app.database import get_db
-from app.limits import MB
+from app.limits import MB, rate_limit
 from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
 from app.models.slide import Slide
 from app.models.user import User
-from app.schemas.session import SessionCreateResponse, SessionListItem, SessionStatusResponse
+from app.schemas.session import ScriptRequest, SessionCreateResponse, SessionListItem, SessionStatusResponse
 from app.services import tasks
+from app.services.learner import learner_brief
 from app.services.pipeline import run_ideal_presentation_pipeline
+from app.services.script_writer import write_script
 from app.services.storage import storage_service
 
 MAX_DECK_BYTES = 100 * MB         # image-heavy PowerPoints get big
@@ -91,9 +93,35 @@ async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db),
         warnings=session.warnings or [],
         original_filename=session.original_filename,
         insights=session.insights,
+        script=session.script,
         created_at=session.created_at,
         updated_at=session.updated_at,
     )
+
+
+async def deck_slides(db: AsyncSession, deck: Session) -> list[dict]:
+    """Each slide's title, text and key point (from the insights), in order."""
+    insights = deck.insights or {}
+    points = {p.get("slide_index"): p.get("key_point") for p in insights.get("slides") or []}
+    titles = {p.get("slide_index"): p.get("title") for p in (insights.get("stats") or {}).get("per_slide") or []}
+    rows = (await db.execute(select(Slide).where(Slide.session_id == deck.id).order_by(Slide.slide_index))).scalars()
+    return [{"index": s.slide_index, "title": titles.get(s.slide_index) or "", "text": (s.slide_text or "")[:1500],
+             "key_point": points.get(s.slide_index) or ""} for s in rows]
+
+
+@router.post("/{session_id}/script", dependencies=[Depends(rate_limit("script", 6))])
+async def write_deck_script(session_id: uuid.UUID, body: ScriptRequest, db: AsyncSession = Depends(get_db),
+                            user: User = Depends(require_cloud_consent)):
+    """Write (or rewrite) the deck's practice script for `minutes`; it replaces the previous one."""
+    session = await get_session_or_404(db, session_id, user)
+    if not session.insights:
+        raise HTTPException(status_code=409, detail="Wait until the deck has been read, then write its script")
+    slides = await deck_slides(db, session)
+    if not slides:
+        raise HTTPException(status_code=409, detail="This deck has no slides")
+    session.script = await write_script(slides, body.minutes, body.style, session.requirement_prompt, learner_brief(user))
+    await db.commit()
+    return session.script
 
 
 @router.post("/{session_id}/retry", response_model=SessionCreateResponse, status_code=202)

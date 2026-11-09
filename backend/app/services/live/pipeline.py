@@ -162,7 +162,7 @@ async def analyze_recording(
         # What was said, judged against the plan (interview answers, Q&A) or as language
         "content_feedback": (
             await talk_feedback(context, asr_result.word_timestamps if asr_result else [],
-                                (client_metrics or {}).get("slide_times"), duration)
+                                (client_metrics or {}).get("slide_times"), duration, learner)
             if talk else await content_task
         ),
         # Full per-model output, for anyone who wants more than the summary above

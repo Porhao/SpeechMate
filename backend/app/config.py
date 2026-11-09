@@ -1,5 +1,7 @@
 """Application configuration loaded from environment variables."""
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
@@ -33,6 +35,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     # Send the refresh cookie over HTTPS only. Keep false for http://localhost; set true when deployed on HTTPS.
     cookie_secure: bool = False
+    # "none" when the frontend and API are on different sites (myapp.vercel.app + api.example.com);
+    # needs cookie_secure. Same site (app.example.com + api.example.com) keeps "lax".
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     # PDPA: refuse to start cloud processing (Groq speech-to-text, Gemini) until the user agreed to it
     require_cloud_consent: bool = True
 

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
 import { liveService } from "@/services/live";
-import type { BackendHealth, DeckListItem, LiveSession } from "@/types";
+import type { BackendHealth, DeckListItem, DeckStatusResponse, LiveSession } from "@/types";
 import { formatDate } from "@/utils/format";
 import { tint, inkOf } from "@/lib/utils";
 import { mascot } from "@/lib/mascot";
@@ -18,10 +18,31 @@ import { useExit } from "@/hooks/useExit";
 import { PageHeader } from "@/components/ui/kit";
 import { SearchBar, Highlight, matches } from "@/components/ui/SearchBar";
 import UploadCard, { type UploadPhase } from "@/components/ui/UploadCard";
+import HoopShot, { type HoopStep } from "@/components/ui/HoopShot";
 import ClayArt from "@/components/three/ClayArt";
 import DeleteButton from "@/components/ui/DeleteButton";
 
 const ACCENT = "#A8620F";
+
+// The deck's preparation as steps on the hoop's backboard (the same steps as GenerationProgress)
+function prepSteps(d: DeckStatusResponse | null): HoopStep[] {
+  const reading = !d || d.status === "queued" || d.status === "processing_slides";
+  const done = d?.status === "complete" || d?.status === "failed";
+  return [
+    { label: d?.status === "queued" ? "Waiting in the queue" : "Reading your slides", state: reading ? "active" : "done",
+      count: d?.slide_count ? `${d.slides_rendered}/${d.slide_count}` : undefined },
+    { label: "Understanding them: summary, key points, Q&A", state: done ? "done" : reading ? "todo" : "active" },
+  ];
+}
+
+// How full the net is: the upload is the first 40%, reading the slides the next 40%, then understanding them
+function netFill(phase: UploadPhase, progress: number | null, d: DeckStatusResponse | null): number {
+  if (phase === "idle") return 0;
+  if (phase === "done") return 1;
+  if (phase === "uploading" || !d) return 0.4 * (progress ?? 0);
+  if (d.status === "analyzing_content") return 0.85;
+  return 0.4 + 0.4 * (d.slide_count ? d.slides_rendered / d.slide_count : 0);
+}
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Queued",
@@ -96,6 +117,10 @@ export default function PresentationsPage() {
   const [dragging, setDragging] = useState(false);
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [progress, setProgress] = useState<number | null>(null);
+  // After the upload: the deck being read, followed on the hoop until it's ready
+  const [prep, setPrep] = useState<DeckStatusResponse | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"board" | "list">("board");
@@ -149,9 +174,20 @@ export default function PresentationsPage() {
         setProgress(f);
         if (f >= 1) setPhase("processing");
       });
-      setPhase("done");
       mascot("success", "Got it! I'm reading your slides now.");
-      setTimeout(() => router.push(`/presentations/${session_id}`), 900);  // let the check pop
+      // Follow its preparation on the hoop, then open it (its page shows a failure and Retry)
+      const follow = async () => {
+        if (!alive.current) return;
+        try {
+          const d = await presentationService.get(session_id);
+          setPrep(d);
+          if (DECK_IN_PROGRESS.has(d.status)) { setTimeout(follow, 1500); return; }
+        } catch { /* the deck page will show what happened */ }
+        if (!alive.current) return;
+        setPhase("done");
+        setTimeout(() => alive.current && router.push(`/presentations/${session_id}`), 900);  // let the check pop
+      };
+      follow();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Upload failed.");
       setPhase("idle"); setProgress(null);
@@ -175,8 +211,8 @@ export default function PresentationsPage() {
   const noAI = health && !health.llm.provider;
 
   return (
-    <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1100px] mx-auto space-y-6">
-      <PageHeader eyebrow="Presentation practice" title="Practise your talk and your Q&A" art={<ClayArt variant="present" className="h-[260px]" />}>
+    <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto space-y-5">
+      <PageHeader eyebrow="Presentation practice" title="Practise your talk and your Q&A" art={<ClayArt variant="present" className="h-[200px]" />}>
         <ol className="space-y-1.5">
           <li><b>1.</b> Upload your slides (.pptx or .pdf). The AI reads them: summary, structure and each slide&apos;s key point (about a minute).</li>
           <li><b>2.</b> Present it on camera, moving through your slides yourself. The AI checks that what you say on each slide matches what the slide is about, plus your voice and body language.</li>
@@ -226,7 +262,7 @@ export default function PresentationsPage() {
           />
           {pptx ? (
             <UploadCard name={pptx.name} size={pptx.size} phase={phase} progress={progress} color={inkOf(ACCENT)}
-              processingLabel="Uploaded. Starting to read your slides…" />
+              processingLabel={prepSteps(prep).find((x) => x.state === "active")?.label ?? "Uploaded. Starting to read your slides…"} />
           ) : (
             <>
               <Upload className={`w-7 h-7 mb-2 transition-transform ${dragging ? "-translate-y-1 scale-110" : ""}`} style={{ color: inkOf(ACCENT) }} />
@@ -251,6 +287,14 @@ export default function PresentationsPage() {
             style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--ink)" }}
           />
         </div>
+
+        {/* The fun way in: shoot the file into the hoop (the button below does the same); the
+            hoop then shows the upload's progress */}
+        {pptx && (
+          <HoopShot key={pptx.name + pptx.size} label={pptx.name.toLowerCase().endsWith(".pdf") ? "PDF" : "PPTX"} fileName={pptx.name}
+            color={inkOf(ACCENT)} onScore={submit} status={phase} progress={progress} processingLabel="Preparing your deck"
+            steps={prepSteps(prep)} fill={netFill(phase, progress, prep)} />
+        )}
 
         {submitError && <p className="text-sm" style={{ color: "var(--bad)" }}>{submitError}</p>}
 

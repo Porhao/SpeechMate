@@ -15,7 +15,6 @@ class RegisterRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    language: str = "en"
     communication_goal: str | None = None
 
 
@@ -39,7 +38,6 @@ class UserResponse(BaseModel):
     full_name: str
     email: EmailStr
     role: str
-    language: str
     age_group: str | None = None
     communication_goal: str | None = None
     skill_level: str
@@ -54,7 +52,6 @@ class UserResponse(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     full_name: str | None = Field(None, min_length=1, max_length=255)
-    language: str | None = None
     age_group: str | None = None
     communication_goal: str | None = None
     skill_level: str | None = None

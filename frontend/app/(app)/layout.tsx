@@ -2,7 +2,7 @@ import TopNav from "@/components/layout/TopNav";
 import ContactDock from "@/components/layout/ContactDock";
 import ConsentGate from "@/components/layout/ConsentGate";
 import SideRail from "@/components/layout/SideRail";
-import Mascot from "@/components/layout/Mascot";
+import Mascot from "@/components/layout/LazyMascot";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (

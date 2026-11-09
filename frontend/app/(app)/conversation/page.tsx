@@ -39,8 +39,8 @@ export default function ConversationPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 py-8 max-w-[1100px] mx-auto">
-      <PageHeader eyebrow="Daily conversation" title="What would you like to talk about?" art={<ClayArt variant="mic" className="h-[260px]" />}>
+    <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto">
+      <PageHeader eyebrow="Daily conversation" title="What would you like to talk about?" art={<ClayArt variant="mic" className="h-[200px]" />}>
         Have a relaxed spoken conversation with your AI partner. Nothing is scored while you talk; afterwards
         you get a simple report on how you sounded, the words you used and how you came across on camera.
       </PageHeader>

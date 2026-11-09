@@ -34,7 +34,8 @@ export default function NotificationBell() {
   // Poll, and check again whenever the tab regains focus
   useEffect(() => {
     const first = setTimeout(refresh, 0);
-    const timer = setInterval(refresh, POLL_MS);
+    // Only while the tab is visible; refresh as soon as it's shown again
+    const timer = setInterval(() => { if (!document.hidden) refresh(); }, POLL_MS);
     window.addEventListener("focus", refresh);
     return () => { clearTimeout(first); clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [refresh]);

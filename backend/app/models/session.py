@@ -38,6 +38,8 @@ class Session(Base):
     slide_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Deck insights (services/deck_insights.py)
     insights: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # Practice script sized to a talk length (services/script_writer.py); rewritten on request
+    script: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

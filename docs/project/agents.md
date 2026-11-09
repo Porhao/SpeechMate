@@ -19,7 +19,7 @@ Read this before changing anything. It's the rules and the workflow that are eas
 | Run everything | `docker compose --profile tts up -d --build` (repo root; `backend/` has its own compose file, don't use it) |
 | Deploy a change | Code is copied into images, no bind mounts: `docker compose up -d --build --no-deps frontend` (or `backend`); without `--no-deps` compose may restart the backend too |
 | Backend tests | Copy the working tree into the container and run pytest (exact commands in Testing.md) |
-| Frontend checks | `npx tsc --noEmit && npx eslint .` in `frontend/` |
+| Frontend checks | `pnpm exec tsc --noEmit && pnpm lint` in `frontend/` |
 | See the UI | Playwright image; load from `http://localhost:3000` (CORS) and route to the host IP (Testing.md) |
 | Demo login | `demo@speechmate.dev` / `Demo1234!` (seeded locally) |
 
@@ -35,7 +35,7 @@ Read this before changing anything. It's the rules and the workflow that are eas
 | Conventions | `docs/project/Code_style.md` |
 | How a metric is computed | the Reference page data (`frontend/app/(app)/methodology/page.tsx`) and `backend/app/services/live/` |
 | Confidence model | `backend/docs/confidence-model.md` |
-| Speech recognition and fine-tuning | `docs/manglish-transcription-spec.md`, `fine-tune/` |
+| Speech recognition and fine-tuning | `docs/project/local-stt-removal.md`, `fine-tune/` (research) |
 
 ## When you change…
 

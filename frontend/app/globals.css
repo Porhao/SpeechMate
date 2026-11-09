@@ -516,3 +516,22 @@ mark.search-hit { background: color-mix(in srgb, var(--peach) 55%, transparent);
   .row-exit { animation-duration: 0.01s; }
   .task-title { transition: none; }
 }
+
+/* HoopShot: the net stretches and springs back on a swish */
+@keyframes net-swish { 0% { transform: scaleY(1) } 35% { transform: scaleY(1.25) scaleX(0.92) } 70% { transform: scaleY(0.94) } 100% { transform: scaleY(1) } }
+.net-swish { animation: net-swish 0.45s ease-out; }
+
+/* Mate eats a deleted item: the mouth opens wide as the paper ball arrives, then chomps (lib/crumple.ts) */
+@keyframes mouth-chomp {
+  0% { transform: translate(-50%, -50%) scale(0.2, 0.05) } 25%, 45% { transform: translate(-50%, -50%) scale(1, 1) }
+  55% { transform: translate(-50%, -50%) scale(1, 0.1) } 65% { transform: translate(-50%, -50%) scale(0.8, 0.5) }
+  75% { transform: translate(-50%, -50%) scale(0.9, 0.08) } 85% { transform: translate(-50%, -50%) scale(0.7, 0.35) }
+  100% { transform: translate(-50%, -50%) scale(0.2, 0) }
+}
+.mascot-mouth {
+  position: absolute; left: 0; top: 0; width: 26px; height: 20px; border-radius: 45% 45% 55% 55%;
+  background: #3A1F2B; box-shadow: inset 0 -5px 0 #E66A8A; transform: translate(-50%, -50%) scale(0);
+  animation: mouth-chomp 1.3s ease-in-out forwards;
+}
+@keyframes mascot-chomp { 0%, 30% { transform: none } 50% { transform: scale(1.08, 0.92) } 62% { transform: scale(0.96, 1.05) } 74% { transform: scale(1.06, 0.94) } 100% { transform: none } }
+.mascot-chomp { animation: mascot-chomp 1.3s ease-in-out; }

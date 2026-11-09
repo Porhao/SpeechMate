@@ -56,22 +56,22 @@ export default function HomePage() {
   useEffect(() => { if (signedIn) presentationService.list().then(setDecks).catch(() => setDecks([])); }, [signedIn]);
 
   return (
-    <div className="px-4 sm:px-6 py-8 sm:py-12 max-w-[1280px] mx-auto">
+    <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-[1280px] mx-auto">
       {/* Hero: headline left, 3D orb right (7/5) */}
-      <div className="grid lg:grid-cols-[7fr_5fr] items-center gap-6 mb-10 lg:mb-14">
+      <div className="grid lg:grid-cols-[7fr_5fr] items-center gap-6 mb-8">
         <div>
           <p className="inline-block text-[13px] font-medium px-3 py-1 rounded-full mb-5" style={{ background: "var(--surface-3)", color: "var(--ink-2)" }}>
             {firstName ? `Hello, ${firstName}` : "Welcome back"}
           </p>
-          <h1 className="font-display text-[40px] sm:text-[56px] lg:text-[64px] leading-[1.02]" style={{ color: "var(--ink)" }}>
+          <h1 className="font-display text-[36px] sm:text-[46px] lg:text-[54px] leading-[1.04]" style={{ color: "var(--ink)" }}>
             What would you like to practise today?
           </h1>
-          <p className="mt-5 text-base sm:text-lg max-w-xl" style={{ color: "var(--ink-2)" }}>
+          <p className="mt-4 text-base max-w-xl" style={{ color: "var(--ink-2)" }}>
             Speak with the AI, then get a clear, simple report. Nothing interrupts you while you talk.
           </p>
         </div>
         {/* 3D clay microphone, speech bubbles and shapes (click to squash) */}
-        <ClayArt variant="mic" className="h-[360px]" />
+        <ClayArt variant="mic" className="h-[300px]" />
       </div>
 
       {/* The three functions: saturated clay cards that lean towards the pointer */}

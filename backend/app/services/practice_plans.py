@@ -86,16 +86,16 @@ def _compose_intro(greeting: str, first_question: str, name: str | None) -> str:
     return " ".join(keep[:2] + [first_question]).strip()
 
 
-async def _llm_json(system: str, payload: dict, model_cls, temperature: float = 0.4, check=None):
+async def _llm_json(system: str, payload: dict, model_cls, temperature: float = 0.4, check=None, tries: int = 2):
     """JSON from the LLM, validated against `model_cls` (and `check(result) -> error | None`),
-    re-prompted once with the problem. A result that still fails `check` is returned as is
+    re-prompted with the problem (`tries` attempts in all). A result that still fails `check` is returned as is
     (the caller repairs it); one that fails validation gives None (the caller falls back)."""
     client = get_llm_client()
     if client is None:
         return None
     messages = [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
     result = None
-    for _ in range(2):
+    for _ in range(tries):
         resp = await client.chat.completions.create(
             model=settings.llm_model, messages=messages, response_format={"type": "json_object"}, temperature=temperature
         )

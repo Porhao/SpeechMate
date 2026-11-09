@@ -6,6 +6,8 @@
 // "Not now" closes it; practice sessions then stay unavailable until they agree.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { authService } from "@/services/auth";
 import { CONSENT_EVENT } from "@/services/api";
@@ -18,6 +20,8 @@ export default function ConsentGate() {
   const [keep, setKeep] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Never over the privacy page itself: its details and its "Agree" are what the user is reading
+  const onPrivacyPage = usePathname() === "/privacy";
 
   useEffect(() => {
     const show = () => setOpen(true);
@@ -48,7 +52,7 @@ export default function ConsentGate() {
     }
   };
 
-  if (!open) return null;
+  if (!open || onPrivacyPage) return null;
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(10,10,10,0.55)" }}>
       <div role="dialog" aria-modal="true" aria-labelledby="consent-title" className="w-full max-w-[520px] rounded-xl p-6 clay"
@@ -73,7 +77,8 @@ export default function ConsentGate() {
           </span>
         </label>
         <p className="text-xs mt-4" style={{ color: "var(--muted)" }}>
-          You can withdraw, download your data or delete your account any time in Settings.
+          You can withdraw, download your data or delete your account any time.{" "}
+          <Link href="/privacy" onClick={() => setOpen(false)} className="underline" style={{ color: "var(--accent-ink)" }}>Read the full details</Link>
         </p>
         {error && <p className="text-sm mt-3" role="alert" style={{ color: "var(--bad)" }}>{error}</p>}
         <div className="flex flex-wrap justify-end gap-2 mt-5">

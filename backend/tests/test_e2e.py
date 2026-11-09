@@ -91,14 +91,21 @@ async def test_deck_then_presenting_it(client: httpx.AsyncClient, tmp_path: Path
     assert session["insights"]["qa_plan"]["questions"]           # Q&A ready to start instantly
     assert (await client.get(f"/api/sessions/{sid}/slides/2/image", headers=headers)).status_code == 200
 
-    # ── Present it ───────────────────────────────────────────────────────
-    r = await client.post("/api/live", headers=headers,
-                          json={"session_type": "Presentation", "deck_id": sid, "presentation_mode": "talk"})
+    # ── Write a 3-minute script, then present it ─────────────────────────
+    talk = {"session_type": "Presentation", "deck_id": sid, "presentation_mode": "talk", "use_script": True}
+    assert (await client.post("/api/live", headers=headers, json=talk)).status_code == 409   # no script yet
+    r = await client.post(f"/api/sessions/{sid}/script", headers=headers, json={"minutes": 3, "style": "full"})
+    assert r.status_code == 200, r.text
+    assert sum(p["seconds"] for p in r.json()["slides"]) == 180
+    assert (await client.get(f"/api/sessions/{sid}", headers=headers)).json()["script"]["minutes"] == 3
+
+    r = await client.post("/api/live", headers=headers, json=talk)
     assert r.status_code == 201, r.text
     live = r.json()
     ctx = live["context"]
-    assert ctx["kind"] == "talk" and "plan" not in ctx
+    assert ctx["kind"] == "talk" and "plan" not in ctx and ctx["script"] is True
     assert [s["index"] for s in ctx["slides"]] == [1, 2, 3] and all(s["key_point"] for s in ctx["slides"])
+    assert all(s["script"] and s["budget_sec"] for s in ctx["slides"])
 
     lid = live["id"]
     times = [{"slide_index": 1, "t_sec": 0}, {"slide_index": 2, "t_sec": 6}]  # slide 3 never shown
@@ -117,6 +124,7 @@ async def test_deck_then_presenting_it(client: httpx.AsyncClient, tmp_path: Path
     by = {r["slide_index"]: r for r in fb["slides"]}
     assert by[1]["seconds"] == 6.0 and by[2]["seconds"] == 6.0
     assert by[3]["status"] == "skipped"
+    assert fb["script"]["planned_sec"] == 180 and by[3]["script_coverage"] == 0.0
     # Offline there's no speech recognition, so the shown slides have no words to judge
     assert by[1]["status"] == "silent"
 

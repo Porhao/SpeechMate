@@ -39,7 +39,7 @@ router = APIRouter(tags=["auth"])
 
 def _to_response(user: User) -> UserResponse:
     return UserResponse(
-        id=user.id, full_name=user.full_name, email=user.email, role=user.role, language=user.language,
+        id=user.id, full_name=user.full_name, email=user.email, role=user.role,
         age_group=user.age_group, communication_goal=user.communication_goal,
         skill_level=user.skill_level, challenges=user.challenges or [], created_at=user.created_at,
         study_level=user.study_level, field_of_study=user.field_of_study, feedback_style=user.feedback_style,
@@ -57,7 +57,6 @@ async def register(body: RegisterRequest, request: Request, db: AsyncSession = D
         full_name=body.full_name.strip(),
         email=email,
         password_hash=hash_password(body.password),
-        language=body.language,
         communication_goal=body.communication_goal or None,
     ))
     await db.commit()
@@ -73,7 +72,7 @@ COOKIE_PATH = "/api/auth"
 def _set_refresh_cookie(response: Response, user) -> None:
     response.set_cookie(
         REFRESH_COOKIE, create_refresh_token(user.id), max_age=settings.refresh_token_expire_days * 86400,
-        httponly=True, samesite="lax", secure=settings.cookie_secure, path=COOKIE_PATH,
+        httponly=True, samesite=settings.cookie_samesite, secure=settings.cookie_secure, path=COOKIE_PATH,
     )
 
 
@@ -107,7 +106,7 @@ async def refresh(
 @router.post("/auth/logout")
 async def logout(response: Response):
     """Clears the refresh cookie; the client drops its access token."""
-    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite="lax", secure=settings.cookie_secure)
+    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite=settings.cookie_samesite, secure=settings.cookie_secure)
     return {"message": "Logged out"}
 
 
@@ -188,4 +187,4 @@ async def delete_my_account(body: DeleteAccountRequest, response: Response,
     await db.commit()
     for folder in folders:
         storage_service.delete_session(folder)
-    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite="lax", secure=settings.cookie_secure)
+    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite=settings.cookie_samesite, secure=settings.cookie_secure)

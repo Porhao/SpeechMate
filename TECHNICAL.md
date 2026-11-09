@@ -485,7 +485,7 @@ The deferral premise (that for anxious speakers on open tasks the load of mid-sp
 | Data integrity | measured values only; "unavailable" when not measured | — |
 | Access and erasure | users see all their sessions and results; **download all their data** as one JSON file; **delete the account** (password re-entered), which removes every row and file | — |
 
-Implemented 2026-10-16 (`routers/auth.py`, `components/layout/ConsentGate.tsx`, Settings → Privacy & your data); tested in `backend/tests/test_privacy.py`. V1's "short, configurable review window" can now be stated as: *recordings are deleted as soon as their analysis completes, unless the user chooses to keep them.*
+Implemented 2026-10-16 (`routers/auth.py`, `components/layout/ConsentGate.tsx`, the Privacy & security page `/privacy`); tested in `backend/tests/test_privacy.py`. V1's "short, configurable review window" can now be stated as: *recordings are deleted as soon as their analysis completes, unless the user chooses to keep them.*
 
 ### I. Graceful Degradation and Measurement Honesty
 

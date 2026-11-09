@@ -18,7 +18,7 @@ SpeechMate handles **voice, face video, resumes and personal goals**, which is s
 | Secrets in repo | `.env`, `.env.*`, `fine-tune/data/`, `fine-tune/eval/` git-ignored (recordings never committed) | `.gitignore` |
 | Cloud processing consent | Audio goes to Groq (speech-to-text) and text to Gemini; vision, pronunciation and prosody stay on the server. Users agree on a consent screen first; the time is stored (`users.cloud_consent_at`) and can be withdrawn in Settings. Without it the server refuses sessions, analyses, interview plans, deck uploads and rehearsals (403 `cloud_consent_required`). Tested | `app/auth.py` (`require_cloud_consent`), `components/layout/ConsentGate.tsx` |
 | Retention | Raw live-session recordings are deleted once their analysis succeeds (after the results are committed), unless the user keeps them (`users.keep_recordings`). Tested | `services/live/pipeline.py` |
-| Access and erasure | `GET /users/me/export` downloads all the user's data as JSON (no storage paths or password hash); `DELETE /users/me` (password re-entered) removes every row and file. Tested | `routers/auth.py`, Settings → Privacy & your data |
+| Access and erasure | `GET /users/me/export` downloads all the user's data as JSON (no storage paths or password hash); `DELETE /users/me` (password re-entered) removes every row and file. Tested | `routers/auth.py`, the Privacy & security page `/privacy` |
 | Deletion | Deleting a session removes its recording and analysis (cascade) | `live.py` |
 
 ## Open risks (priority order)

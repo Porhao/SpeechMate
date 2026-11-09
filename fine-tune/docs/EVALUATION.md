@@ -6,11 +6,11 @@ Every result is printed as JSON with a 95% confidence interval and compared with
 
 ## Steps
 
-1. **Record and prepare the clips.** Follow `OWN_DATA_GUIDE.md`, then run:
+1. **Record and prepare the clips.** Get consent (`CONSENT_FORM.md`), record each speaker with `EVAL_SPEAKER_SCRIPT.md` (about 10 minutes each) and write the transcripts (`OWN_DATA_GUIDE.md`, step 4). Then run:
    ```
    python fine-tune/scripts/prepare_own.py --test s01 s02 …
    ```
-   This writes the held-out test clips to `fine-tune/eval/real/` (`001.wav` …), with their human transcripts in `refs.json`. Silent clips have the reference `""`.
+   This writes the held-out test clips to `fine-tune/eval/real/` (`001.wav` …), with their human transcripts in `refs.json`, the original file of each clip in `sources.csv`, and each clip's group in `groups.csv`. Silent clips have the reference `""`. For the confidence ratings, also run the videos: `run_app_on_clips.py --clips fine-tune/eval/video --out fine-tune/eval/video/app`.
 2. **Run the clips through the deployed app** (backend running, Groq and Gemini keys set):
    ```
    python fine-tune/scripts/run_app_on_clips.py --clips fine-tune/eval/real --out fine-tune/eval/real/app
@@ -18,12 +18,13 @@ Every result is printed as JSON with a 95% confidence interval and compared with
    - It uses a separate evaluation account, never the demo account, and deletes each session after reading it (`--keep` to keep them).
    - It is resumable: clips already in `app/analysis/` are skipped.
    - Each clip costs one speech-to-text request plus one or two LLM calls.
-3. **Annotate and rate** (spreadsheets saved as CSV, formats below). Annotators and raters must not see the app's output.
+3. **Annotate and rate** (spreadsheets saved as CSV, formats below; empty templates in `fine-tune/templates/`, instructions and questionnaire in `STUDY_MATERIALS.md`). Annotators and raters must not see the app's output.
 4. **Compute:**
    ```
-   python fine-tune/scripts/study_stats.py asr     --refs fine-tune/eval/real/refs.json --hyps fine-tune/eval/real/app/app_outputs.csv --groups groups.csv
+   python fine-tune/scripts/study_stats.py asr     --refs fine-tune/eval/real/refs.json --hyps fine-tune/eval/real/app/app_outputs.csv --groups fine-tune/eval/real/groups.csv
    python fine-tune/scripts/study_stats.py events  --gold annotations.csv --system fine-tune/eval/real/app/app_events.csv
-   python fine-tune/scripts/study_stats.py ratings --ratings ratings.csv --system fine-tune/eval/real/app/app_scores.csv
+   python fine-tune/scripts/study_stats.py ratings --ratings ratings.csv --system fine-tune/eval/real/app/app_scores.csv    # pronunciation (audio)
+   python fine-tune/scripts/study_stats.py ratings --ratings ratings.csv --system fine-tune/eval/video/app/app_scores.csv   # confidence, overall (video)
    python fine-tune/scripts/study_stats.py likert  --responses uat.csv
    ```
    `python fine-tune/scripts/study_stats.py selftest` checks the statistics on made-up data with known answers.
@@ -32,7 +33,7 @@ Every result is printed as JSON with a 95% confidence interval and compared with
 
 | File | Columns | Notes |
 |---|---|---|
-| `groups.csv` | `clip_id, group` | e.g. `english`, `malay`, `mixed`, `noisy`, `silent`; results are reported per group and overall |
+| `groups.csv` | `clip_id, group` | written by `prepare_own.py` from the prompt (`english`, `malay`, `mixed`, `noisy`, `silent`); results are reported per group and overall |
 | `annotations.csv` | `clip_id, type, t_sec, annotator` | `type` = `filler`, `repetition`, `block`, `prolongation`; `t_sec` = start of the event in the clip. Have a second annotator mark at least 20% of clips so agreement can be reported |
 | `ratings.csv` | `clip_id, rater, construct, score` | `construct` = `confidence` (1–7: "How confident does this speaker sound and look?"), `pronunciation` (1–7: "How clear is the pronunciation?"), `overall` (supervisor, 1–10). 2–3 raters, blind to the app's scores |
 | `uat.csv` | `participant, condition, item, score` | 1–5 Likert. `condition` = e.g. `grounded` vs `generic` (feedback quality) or `deferred` vs `realtime` (deferral study); `item` = `specific`, `actionable`, `accurate`, `anxiety`, … Each participant rates both conditions (within-subject) |

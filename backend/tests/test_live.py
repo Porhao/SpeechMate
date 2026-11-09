@@ -351,3 +351,13 @@ async def test_silent_recording_fails_cleanly(client: httpx.AsyncClient):
     live = (await client.get(f"/api/live/{lid}", headers=headers)).json()
     assert live["status"] == "failed"
     assert "No speech" in live["error_detail"]
+
+
+async def test_learner_profile_fields_are_saved_and_validated(client: httpx.AsyncClient):
+    headers = await sign_in(client)
+    r = await client.put("/api/users/profile", headers=headers, json={
+        "study_level": "Postgraduate", "field_of_study": "Data Science", "feedback_style": "direct"})
+    assert r.status_code == 200, r.text
+    assert (r.json()["study_level"], r.json()["field_of_study"], r.json()["feedback_style"]) == ("Postgraduate", "Data Science", "direct")
+    assert (await client.put("/api/users/profile", headers=headers, json={"study_level": "Kindergarten"})).status_code == 422
+    assert (await client.put("/api/users/profile", headers=headers, json={"feedback_style": "harsh"})).status_code == 422

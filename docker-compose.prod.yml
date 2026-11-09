@@ -1,0 +1,38 @@
+# Production override for the API server (the frontend is on Vercel): HTTPS through Caddy,
+# nothing else reachable from outside, no demo accounts. Setup: docs/project/deploy-vercel.md
+#   API_DOMAIN=api.example.com FRONTEND_ORIGIN=https://speechmate.vercel.app \
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile tts up -d --build db backend kokoro caddy
+
+services:
+  db:
+    ports: !reset []
+
+  backend:
+    ports: !reset []
+    environment:
+      - CORS_ORIGINS=["${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN}"]
+      - SEED_DEMO_DATA=false
+      - COOKIE_SECURE=true
+      # The Vercel site and the API are different sites unless both are on your own domain
+      - COOKIE_SAMESITE=${COOKIE_SAMESITE:-none}
+      - FORWARDED_ALLOW_IPS=*
+
+  kokoro:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - API_DOMAIN=${API_DOMAIN:?set API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

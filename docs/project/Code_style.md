@@ -19,7 +19,7 @@ Match the code around you. These are the conventions it already follows.
 - Browser-only values (localStorage, matchMedia) never decide the server render: gate with `useSyncExternalStore(..., () => null)` or `suppressHydrationWarning`.
 - Accessibility: `aria-label` on icon buttons, `aria-pressed` on toggles, `role="status"` on live text.
 - Names: components `PascalCase`, hooks `useThing`, constants `UPPER_SNAKE`, files match the default export.
-- Checks: `npx tsc --noEmit` and `npx eslint` must be clean.
+- Checks: `pnpm exec tsc --noEmit` and `pnpm lint` must be clean.
 
 ## Python (backend)
 

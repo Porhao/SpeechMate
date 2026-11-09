@@ -13,6 +13,7 @@ import { Menu, Mic2, X } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { ThemeToggleButton } from "@/components/theme/ThemeToggle";
 import NotificationBell from "@/components/layout/NotificationBell";
+import { useIdle } from "@/hooks/useIdle";
 
 // The logo: the 3D clay mic from the home page, turning slowly (an icon until it loads)
 const ClayScene = dynamic(() => import("@/components/three/ClayScene"), {
@@ -20,18 +21,20 @@ const ClayScene = dynamic(() => import("@/components/three/ClayScene"), {
   loading: () => <Mic2 className="w-4 h-4 m-auto" style={{ color: "var(--pink)" }} />,
 });
 
-// The three practice functions and your progress
+// The three practice functions, the script writer and your progress
 const LINKS: { href: string; label: string; also?: string[] }[] = [
   { href: "/home", label: "Home" },
   { href: "/conversation", label: "Conversation" },
   { href: "/interview", label: "Interview" },
   { href: "/presentations", label: "Presentation" },
+  { href: "/script", label: "Script" },
   { href: "/progress", label: "Progress", also: ["/results"] },
 ];
 // The side rail's pages, for the small-screen menu (the rail is desktop only)
 const RAIL_LINKS = [
   { href: "/profile", label: "Profile" },
   { href: "/settings", label: "Settings" },
+  { href: "/privacy", label: "Privacy & security" },
   { href: "/methodology", label: "How it's measured" },
 ];
 
@@ -44,6 +47,7 @@ export default function TopNav() {
   const pathname = usePathname();
   const user = useUserStore((s) => s.user);
   const [open, setOpen] = useState(false);
+  const idle = useIdle();  // the 3D logo (three.js) loads once the page itself is done
   const [openedAt, setOpenedAt] = useState(pathname);
   // Close the mobile menu after navigating (derived during render, no effect needed)
   if (open && openedAt !== pathname) setOpen(false);
@@ -59,7 +63,8 @@ export default function TopNav() {
         <Link href="/home" className="nav-logo flex items-center gap-2.5 flex-shrink-0" aria-label="SpeechMate home">
           <span className="clay w-11 h-11 rounded-lg relative overflow-hidden flex"
             style={{ background: "radial-gradient(90% 90% at 50% 35%, #FFE3CF, var(--peach))" }}>
-            <ClayScene variant="logo" className="absolute inset-0" />
+            {idle ? <ClayScene variant="logo" className="absolute inset-0" />
+              : <Mic2 className="w-4 h-4 m-auto" style={{ color: "var(--pink)" }} />}
           </span>
           <span className="font-display text-[17px] text-[var(--ink)] hidden sm:inline">SpeechMate</span>
         </Link>

@@ -8,6 +8,7 @@ export type MascotAction =
   | "search"     // the user is searching — it peeks
   | "empty"      // a search found nothing — a puzzled tilt
   | "done"       // a task was ticked off — a spin
+  | "eat"        // a deleted item is tossed its way — it opens wide and chomps (lib/crumple.ts)
   | "error";     // something failed — a shake
 
 export const MASCOT_EVENT = "speechmate:mascot";

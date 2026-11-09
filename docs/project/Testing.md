@@ -20,14 +20,14 @@ docker compose -f ../docker-compose.yml exec -T -w $D backend python -m pytest -
 Rules:
 - Every new metric or rule gets a test with a **worked number** (e.g. `test_confidence_is_per_minute_not_per_session`).
 - Regressions get a test named after the bug (`test_fluency_ignores_turn_gaps_in_a_conversation`).
-- Tests never call real models or the LLM: monkeypatch `_whisper_model`, LLM clients, etc.
+- Tests never call real models or the LLM: monkeypatch the STT and LLM clients, etc.
 
 ## Frontend
 
 ```bash
 cd frontend
-npx tsc --noEmit        # types (ignore stale .next/dev errors for deleted routes)
-npx eslint .            # lint, incl. React hooks rules
+pnpm exec tsc --noEmit  # types (ignore stale .next/dev errors for deleted routes)
+pnpm lint              # lint, incl. React hooks rules
 ```
 
 There is no unit-test runner on the frontend; keep logic small and covered by types, and verify behaviour in a browser.

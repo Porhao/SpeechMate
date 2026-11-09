@@ -11,20 +11,20 @@ import type { MetricStatus } from "@/types";
 export function PageHeader({ eyebrow, title, children, art }: { eyebrow?: string; title: string; children?: ReactNode; art?: ReactNode }) {
   const text = (
     <div>
-      {eyebrow && <p className="text-xs font-semibold uppercase tracking-[0.12em] mb-3" style={{ color: "var(--muted)" }}>{eyebrow}</p>}
-      <h1 className="font-display text-4xl sm:text-5xl leading-[1.05]" style={{ color: "var(--ink)" }}>{title}</h1>
-      {children && <div className="mt-4 text-base max-w-2xl leading-relaxed" style={{ color: "var(--ink-2)" }}>{children}</div>}
+      {eyebrow && <p className="text-xs font-semibold uppercase tracking-[0.12em] mb-2" style={{ color: "var(--muted)" }}>{eyebrow}</p>}
+      <h1 className="font-display text-3xl sm:text-4xl leading-[1.08]" style={{ color: "var(--ink)" }}>{title}</h1>
+      {children && <div className="mt-3 text-[15px] max-w-2xl leading-relaxed" style={{ color: "var(--ink-2)" }}>{children}</div>}
     </div>
   );
   // With `art` (e.g. a 3D ClayArt), the text sits left and the art right on wide screens
   return art
-    ? <div className="mb-10 grid lg:grid-cols-[1fr_380px] gap-6 items-center">{text}{art}</div>
-    : <div className="mb-10">{text}</div>;
+    ? <div className="mb-6 grid lg:grid-cols-[1fr_320px] gap-6 items-center">{text}{art}</div>
+    : <div className="mb-6">{text}</div>;
 }
 
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: string; action?: ReactNode }) {
   return (
-    <section className={cn("p-6 rounded-lg", className)} style={{ background: "var(--surface)", border: "1px solid var(--line)", boxShadow: "var(--shadow-card)" }}>
+    <section className={cn("p-5 rounded-lg", className)} style={{ background: "var(--surface)", border: "1px solid var(--line)", boxShadow: "var(--shadow-card)" }}>
       {(title || action) && (
         <div className="flex items-center justify-between gap-3 mb-4">
           {title && <h2 className="text-sm font-semibold" style={{ color: "var(--ink)" }}>{title}</h2>}

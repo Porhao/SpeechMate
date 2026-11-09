@@ -27,7 +27,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Local models for live-session analysis (Wav2Vec2, MediaPipe…).
 # Adds ~2 GB; build with --build-arg INSTALL_ML=false for a slim image.
 ARG INSTALL_ML=true
-RUN if [ "$INSTALL_ML" = "true" ]; then pip install --no-cache-dir -r requirements-ml.txt; fi
+# MediaPipe pulls in jax/jaxlib (~400 MB) that nothing here imports
+RUN if [ "$INSTALL_ML" = "true" ]; then pip install --no-cache-dir -r requirements-ml.txt && pip uninstall -y jax jaxlib; fi
 
 COPY . .
 
