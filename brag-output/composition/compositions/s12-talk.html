@@ -1,0 +1,159 @@
+<template>
+  <style>
+#root{position:absolute;inset:0;overflow:hidden;background:#FFFAF0;font-family:Inter,sans-serif;color:#0A0A0A}
+.h{opacity:0}
+.abs{position:absolute}
+.disp{font-weight:600;letter-spacing:-0.035em;line-height:1.04}
+.card{position:absolute;border-radius:28px;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -7px 0 rgba(0,0,0,.12),0 22px 44px rgba(10,26,26,.16)}
+.chip{position:absolute;display:inline-flex;align-items:center;gap:12px;padding:12px 24px;border-radius:999px;font-size:30px;font-weight:600;white-space:nowrap;box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 0 rgba(0,0,0,.1),0 10px 22px rgba(10,26,26,.12)}
+.bot{position:absolute}
+.bot img{position:absolute;inset:0;width:100%;height:100%}
+.row{position:absolute;display:flex;align-items:center;gap:16px;font-size:29px;font-weight:500}
+.row i{flex:none;width:15px;height:15px;border-radius:50%}
+.win{position:absolute;border-radius:22px;background:#FFFAF0;overflow:hidden;box-shadow:0 30px 70px rgba(10,26,26,.24),0 0 0 1px rgba(10,26,26,.08)}
+.win .bar{position:absolute;left:0;right:0;top:0;height:46px;display:flex;align-items:center;gap:9px;padding:0 18px;background:#F3EEE3;border-bottom:1px solid rgba(10,26,26,.08);z-index:5}
+.win .bar b{width:13px;height:13px;border-radius:50%;background:#D9D2C3}
+.win .bar span{margin-left:16px;padding:4px 16px;border-radius:999px;background:#fff;font-size:20px;color:#5C6766}
+.wc{position:absolute;left:0;right:0;top:46px;bottom:0;overflow:hidden}
+.nav{position:absolute;left:0;right:0;top:0;height:62px;display:flex;align-items:center;gap:30px;padding:0 34px;border-bottom:1px solid rgba(10,26,26,.07);font-size:19px;color:#5C6766}
+.nav .wm{font-weight:600;letter-spacing:-0.03em;font-size:23px;color:#0A0A0A;margin-right:26px;display:flex;align-items:center;gap:10px}
+.nav .wm i{width:22px;height:22px;border-radius:50%;background:#FFB084;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12)}
+.nav .on{color:#0A0A0A;font-weight:600}
+.lbl{position:absolute;font-size:19px;font-weight:600;color:#0A0A0A}
+.inp{position:absolute;height:50px;border-radius:12px;background:#fff;border:1.5px solid rgba(10,26,26,.14);font-size:20px;padding:12px 16px;color:#0A0A0A;white-space:nowrap;overflow:hidden}
+.ta{position:absolute;border-radius:12px;background:#fff;border:1.5px solid rgba(10,26,26,.14);font-size:19px;line-height:1.45;padding:12px 16px;color:#0A0A0A}
+.typ{display:inline-block;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+.opt{position:absolute;padding:9px 18px;border-radius:999px;font-size:18px;font-weight:600;background:#fff;color:#0A0A0A;border:1.5px solid rgba(10,26,26,.14);white-space:nowrap}
+.btn{position:absolute;padding:14px 26px;border-radius:12px;font-size:20px;font-weight:600;background:#0A0A0A;color:#fff;white-space:nowrap}
+.pane{position:absolute;border-radius:18px;background:#fff;box-shadow:0 8px 24px rgba(10,26,26,.08),0 0 0 1px rgba(10,26,26,.06)}
+.dark{background:#0A1A1A;color:#FFFAF0}
+.dpane{position:absolute;border-radius:18px;background:#13201F;color:#FFFAF0}
+.turn{position:absolute;display:flex;align-items:center;gap:12px;padding:12px 22px;border-radius:14px;font-size:20px;font-weight:600}
+.illus{position:absolute;right:20px;top:78px;padding:6px 14px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:16px;font-weight:700;letter-spacing:.06em;z-index:6}
+.cur{position:absolute;left:0;top:0;width:40px;height:48px;z-index:40;pointer-events:none}
+.bubble{position:absolute;padding:16px 22px;border-radius:20px;font-size:22px;line-height:1.35}
+
+#root{background:#FFFAF0}
+
+.pg{position:absolute;left:0;top:0;width:1440px;height:760px;transform:scale(1.1);transform-origin:0 0;overflow:hidden;font-family:Inter,sans-serif;color:#0A0A0A}
+.layer{position:absolute;inset:0}
+.navp{position:absolute;z-index:8;left:30px;right:30px;top:10px;height:50px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(10,26,26,.08);display:flex;align-items:center;padding:0 14px 0 10px;gap:6px;font-size:15px}
+.navp .lg{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-right:auto}
+.navp .lg i{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#FFD9C2,#F5A27C)}
+.navp .it{padding:8px 16px;border-radius:999px;color:#3A4645}
+.navp .it.on{background:#0A0A0A;color:#fff;font-weight:600}
+.navp .me{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:14px}
+.navp .me b{width:34px;height:34px;border-radius:50%;background:#0A0A0A;color:#fff;font-size:12px;display:grid;place-items:center}
+.navp .bell{width:22px;height:22px;border-radius:6px;border:2px solid #3A4645;position:relative;margin-right:10px}
+.navp .bell:after{content:"3";position:absolute;right:-9px;top:-9px;width:16px;height:16px;border-radius:50%;background:#E5484D;color:#fff;font-size:10px;display:grid;place-items:center}
+.rail{position:absolute;z-index:8;left:10px;top:90px;width:42px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(10,26,26,.08);padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:12px}
+.rail i{width:24px;height:24px;border-radius:8px;background:#EDE6D8}
+.rail i.dk{background:#0A0A0A;border-radius:50%}
+.eb{position:absolute;font-size:13px;font-weight:700;letter-spacing:.14em}
+.h1{position:absolute;font-size:42px;font-weight:700;letter-spacing:-0.03em;line-height:1.08}
+.sub{position:absolute;font-size:16px;line-height:1.5;color:#3A4645}
+.wcard{position:absolute;border-radius:18px;background:#fff;box-shadow:0 1px 0 rgba(10,26,26,.04),0 0 0 1px rgba(10,26,26,.07)}
+.lb{position:absolute;font-size:15px;font-weight:600}
+.lb em{font-style:normal;font-weight:400;color:#7A8584;margin-left:6px;font-size:13px}
+.in{position:absolute;height:42px;border-radius:10px;background:#fff;border:1.5px solid rgba(10,26,26,.16);font-size:16px;padding:10px 14px;white-space:nowrap;overflow:hidden;color:#0A0A0A}
+.in .ph{color:#9AA3A2}
+.tile{position:absolute;border-radius:10px;background:#fff;border:1.5px solid rgba(10,26,26,.14);padding:9px 14px;font-size:15px;font-weight:600}
+.tile small{display:block;font-weight:400;font-size:12px;color:#5C6766;margin-top:2px}
+.tile.sel{border-color:#0A0A0A;background:#FBF4E6}
+.pill{position:absolute;border-radius:10px;border:1.5px solid rgba(10,26,26,.14);background:#fff;padding:8px 13px;font-size:14px}
+.bk{position:absolute;border-radius:12px;background:#0A0A0A;color:#fff;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.wt{position:absolute;border-radius:12px;background:#fff;color:#0A0A0A;border:1.5px solid rgba(10,26,26,.15);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.typ{display:inline-block;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+.caret{position:absolute;width:2px;height:22px;background:#0A0A0A;opacity:0}
+.mate{position:absolute;z-index:8;right:16px;bottom:10px;width:92px;height:92px}
+.mate img{position:absolute;inset:0;width:100%;height:100%}
+.mb{position:absolute;z-index:8;right:96px;bottom:70px;max-width:280px;padding:8px 14px;border-radius:14px 14px 4px 14px;background:#fff;font-size:15px;font-weight:600;box-shadow:0 8px 20px rgba(10,26,26,.15);opacity:0}
+.illus{position:absolute;padding:5px 12px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:12px;font-weight:800;letter-spacing:.08em}
+.dk{background:#0A1A1A;color:#FFFAF0}
+.dp{position:absolute;border-radius:16px;background:#13201F;color:#FFFAF0}
+.turn{position:absolute;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:12px;font-size:16px;font-weight:600;opacity:0}
+.bars{position:absolute;display:flex;gap:4px;align-items:flex-end;height:26px}
+.bars i{width:5px;height:6px;border-radius:3px;background:#5EEAD4}
+.load{position:absolute;left:0;top:0;height:3px;width:100%;background:#1F6F6B;transform-origin:0 50%;z-index:9}
+.rip{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(31,111,107,.28);border:2px solid rgba(31,111,107,.5);opacity:0;z-index:39;pointer-events:none}
+.dots i{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px}
+
+  </style>
+  <div id="root" data-composition-id="s12-talk" data-width="1920" data-height="1080">
+    <div id="s12-cam" class="abs" style="left:0;top:0;width:1920px;height:1080px">
+    <div id="s12-w" class="win" style="left:168px;top:18px;width:1584px;height:882px" ><div class="bar"><b></b><b></b><b></b><span style="position:relative;min-width:420px"><span id="s12-url">speechmate.app/presentations</span><span id="s12-url2" style="position:absolute;left:0;top:0;opacity:0">speechmate.app/session</span></span></div><div class="wc"><div class="load" id="s12-load" style="transform:scaleX(0)"></div><div class="pg"><div id="s12-dk0" class="layer" style="opacity:1;background:#FFFAF0"><div class="navp" data-layout-allow-overlap data-layout-allow-occlusion><span class="lg"><i></i>SpeechMate</span><span class="it">Home</span><span class="it">Conversation</span><span class="it">Interview</span><span class="it on">Presentation</span><span class="it">Script</span><span class="it">Progress</span><span class="me"><span class="bell"></span><b>AR</b><span><b style="all:unset;font-weight:600;display:block">Aisyah Rahman</b><span style="font-size:12px;color:#7A8584">demo@speechmate.dev</span></span></span></div><div class="rail"><i class="dk"></i><i></i><i></i><i></i><i></i></div><div id="s12-dk0-mate-br" style="position:absolute;right:16px;bottom:10px;width:92px;height:92px;z-index:8"><div id="s12-dk0-mate" style="position:absolute;inset:0"><img id="s12-dk0-mate-default" src="assets/bots/mate-default.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:1;"><img id="s12-dk0-mate-left" src="assets/bots/mate-left.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-dk0-mate-right" src="assets/bots/mate-right.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-dk0-mate-down" src="assets/bots/mate-down.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-dk0-mate-tiltl" src="assets/bots/mate-tiltl.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-dk0-mate-tiltr" src="assets/bots/mate-tiltr.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-dk0-mate-working" src="assets/bots/mate-working.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-dk0-mate-sleeping" src="assets/bots/mate-sleeping.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:2;"></div></div><div class="mb" id="s12-dk0-mb"></div></div><div id="s12-tk" class="layer dk" style="opacity:0;background:#0A1A1A"><div style="position:absolute;left:40px;top:24px;width:1100px;height:620px;border-radius:16px;overflow:hidden"><div id="s12-tk-sl0" style="position:absolute;inset:0;background:#fff;opacity:1"><div style="position:absolute;left:60px;top:50px;font-size:44px;font-weight:700;letter-spacing:-.02em;color:#0A0A0A">Five Strategies for Effective Time Management</div><div style="position:absolute;left:60px;top:120px;width:140px;height:7px;border-radius:4px;background:#B8A4ED"></div><div style="position:absolute;left:60px;top:170px;width:560px;height:26px;border-radius:13px;background:#EDE7DA"></div><div style="position:absolute;left:60px;top:230px;width:470px;height:26px;border-radius:13px;background:#EDE7DA"></div><div style="position:absolute;left:60px;top:290px;width:520px;height:26px;border-radius:13px;background:#EDE7DA"></div></div><div id="s12-tk-sl1" style="position:absolute;inset:0;background:#fff;opacity:0"><div style="position:absolute;left:60px;top:50px;font-size:44px;font-weight:700;letter-spacing:-.02em;color:#0A0A0A">Plan and Prioritize</div><div style="position:absolute;left:60px;top:120px;width:140px;height:7px;border-radius:4px;background:#B8A4ED"></div><div style="position:absolute;left:60px;top:150px;width:280px;height:134px;border-radius:14px;background:#FFB084;font-size:20px;font-weight:700;padding:14px">Urgent · important</div><div style="position:absolute;left:360px;top:150px;width:280px;height:134px;border-radius:14px;background:#A4D4C5;font-size:20px;font-weight:700;padding:14px">Important</div><div style="position:absolute;left:60px;top:300px;width:280px;height:134px;border-radius:14px;background:#E8B94A;font-size:20px;font-weight:700;padding:14px">Urgent</div><div style="position:absolute;left:360px;top:300px;width:280px;height:134px;border-radius:14px;background:#EDE7DA;font-size:20px;font-weight:700;padding:14px">Neither</div></div><div id="s12-tk-sl2" style="position:absolute;inset:0;background:#fff;opacity:0"><div style="position:absolute;left:60px;top:50px;font-size:44px;font-weight:700;letter-spacing:-.02em;color:#0A0A0A">Protect Your Focus</div><div style="position:absolute;left:60px;top:120px;width:140px;height:7px;border-radius:4px;background:#B8A4ED"></div><div style="position:absolute;left:60px;top:340px;width:120px;height:100px;border-radius:12px;background:#B8A4ED;opacity:0.5"></div><div style="position:absolute;left:210px;top:290px;width:120px;height:150px;border-radius:12px;background:#B8A4ED;opacity:0.65"></div><div style="position:absolute;left:360px;top:240px;width:120px;height:200px;border-radius:12px;background:#B8A4ED;opacity:0.8"></div><div style="position:absolute;left:510px;top:190px;width:120px;height:250px;border-radius:12px;background:#B8A4ED;opacity:0.95"></div></div></div><div style="position:absolute;left:1160px;top:24px;width:240px;height:180px;border-radius:14px;overflow:hidden"><div style="position:absolute;inset:0;background:linear-gradient(#E6DAC8,#D9CBB5)"><div style="position:absolute;left:19.2px;top:25.200000000000003px;width:52.8px;height:61.2px;border-radius:10px;background:#C9D9DA;box-shadow:inset 0 0 0 8px #EFE6D8"></div><div style="position:absolute;right:16.8px;top:36.0px;width:48.0px;height:10px;border-radius:5px;background:#B89B74"></div><div style="position:absolute;right:24.0px;top:-10.0px;width:40px;height:46px;border-radius:20px 20px 6px 6px;background:#7FA88E"></div><div style="position:absolute;right:38.4px;top:6.0px;width:26px;height:30px;border-radius:4px;background:#FFB084"></div><svg viewBox="0 0 400 600" style="position:absolute;width:110.39999999999999px;height:165.6px;overflow:visible;left:64.80000000000001px;bottom:-14.4px"><g id="s12-tk-me" class="pbody" style="transform-box:fill-box;transform-origin:50% 100%">
+  <path d="M84 600 C84 452 126 392 200 392 C274 392 316 452 316 600 Z" fill="#2F6B6B"/>
+  <path d="M150 400 C160 440 240 440 250 400 C236 392 164 392 150 400 Z" fill="#245656"/>
+  <rect x="181" y="336" width="38" height="62" rx="12" fill="#B57A50"/>
+  <g class="parm" style="transform-box:view-box;transform-origin:292px 452px">
+    <path d="M276 440 C318 452 340 500 334 546 L300 552 C300 516 290 490 266 474 Z" fill="#245656"/>
+    <circle cx="318" cy="552" r="22" fill="#C98B5E"/>
+  </g>
+  <g class="phead" style="transform-box:view-box;transform-origin:200px 350px">
+    <circle cx="122" cy="268" r="15" fill="#B57A50"/><circle cx="278" cy="268" r="15" fill="#B57A50"/>
+    <ellipse cx="200" cy="262" rx="78" ry="90" fill="#C98B5E"/>
+    <path d="M118 258 C108 170 156 146 206 148 C258 150 296 178 284 258 C272 214 240 198 204 202 C168 206 138 220 118 258 Z" fill="#1D1A18"/>
+    <g class="pbrow"><rect x="156" y="238" width="32" height="8" rx="4" fill="#1D1A18"/><rect x="212" y="238" width="32" height="8" rx="4" fill="#1D1A18"/></g>
+    <g class="peyes" style="transform-box:fill-box;transform-origin:50% 50%"><ellipse cx="172" cy="272" rx="8.5" ry="10.5" fill="#1D1A18"/><ellipse cx="228" cy="272" rx="8.5" ry="10.5" fill="#1D1A18"/></g>
+    <ellipse cx="156" cy="300" rx="13" ry="7" fill="#E07A6A" opacity=".35"/><ellipse cx="244" cy="300" rx="13" ry="7" fill="#E07A6A" opacity=".35"/>
+    <g style="transform-box:fill-box;transform-origin:50% 50%"><ellipse class="pmouth" cx="200" cy="318" rx="15" ry="5" fill="#6B2A22"/></g>
+  </g>
+  
+</g></svg></div></div><div class="dp" style="left:1160px;top:220px;width:240px;height:200px"><div id="s12-tk-bot-br" style="position:absolute;left:45px;top:4px;width:150px;height:150px"><div id="s12-tk-bot" style="position:absolute;inset:0"><img id="s12-tk-bot-default" src="assets/bots/presenter-default.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:1;"><img id="s12-tk-bot-left" src="assets/bots/presenter-left.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-tk-bot-right" src="assets/bots/presenter-right.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-tk-bot-down" src="assets/bots/presenter-down.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-tk-bot-tiltl" src="assets/bots/presenter-tiltl.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-tk-bot-tiltr" src="assets/bots/presenter-tiltr.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-tk-bot-working" src="assets/bots/presenter-working.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s12-tk-bot-sleeping" src="assets/bots/presenter-sleeping.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:2;"></div></div><div style="position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:14px;font-weight:600">Listening quietly</div></div><div style="position:absolute;left:40px;top:666px;padding:9px 16px;border-radius:10px;background:#4B2FA8;font-size:15px;font-weight:600">● Presenting</div><div style="position:absolute;left:520px;top:662px;display:flex;gap:14px;align-items:center;font-size:16px"><span class="wt" style="position:relative;width:46px;height:40px;background:#2A3A39;color:#fff;border:none">←</span><span id="s12-tk-n" style="font-weight:700">1 / 3</span><span id="s12-tk-nx" class="wt" style="position:relative;width:46px;height:40px;background:#2A3A39;color:#fff;border:none">→</span></span></div><div id="s12-tk-end" style="position:absolute;left:1300px;top:666px;padding:9px 18px;border-radius:10px;background:#E5484D;font-size:15px;font-weight:700">End</div></div></div></div></div>
+    <div id="s12-step" class="abs" style="right:182px;top:23px;height:36px;display:flex;align-items:center;gap:10px;padding:0 16px;border-radius:999px;background:#B8A4ED;color:#0A0A0A;font-size:20px;font-weight:600;z-index:45;white-space:nowrap;box-shadow:0 6px 18px rgba(10,26,26,.25)" ><b style="font-weight:800">Presentation</b><span style="opacity:.8">Step 2 of 4</span><span>· Present</span></div>
+    <div id="s12-cur" class="cur h" style="" ><svg viewBox="0 0 40 48"><path d="M4 3 L4 38 L13 30 L19 44 L26 41 L20 27 L32 27 Z" fill="#fff" stroke="#0A0A0A" stroke-width="3" stroke-linejoin="round"/></svg></div>
+    <div id="s12-rip0" class="rip" style="left:891px;top:814px" ></div>
+    <div id="s12-rip1" class="rip" style="left:891px;top:814px" ></div>
+    <div id="s12-cs" class="chip h" style="left:245px;top:680px;background:#FFB084;color:#0A0A0A;font-size:24px;padding:10px 20px;z-index:30" ></div>
+    <div id="s12-cq" class="chip h" style="left:1114px;top:559px;background:#B8A4ED;color:#0A0A0A;font-size:24px;padding:10px 20px;z-index:30" ></div>
+    <div id="s12-rip2" class="rip" style="left:1637px;top:818px" ></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#s12-cur",{opacity:1,x:674,y:372},0.0);
+    tl.fromTo("#s12-load",{scaleX:0,opacity:1},{scaleX:1,duration:0.45,ease:"power2.out"},0.05);tl.to("#s12-load",{opacity:0,duration:0.2},0.5);
+    tl.to("#s12-dk0",{opacity:0,duration:0.18,ease:"power2.in"},0.2);
+    tl.fromTo("#s12-tk",{opacity:0,y:14},{opacity:1,y:0,duration:0.45,ease:"expo.out"},0.35);
+    tl.set("#s12-url",{opacity:0},0.1);tl.set("#s12-url2",{opacity:1},0.1);
+    tl.to("#s12-cur",{x:891,y:834,duration:0.6,ease:"power2.inOut"},0.4);
+    tl.to("#s12-tk-me .pmouth",{scaleY:2.4,transformOrigin:"50% 50%",duration:0.1,yoyo:true,repeat:97,ease:"sine.inOut"},0.6);
+    tl.to("#s12-cur",{x:891,y:814,duration:0.35,ease:"power2.inOut"},3.2);
+    tl.to("#s12-cur",{scale:0.8,duration:0.07,ease:"power2.out"},3.55);tl.to("#s12-cur",{scale:1,duration:0.15,ease:"power2.out"},3.62);
+    tl.fromTo("#s12-rip0",{opacity:0.9,scale:0.3},{opacity:0,scale:1.5,duration:0.5,ease:"power2.out",immediateRender:false},3.55);
+    tl.to("#s12-tk-nx",{scale:0.96,duration:0.07,ease:"power2.out"},3.55);tl.to("#s12-tk-nx",{scale:1,duration:0.2,ease:"back.out(2)"},3.62);
+    tl.to("#s12-tk-sl0",{opacity:0,duration:0.2},3.5999999999999996);tl.to("#s12-tk-sl1",{opacity:1,duration:0.2},3.5999999999999996);tl.set("#s12-tk-n",{textContent:"2 / 3"},3.5999999999999996);
+    tl.to("#s12-cur",{x:891,y:814,duration:0.35,ease:"power2.inOut"},6.6);
+    tl.to("#s12-cur",{scale:0.8,duration:0.07,ease:"power2.out"},6.95);tl.to("#s12-cur",{scale:1,duration:0.15,ease:"power2.out"},7.02);
+    tl.fromTo("#s12-rip1",{opacity:0.9,scale:0.3},{opacity:0,scale:1.5,duration:0.5,ease:"power2.out",immediateRender:false},6.95);
+    tl.to("#s12-tk-nx",{scale:0.96,duration:0.07,ease:"power2.out"},6.95);tl.to("#s12-tk-nx",{scale:1,duration:0.2,ease:"back.out(2)"},7.02);
+    tl.to("#s12-tk-sl1",{opacity:0,duration:0.2},7.0);tl.to("#s12-tk-sl2",{opacity:1,duration:0.2},7.0);tl.set("#s12-tk-n",{textContent:"3 / 3"},7.0);
+    tl.fromTo("#s12-cs",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},3.8);
+    tl.to("#s12-cs",{opacity:0,filter:"blur(8px)",duration:0.25,ease:"power2.in"},6.15);
+    tl.fromTo("#s12-cq",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},1.0);
+    tl.to("#s12-cq",{opacity:0,filter:"blur(8px)",duration:0.25,ease:"power2.in"},2.75);
+    tl.to("#s12-cur",{x:1637,y:818,duration:0.5,ease:"power2.inOut"},10.8);
+    tl.to("#s12-cur",{scale:0.8,duration:0.07,ease:"power2.out"},11.3);tl.to("#s12-cur",{scale:1,duration:0.15,ease:"power2.out"},11.37);
+    tl.fromTo("#s12-rip2",{opacity:0.9,scale:0.3},{opacity:0,scale:1.5,duration:0.5,ease:"power2.out",immediateRender:false},11.3);
+    tl.to("#s12-tk-end",{scale:0.96,duration:0.07,ease:"power2.out"},11.3);tl.to("#s12-tk-end",{scale:1,duration:0.2,ease:"back.out(2)"},11.37);
+    tl.set("#s12-dk0-mate-left",{opacity:1},0.953);tl.set("#s12-dk0-mate-default",{opacity:0},0.987);
+    tl.set("#s12-dk0-mate-default",{opacity:1},2.472);tl.set("#s12-dk0-mate-left",{opacity:0},2.506);
+    tl.set("#s12-dk0-mate-down",{opacity:1},5.003);tl.set("#s12-dk0-mate-default",{opacity:0},5.037);
+    tl.set("#s12-dk0-mate-default",{opacity:1},7.264);tl.set("#s12-dk0-mate-down",{opacity:0},7.298);
+    tl.set("#s12-dk0-mate-sleeping",{opacity:1},10.008);tl.set("#s12-dk0-mate-sleeping",{opacity:0},10.138);
+    tl.set("#s12-dk0-mate-sleeping",{opacity:1},11.478);tl.set("#s12-dk0-mate-sleeping",{opacity:0},11.608);
+    tl.fromTo("#s12-dk0-mate-br",{y:0,scaleY:1,scaleX:1},{y:-4,scaleY:1.03,scaleX:0.985,transformOrigin:"50% 100%",duration:1.2,ease:"sine.inOut",yoyo:true,repeat:7},0.3);
+    tl.set("#s12-tk-bot-left",{opacity:1},1.169);tl.set("#s12-tk-bot-default",{opacity:0},1.203);
+    tl.set("#s12-tk-bot-default",{opacity:1},2.602);tl.set("#s12-tk-bot-left",{opacity:0},2.636);
+    tl.set("#s12-tk-bot-down",{opacity:1},3.966);tl.set("#s12-tk-bot-default",{opacity:0},4.0);
+    tl.set("#s12-tk-bot-sleeping",{opacity:1},5.207);tl.set("#s12-tk-bot-sleeping",{opacity:0},5.337);
+    tl.set("#s12-tk-bot-sleeping",{opacity:1},6.737);tl.set("#s12-tk-bot-sleeping",{opacity:0},6.867);
+    tl.set("#s12-tk-bot-left",{opacity:1},7.933);tl.set("#s12-tk-bot-down",{opacity:0},7.967);
+    tl.set("#s12-tk-bot-tiltl",{opacity:1},9.644);tl.set("#s12-tk-bot-left",{opacity:0},9.678);
+    tl.set("#s12-tk-bot-left",{opacity:1},10.789);tl.set("#s12-tk-bot-tiltl",{opacity:0},10.823);
+    tl.fromTo("#s12-tk-bot-br",{y:0,scaleY:1,scaleX:1},{y:-4,scaleY:1.03,scaleX:0.985,transformOrigin:"50% 100%",duration:1.2,ease:"sine.inOut",yoyo:true,repeat:7},0.3);
+    tl.fromTo("#s12-cam",{scale:1},{scale:1.018,transformOrigin:"50% 42%",duration:6.0,ease:"sine.inOut",yoyo:true,repeat:1},0);
+    tl.set({}, {}, 12);
+    window.__timelines["s12-talk"] = tl;
+  </script>
+</template>

@@ -10,7 +10,7 @@ import {
 import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
 import { liveService } from "@/services/live";
 import type { BackendHealth, DeckListItem, DeckStatusResponse, LiveSession } from "@/types";
-import { formatDate } from "@/utils/format";
+import { formatDate } from "@/lib/format";
 import { tint, inkOf } from "@/lib/utils";
 import { mascot } from "@/lib/mascot";
 import { STAGES, deckProgress, type DeckProgress } from "@/lib/deckPipeline";

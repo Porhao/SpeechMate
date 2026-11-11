@@ -13,7 +13,7 @@ One row per run, failed ones included (plan §5).
 
 ## F6: shipped vs fine-tune on eval/paper (2026-10-06)
 
-400 clips never trained on, run through the app's `asr.whisper_segments` (CT2 int8, CPU, auto language, VAD). `scripts/eval_finetune.py`, per-clip output in `eval/paper/finetune_results.csv`.
+400 clips never trained on, run through the app's `asr.whisper_segments` (CT2 int8, CPU, auto language, VAD). `scripts/archive/eval_finetune.py`, per-clip output in `eval/paper/finetune_results.csv`.
 
 | Group | Shipped (Mesolitica turbo-v3, app prompt) | Fine-tune, no prompt | Fine-tune, app prompt | Plain Whisper large-v3 (`eval_routing.py`) |
 |---|---|---|---|---|
@@ -24,15 +24,28 @@ One row per run, failed ones included (plan §5).
 - Mixed gains are in-domain (same TTS system and sentence style as training). The mixed references keep the corpus's raw spellings ("wei", "la"), so the fine-tune's style-guide spellings ("weh", "lah") count against it.
 - The prompt barely matters for the fine-tune (+0.1-0.3 points).
 - Silence safety (plan §11): 0 of 10 silent or noise-only clips produced any text, for both models (8 dev silent clips + 8 s of silence + 8 s of white noise, app settings with VAD).
-- Not yet checked: real Malaysian speakers (`bench_stt.py --real`) and noisy real speech. Go/no-go (plan §11) still needs those.
+- Real Malaysian speakers and noisy real speech: measured on the deployed app, see the next section. The fine-tune itself was not run on them (the local speech-to-text was removed).
 
-## Licences
+## Real speakers: the deployed app on eval/real (2026-11-11)
 
-| Item | Licence | Use |
-|---|---|---|
-| Google FLEURS ([google/fleurs](https://huggingface.co/datasets/google/fleurs)) | CC BY 4.0 | `ms_my` and `en_us` train splits as guard data, validation splits as dev. The test split is reserved for the STT benchmark. |
-| Synth-Manglish ([emhaihsan/Synth-Manglish](https://huggingface.co/datasets/emhaihsan/Synth-Manglish)) | CC BY 4.0 | Manglish training data (synthetic TTS voices); 3 voices held out as dev. Particle spellings normalised to `STYLE_GUIDE.md`. |
-| Mesolitica Hugging Face datasets (Malaysian-STT-Whisper, semisupervised-*, malaya-speech-malay-stt) | **Not stated** | Not used. Same open question as their model. |
-| Semisupervised Manglish (Malaya-Speech docs, CC BY 4.0) | CC BY 4.0 | Not used: the documented download link is dead (404, 2026-10-06). |
-| `openai/whisper-small` | MIT | Smoke-test base |
-| Mesolitica `Malaysian-whisper-large-v3-turbo-v3` | **Not stated: ask (F0)** | Candidate base; also the shipped model |
+10 test speakers (s01-s10, never trained on), 87 clips, 26 min: 29 English, 20 Manglish, 20 Malay, 9 noisy, 9 silent (a few clips skipped by testers). References written by ear from drafts of the local fine-tune (`out/ct2`), not of Groq, so they don't favour the system under test. Every clip went through the app as a real user's would (`scripts/run_app_on_clips.py`: Groq `whisper-large-v3`, auto language, the app's prompt and filters); WER from `study_stats.py asr`, 95% bootstrap CI.
+
+| Group | Clips | Before the fix | After the fix | 95% CI (after) |
+|---|---|---|---|---|
+| English | 29 | 14.3% | **8.7%** | 6.0-11.9 |
+| Manglish | 20 | 18.8% | **11.7%** | 8.5-15.6 |
+| Malay | 20 | 8.4% | **8.4%** | 5.6-11.9 |
+| Noisy | 9 | 35.5% | **18.5%** | 7.6-36.6 |
+| All | 87 | 16.9% | **10.4%** | 8.3-13.0 |
+| Silent clips with invented text | 9 | 2 | **0** | |
+
+(Group counts are as `groups.csv` labels them; "Malay" includes s10's code-switched D1/D3 answers.)
+
+**What the first run found, and the fix** (`backend/app/services/live/pipeline.py`, `asr.py`):
+- *Translation instead of transcription:* Groq detects "Malay" for almost all Malaysian speech, English included, and on 3 of 78 speech clips it wrote a Malay translation (WER 96-100%). The app's existing guard (re-transcribe in English when the phone-level pronunciation score shows the words don't match the sounds) only fired below 40; the translated clips scored 40.8-45.4 and genuine speech never below 54.7. Threshold raised to 50; all three are now caught (98→6%, 100→3%, 96→13%) and no Malay clip changed.
+- *Invented sentences on silence:* "I'm going to the gym, and I'm going to the gym." at no-speech probability 0.03-0.36 but avg log-probability -1.38/-1.58 (real speech never below -0.75). Segments under -1.0, Whisper's own decoding-failure line, are now dropped.
+
+**Caveats.** Both thresholds were chosen on this same test set, so the "after" numbers are optimistic; a fresh set of speakers would confirm them. 10 speakers is small (wide CIs, noisy group n=9). Remaining errors are names ("Mifzal" → "Mirza"), accented words ("UTP" → "UDP"), and one noisy clip whose content was invented (s05/032).
+
+Outputs: `eval/real/app/` (before), `eval/real/app_fixed/` (after), each with `asr_results.json`.
+

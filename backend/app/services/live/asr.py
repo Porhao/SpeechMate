@@ -42,6 +42,10 @@ class ASRResult:
 # come from subtitle training data are dropped whatever the score.
 NO_SPEECH_DROP = 0.4
 NO_SPEECH_SUSPECT = 0.2
+# Whisper's own "decoding failed" line. On the 10-speaker study (fine-tune/eval/real, 2026-11-11) two
+# silent clips came back as full sentences ("I'm going to the gym...") at no_speech_prob 0.03-0.36,
+# but avg_logprob -1.38 and -1.58; real speech, noisy and accented included, was never below -0.75.
+MIN_AVG_LOGPROB = -1.0
 _CREDITS = re.compile(r"amara\.org|subtitles? by|thanks? (you )?for watching|please subscribe|like and subscribe", re.I)
 _STOCK = {"you", "okay", "ok", "thank you", "thanks", "bye", "so", "uh", "um", "yeah", "hmm"}
 
@@ -50,12 +54,14 @@ def _norm(text: str) -> str:
     return " ".join(re.sub(r"[^\w' ]+", " ", text.lower()).split())
 
 
-def is_hallucination(text: str, no_speech_prob: float | None = None) -> bool:
+def is_hallucination(text: str, no_speech_prob: float | None = None, avg_logprob: float | None = None) -> bool:
     """True when a transcribed segment is almost certainly not speech (see the note above)."""
     if _CREDITS.search(text):
         return True
     words = _norm(text) or ""
     if not words:
+        return True
+    if avg_logprob is not None and avg_logprob < MIN_AVG_LOGPROB:
         return True
     if no_speech_prob is None:
         return False
@@ -69,7 +75,8 @@ def keep_speech(text: str, segments: list | None) -> tuple[str, list[tuple[float
     Without segments only the text itself can be checked."""
     if not segments:
         return ("", []) if is_hallucination(text) else (text.strip(), [])
-    kept = [s for s in segments if not is_hallucination(_seg(s, "text") or "", _seg(s, "no_speech_prob"))]
+    kept = [s for s in segments
+            if not is_hallucination(_seg(s, "text") or "", _seg(s, "no_speech_prob"), _seg(s, "avg_logprob"))]
     return " ".join((_seg(s, "text") or "").strip() for s in kept).strip(), [(_seg(s, "start"), _seg(s, "end")) for s in kept]
 
 
@@ -166,14 +173,50 @@ async def transcribe_turn(audio: Path, context: str | None = None) -> str:
     # Whisper reads only the last ~224 prompt tokens: keep the verbatim style first, the context short
     prompt = f"{VERBATIM_PROMPT} {context.strip()[-400:]}" if context and context.strip() else VERBATIM_PROMPT
 
-    async def call() -> str:
+    async def call(language: str | None):
         with audio.open("rb") as f:
             # Segment no-speech probabilities let keep_speech drop text invented on a noise-only turn
-            resp = await client.audio.transcriptions.create(
+            return await client.audio.transcriptions.create(
                 model=settings.transcription_model, file=f, prompt=prompt,
                 response_format="verbose_json", timestamp_granularities=["segment"],
-                **({"language": lang} if lang else {}),
+                **({"language": language} if language else {}),
             )
-        return keep_speech(resp.text, getattr(resp, "segments", None))[0]
 
-    return await with_retries(call, attempts=2, base_delay=0.5, label="Whisper (turn)")
+    resp = await with_retries(lambda: call(lang), attempts=2, base_delay=0.5, label="Whisper (turn)")
+    text = keep_speech(resp.text, getattr(resp, "segments", None))[0]
+    if lang is None and _looks_malay(text):
+        # Groq labels most Malaysian speech "Malay" and sometimes *translates* English into Malay.
+        # The full analysis catches that with the pronunciation model; a live turn can't wait for it,
+        # so transcribe once more as English and keep it only if Whisper is clearly surer of it.
+        try:
+            english = await call("en")
+        except Exception as e:  # noqa: BLE001 — the first transcript still stands
+            logger.warning("English re-check of a turn failed: %s", e)
+            return text
+        if pick_english(_mean_logprob(resp), _mean_logprob(english)):
+            return keep_speech(english.text, getattr(english, "segments", None))[0]
+    return text
+
+
+# On the 10-speaker study (fine-tune/eval/real, 2026-11-11) forcing English raised Whisper's mean
+# log-probability by 0.19-0.31 on the three translated clips, and by at most 0.05 on genuine Malay
+# (whose text stays Malay when English is forced). A turn is re-checked when most words are Malay.
+TURN_MALAY_RATIO, ENGLISH_BETTER_BY = 0.4, 0.1
+
+
+def _looks_malay(text: str) -> bool:
+    from app.services.live.language import estimate_language_ratio
+    return len(text.split()) >= 5 and estimate_language_ratio(text)[1] >= TURN_MALAY_RATIO
+
+
+def _mean_logprob(resp) -> float | None:
+    """Token-weighted mean of the segments' avg_logprob (None without segment scores)."""
+    segs = [s for s in (getattr(resp, "segments", None) or []) if _seg(s, "avg_logprob") is not None]
+    if not segs:
+        return None
+    weights = [len(_seg(s, "tokens") or []) or 1 for s in segs]
+    return sum(_seg(s, "avg_logprob") * w for s, w in zip(segs, weights)) / sum(weights)
+
+
+def pick_english(auto_logprob: float | None, english_logprob: float | None) -> bool:
+    return auto_logprob is not None and english_logprob is not None and english_logprob > auto_logprob + ENGLISH_BETTER_BY

@@ -11,6 +11,7 @@ import { authService } from "@/services/auth";
 import { Button, Card, Field, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import { mascot } from "@/lib/mascot";
 import type { FeedbackStyle, StudyLevel } from "@/types";
+import { formatMonth } from "@/lib/format";
 
 const GOAL_OPTIONS = [
   "Academic Presentations", "Job Interviews", "Public Speaking", "Business Communication", "Daily Conversation",
@@ -156,7 +157,7 @@ export default function ProfilePage() {
           </div>
           {user.created_at && (
             <p className="text-xs mt-5" style={{ color: "var(--muted)" }}>
-              Member since {new Date(user.created_at).toLocaleDateString("en-MY", { month: "long", year: "numeric" })}
+              Member since {formatMonth(user.created_at)}
             </p>
           )}
         </Card>

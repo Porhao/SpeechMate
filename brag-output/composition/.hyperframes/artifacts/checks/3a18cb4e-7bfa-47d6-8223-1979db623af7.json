@@ -1,0 +1,4028 @@
+{
+  "ok": false,
+  "strict": false,
+  "browserSkipped": false,
+  "lint": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 63,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s02-problem.wav at 24.5-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s03-intro.wav at 48.73-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s04-profile.wav at 78.37-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s05-interview.wav at 89.94-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s06-results.wav at 134.6-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s07-present.wav at 157.88-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s01-mirror.wav at 1.6-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s03-intro.wav at 48.73-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s04-profile.wav at 78.37-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s05-interview.wav at 89.94-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s06-results.wav at 134.6-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s07-present.wav at 157.88-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s02-problem.wav at 24.5-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s04-profile.wav at 78.37-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s05-interview.wav at 89.94-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s06-results.wav at 134.6-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s07-present.wav at 157.88-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s03-intro.wav at 48.73-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s05-interview.wav at 89.94-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s06-results.wav at 134.6-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s07-present.wav at 157.88-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s04-profile.wav at 78.37-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s05-interview.wav at 89.94-282.18s, assets/voice/s06-results.wav at 134.6-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s05-interview.wav at 89.94-282.18s, assets/voice/s07-present.wav at 157.88-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s05-interview.wav at 89.94-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s05-interview.wav at 89.94-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s05-interview.wav at 89.94-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s05-interview.wav at 89.94-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s06-results.wav at 134.6-282.18s, assets/voice/s07-present.wav at 157.88-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s06-results.wav at 134.6-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s06-results.wav at 134.6-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s06-results.wav at 134.6-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s06-results.wav at 134.6-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07-present.wav at 157.88-282.18s, assets/voice/s07b-qa.wav at 203.97-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07-present.wav at 157.88-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07-present.wav at 157.88-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07-present.wav at 157.88-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07b-qa.wav at 203.97-282.18s, assets/voice/s08-convo.wav at 213.51-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07b-qa.wav at 203.97-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s07b-qa.wav at 203.97-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s08-convo.wav at 213.51-282.18s, assets/voice/s09-agents.wav at 226.62-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s08-convo.wav at 213.51-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "duplicate_audio_track",
+        "severity": "warning",
+        "message": "Multiple audible <audio>/<video> elements on track 3 overlap (assets/voice/s09-agents.wav at 226.62-282.18s, assets/voice/s10-close.wav at 264.17-282.18s). This causes layered audio playback.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Use non-overlapping time windows or different track indices."
+      },
+      {
+        "code": "overlapping_gsap_tweens",
+        "severity": "warning",
+        "message": "GSAP tweens overlap on \"#s02-k1\" for opacity between 12.82s and 12.86s.",
+        "selector": "#s02-k1",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s02-problem.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Shorten the earlier tween, move the later tween, or add `overwrite: \"auto\"`."
+      },
+      {
+        "code": "gsap_repeated_fromto_without_baseline",
+        "severity": "warning",
+        "message": "2 tl.fromTo() calls target \"proxy (unresolved DOM association)\" with no stable baseline. The last-authored fromTo \"from\" values become the element's resting state for any seek before the first tween actually runs, because GSAP applies fromTo from-values at authoring time (immediateRender), not at tween position.",
+        "selector": "proxy (unresolved DOM association)",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s02-problem.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Add `immediateRender: false` to every fromTo except the earliest-positioned one (at 9.011s), so pre-first-tween seeks keep its \"from\" values. A hiding `tl.set(..., 0)` baseline trips gsap_timeline_set_initial_hide, and a `gsap.set` authored before the fromTo calls is overwritten by them."
+      },
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 2 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s07-present.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      },
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 2 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s08-convo.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      },
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 3 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s09-agents.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      },
+      {
+        "code": "duplicate_media_discovery_risk",
+        "severity": "warning",
+        "message": "Detected 2 matching img entries with the same source/start/duration.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s09-agents.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Avoid duplicated media nodes that can be discovered twice during compilation."
+      },
+      {
+        "code": "svg_round_cap_hidden_dash",
+        "severity": "warning",
+        "message": "<ellipse> is hidden with stroke-dasharray 100 100 and stroke-dashoffset 100 on pathLength 100, but its round cap can still paint a dot at the end of the path (Chrome rounds the zero-length dash differently per curve).",
+        "selector": "#s09-sweep",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s09-agents.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Make the gap longer than the path (stroke-dasharray \"100 120\" with stroke-dashoffset 110), or keep the element visibility:hidden until its draw tween starts."
+      },
+      {
+        "code": "overlapping_gsap_tweens",
+        "severity": "warning",
+        "message": "GSAP tweens overlap on \"#s10-mate\" for y between 11.50s and 11.86s.",
+        "selector": "#s10-mate",
+        "dataAttributes": {},
+        "sourceFile": "/home/hao/projects/FYP/SpeechMate/brag-output/composition/compositions/s10-close.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0,
+        "fixHint": "Shorten the earlier tween, move the later tween, or add `overwrite: \"auto\"`."
+      }
+    ],
+    "filesScanned": 13
+  },
+  "runtime": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 47,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx21\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx22\" is 0.19s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.19s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx23\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx24\" is 0.19s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.19s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx25\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx26\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx27\" is 1.48s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~1.48s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx28\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx29\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx30\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx31\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx32\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx33\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx34\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx35\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx36\" is 0.60s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.60s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx37\" is 0.60s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.60s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx38\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx39\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx40\" is 0.19s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.19s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx41\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx42\" is 0.19s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.19s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx43\" is 0.60s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.60s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx44\" is 0.60s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.60s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx45\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx46\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx47\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx48\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx49\" is 0.19s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.19s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx50\" is 0.18s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.18s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx51\" is 0.60s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.60s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx52\" is 0.60s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.60s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx53\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx54\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx55\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx56\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx57\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx58\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx59\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx60\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx61\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx62\" is 0.11s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.11s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx63\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx64\" is 0.46s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.46s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx65\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx66\" is 0.69s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.69s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      },
+      {
+        "code": "clip_media_fit",
+        "severity": "warning",
+        "message": "Audio \"fx67\" is 0.65s but its slot (data-duration) is 2.50s — the slot is shortened to the media length when rendered. Set data-duration to ~0.65s if that isn't intended.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {
+          "data-composition-id": "main",
+          "data-start": "0",
+          "data-duration": "282.179",
+          "data-width": "1920",
+          "data-height": "1080"
+        },
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 1920,
+          "height": 1080
+        },
+        "time": 0
+      }
+    ]
+  },
+  "layout": {
+    "ok": false,
+    "errorCount": 14,
+    "warningCount": 0,
+    "infoCount": 13,
+    "findings": [
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 33.105,
+        "selector": "#s02-c0",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 184,
+          "top": 312,
+          "right": 434.47,
+          "bottom": 351,
+          "width": 250.47,
+          "height": 39
+        },
+        "containerSelector": "#s02-n0",
+        "text": "Fresh graduates",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s02-problem.html",
+        "bbox": {
+          "x": 184,
+          "y": 312,
+          "width": 250.47,
+          "height": 39
+        },
+        "firstSeen": 33.105,
+        "lastSeen": 34.681,
+        "occurrences": 3,
+        "heldMs": 500,
+        "times": [
+          33.105,
+          33.605,
+          34.681
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 33.105,
+        "selector": "#s02-c1",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 524,
+          "top": 312,
+          "right": 643.17,
+          "bottom": 351,
+          "width": 119.17,
+          "height": 39
+        },
+        "containerSelector": "#s02-k0 > div:nth-of-type(1)",
+        "text": "Anxiety",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s02-problem.html",
+        "bbox": {
+          "x": 524,
+          "y": 312,
+          "width": 119.17,
+          "height": 39
+        },
+        "firstSeen": 33.105,
+        "lastSeen": 34.681,
+        "occurrences": 3,
+        "heldMs": 500,
+        "times": [
+          33.105,
+          33.605,
+          34.681
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 55.175,
+        "selector": "#s03-logo",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 358.03,
+          "top": 230,
+          "right": 1561.97,
+          "bottom": 484,
+          "width": 1203.94,
+          "height": 254
+        },
+        "containerSelector": "#s03-matel",
+        "text": "SpeechMate",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s03-intro.html",
+        "bbox": {
+          "x": 358.03,
+          "y": 230,
+          "width": 1203.94,
+          "height": 254
+        },
+        "firstSeen": 55.175,
+        "lastSeen": 64.633,
+        "occurrences": 9,
+        "heldMs": 500,
+        "times": [
+          55.175,
+          55.675,
+          56.751,
+          57.251,
+          58.328,
+          59.904,
+          61.48,
+          63.057,
+          64.633
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 93.009,
+        "selector": "#s05-ftitle",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 860,
+          "top": 236.45,
+          "right": 1747.05,
+          "bottom": 391.45,
+          "width": 887.05,
+          "height": 155
+        },
+        "containerSelector": "#s05-g0",
+        "text": "Mock interview",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 860,
+          "y": 236.45,
+          "width": 887.05,
+          "height": 155
+        },
+        "firstSeen": 93.009,
+        "lastSeen": 96.162,
+        "occurrences": 5,
+        "heldMs": 500,
+        "times": [
+          93.009,
+          93.509,
+          94.585,
+          95.085,
+          96.162
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 109.736,
+        "selector": "#s05-fnum",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 860,
+          "top": 228.73,
+          "right": 924.81,
+          "bottom": 305.73,
+          "width": 64.81,
+          "height": 77
+        },
+        "containerSelector": "#s05-ftitle",
+        "text": "01",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 860,
+          "y": 228.73,
+          "width": 64.81,
+          "height": 77
+        },
+        "firstSeen": 93.009,
+        "lastSeen": 133.996,
+        "occurrences": 31,
+        "heldMs": 1576.0000000000077,
+        "times": [
+          93.009,
+          93.509,
+          94.585,
+          95.085,
+          96.162,
+          97.738,
+          99.314,
+          100.891,
+          102.467,
+          104.044,
+          105.62,
+          107.196,
+          108.773,
+          109.736,
+          110.349,
+          111.926,
+          113.502,
+          115.079,
+          116.655,
+          118.231,
+          118.731,
+          119.808,
+          121.384,
+          122.961,
+          124.537,
+          126.114,
+          127.69,
+          129.266,
+          130.843,
+          132.419,
+          133.996
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 109.736,
+        "selector": "#s05-fsub",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 864,
+          "top": 519,
+          "right": 1346.48,
+          "bottom": 560,
+          "width": 482.48,
+          "height": 41
+        },
+        "containerSelector": "#s05-p > div:nth-of-type(2) > div:nth-of-type(3)",
+        "text": "Questions for YOUR interview",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 864,
+          "y": 519,
+          "width": 482.48,
+          "height": 41
+        },
+        "firstSeen": 93.509,
+        "lastSeen": 122.961,
+        "occurrences": 17,
+        "heldMs": 1576.0000000000077,
+        "times": [
+          93.509,
+          94.585,
+          95.085,
+          96.162,
+          107.196,
+          108.773,
+          109.736,
+          110.349,
+          111.926,
+          113.502,
+          115.079,
+          116.655,
+          118.231,
+          118.731,
+          119.808,
+          121.384,
+          122.961
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 172.443,
+        "selector": "#s07-fnum",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 860,
+          "top": 228.73,
+          "right": 937.63,
+          "bottom": 305.73,
+          "width": 77.63,
+          "height": 77
+        },
+        "containerSelector": "#s07-ftitle",
+        "text": "02",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s07-present.html",
+        "bbox": {
+          "x": 860,
+          "y": 228.73,
+          "width": 77.63,
+          "height": 77
+        },
+        "firstSeen": 160.795,
+        "lastSeen": 203.358,
+        "occurrences": 31,
+        "heldMs": 1575.9999999999934,
+        "times": [
+          160.795,
+          161.295,
+          162.371,
+          163.948,
+          165.524,
+          167.1,
+          168.677,
+          170.253,
+          171.83,
+          172.443,
+          173.406,
+          174.983,
+          176.559,
+          178.135,
+          179.712,
+          181.288,
+          182.865,
+          184.441,
+          186.017,
+          187.594,
+          189.17,
+          190.747,
+          192.323,
+          193.9,
+          195.476,
+          197.052,
+          198.629,
+          199.129,
+          200.205,
+          201.782,
+          203.358
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 172.443,
+        "selector": "#s07-ftitle",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 860,
+          "top": 105.91,
+          "right": 1591.08,
+          "bottom": 391.45,
+          "width": 731.08,
+          "height": 285.54
+        },
+        "containerSelector": "#s07-v > div:nth-of-type(1) > span:nth-of-type(1)",
+        "text": "Presentation practice",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s07-present.html",
+        "bbox": {
+          "x": 860,
+          "y": 105.91,
+          "width": 731.08,
+          "height": 285.54
+        },
+        "firstSeen": 159.218,
+        "lastSeen": 203.358,
+        "occurrences": 30,
+        "heldMs": 1575.9999999999934,
+        "times": [
+          159.218,
+          159.718,
+          161.295,
+          162.371,
+          163.948,
+          165.524,
+          167.1,
+          168.677,
+          170.253,
+          171.83,
+          172.443,
+          173.406,
+          174.983,
+          176.559,
+          178.135,
+          179.712,
+          181.288,
+          182.865,
+          184.441,
+          186.017,
+          187.594,
+          189.17,
+          193.9,
+          195.476,
+          197.052,
+          198.629,
+          199.129,
+          200.205,
+          201.782,
+          203.358
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 198.629,
+        "selector": "#s07-fsub",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 864,
+          "top": 519,
+          "right": 1410.91,
+          "bottom": 560,
+          "width": 546.91,
+          "height": 41
+        },
+        "containerSelector": "#s07-m3",
+        "text": "Does your talk match your slides?",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s07-present.html",
+        "bbox": {
+          "x": 864,
+          "y": 519,
+          "width": 546.91,
+          "height": 41
+        },
+        "firstSeen": 198.629,
+        "lastSeen": 203.358,
+        "occurrences": 5,
+        "heldMs": 500,
+        "times": [
+          198.629,
+          199.129,
+          200.205,
+          201.782,
+          203.358
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 214.393,
+        "selector": "#s08-ftitle",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 860,
+          "top": 367,
+          "right": 1612.97,
+          "bottom": 652.55,
+          "width": 752.97,
+          "height": 285.55
+        },
+        "containerSelector": "#s08-fsub",
+        "text": "Daily conversation",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s08-convo.html",
+        "bbox": {
+          "x": 860,
+          "y": 367,
+          "width": 752.97,
+          "height": 285.55
+        },
+        "firstSeen": 214.393,
+        "lastSeen": 225.428,
+        "occurrences": 10,
+        "heldMs": 500,
+        "times": [
+          214.393,
+          214.893,
+          215.969,
+          217.546,
+          218.046,
+          219.122,
+          220.699,
+          222.275,
+          223.851,
+          225.428
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 217.546,
+        "selector": "#s08-fnum",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 860,
+          "top": 228.73,
+          "right": 938.47,
+          "bottom": 305.73,
+          "width": 78.47,
+          "height": 77
+        },
+        "containerSelector": "#s08-ftitle",
+        "text": "03",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s08-convo.html",
+        "bbox": {
+          "x": 860,
+          "y": 228.73,
+          "width": 78.47,
+          "height": 77
+        },
+        "firstSeen": 217.546,
+        "lastSeen": 225.428,
+        "occurrences": 7,
+        "heldMs": 500,
+        "times": [
+          217.546,
+          218.046,
+          219.122,
+          220.699,
+          222.275,
+          223.851,
+          225.428
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 217.546,
+        "selector": "#s08-fsub",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 864,
+          "top": 519,
+          "right": 1301.98,
+          "bottom": 560,
+          "width": 437.98,
+          "height": 41
+        },
+        "containerSelector": "#s08-a > div:nth-of-type(2) > div:nth-of-type(3) > b:nth-of-type(1)",
+        "text": "Talk the way you really talk",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s08-convo.html",
+        "bbox": {
+          "x": 864,
+          "y": 519,
+          "width": 437.98,
+          "height": 41
+        },
+        "firstSeen": 217.546,
+        "lastSeen": 225.428,
+        "occurrences": 7,
+        "heldMs": 500,
+        "times": [
+          217.546,
+          218.046,
+          219.122,
+          220.699,
+          222.275,
+          223.851,
+          225.428
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 249.574,
+        "selector": "#s09-n0 > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 928.93,
+          "top": 84.43,
+          "right": 1079.58,
+          "bottom": 162.8,
+          "width": 150.65,
+          "height": 78.37
+        },
+        "containerSelector": "#s09-n0 > div:nth-of-type(2)",
+        "text": "Know the learner",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s09-agents.html",
+        "bbox": {
+          "x": 928.93,
+          "y": 84.43,
+          "width": 150.65,
+          "height": 78.37
+        },
+        "firstSeen": 249.574,
+        "lastSeen": 263.262,
+        "occurrences": 12,
+        "heldMs": 500,
+        "times": [
+          249.574,
+          250.651,
+          251.151,
+          252.227,
+          253.803,
+          255.38,
+          256.956,
+          257.456,
+          258.533,
+          260.109,
+          261.686,
+          263.262
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "error",
+        "time": 256.956,
+        "selector": "#s09-n5 > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 444.51,
+          "top": 245.27,
+          "right": 571.17,
+          "bottom": 322.19,
+          "width": 126.66,
+          "height": 76.92
+        },
+        "containerSelector": "#s09-n5 > div:nth-of-type(2)",
+        "text": "Practise again",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s09-agents.html",
+        "bbox": {
+          "x": 444.51,
+          "y": 245.27,
+          "width": 126.66,
+          "height": 76.92
+        },
+        "firstSeen": 256.956,
+        "lastSeen": 263.262,
+        "occurrences": 6,
+        "heldMs": 500,
+        "times": [
+          256.956,
+          257.456,
+          258.533,
+          260.109,
+          261.686,
+          263.262
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 56.751,
+        "selector": "#cap16 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 540.78,
+          "top": 911.41,
+          "right": 1379.2,
+          "bottom": 957.41,
+          "width": 838.42,
+          "height": 46
+        },
+        "containerSelector": "#cap17 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "text": "and this is Mate, my companion along the way.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 540.78,
+          "y": 911.41,
+          "width": 838.42,
+          "height": 46
+        },
+        "firstSeen": 56.751,
+        "lastSeen": 56.751,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          56.751
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 56.751,
+        "selector": "#cap16 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 653.89,
+          "top": 965.91,
+          "right": 1266.08,
+          "bottom": 998.91,
+          "width": 612.19,
+          "height": 33
+        },
+        "containerSelector": "#cap17 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "text": "dan ini Mate, teman saya sepanjang perjalanan.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 653.89,
+          "y": 965.91,
+          "width": 612.19,
+          "height": 33
+        },
+        "firstSeen": 56.751,
+        "lastSeen": 56.751,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          56.751
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 109.736,
+        "selector": "#s05-fnum",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 860,
+          "top": 228.73,
+          "right": 924.81,
+          "bottom": 305.73,
+          "width": 64.81,
+          "height": 77
+        },
+        "containerSelector": "#s05-p > div:nth-of-type(2)",
+        "text": "01",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 860,
+          "y": 228.73,
+          "width": 64.81,
+          "height": 77
+        },
+        "firstSeen": 109.736,
+        "lastSeen": 109.736,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          109.736
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 109.736,
+        "selector": "#s05-ftitle",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 860,
+          "top": 236.45,
+          "right": 1747.05,
+          "bottom": 391.45,
+          "width": 887.05,
+          "height": 155
+        },
+        "containerSelector": "#s05-p > div:nth-of-type(2)",
+        "text": "Mock interview",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 860,
+          "y": 236.45,
+          "width": 887.05,
+          "height": 155
+        },
+        "firstSeen": 109.736,
+        "lastSeen": 109.736,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          109.736
+        ]
+      },
+      {
+        "code": "text_occluded",
+        "severity": "info",
+        "time": 109.736,
+        "selector": "#s05-fsub",
+        "message": "Text is hidden beneath an opaque element.",
+        "rect": {
+          "left": 864,
+          "top": 519,
+          "right": 1346.48,
+          "bottom": 560,
+          "width": 482.48,
+          "height": 41
+        },
+        "containerSelector": "#s05-p > div:nth-of-type(2)",
+        "text": "Questions for YOUR interview",
+        "fixHint": "Give the text its own zone, raise its stacking order above the covering element, or mark intentional layering with data-layout-allow-occlusion.",
+        "coveredFraction": 1,
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 864,
+          "y": 519,
+          "width": 482.48,
+          "height": 41
+        },
+        "firstSeen": 109.736,
+        "lastSeen": 109.736,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          109.736
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 109.736,
+        "selector": "#s05-fbot",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 250,
+          "top": -270,
+          "right": 770,
+          "bottom": 250,
+          "width": 520,
+          "height": 520
+        },
+        "containerSelector": "#s05-interview > div:nth-of-type(1)",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "width": 1920,
+          "height": 1080
+        },
+        "overflow": {
+          "top": 270
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 250,
+          "y": -270,
+          "width": 520,
+          "height": 520
+        },
+        "firstSeen": 109.736,
+        "lastSeen": 109.736,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          109.736
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 118.231,
+        "selector": "#cap37 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 680.98,
+          "top": 911.41,
+          "right": 1239,
+          "bottom": 957.41,
+          "width": 558.02,
+          "height": 46
+        },
+        "containerSelector": "#cap38 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "text": "the ones I should really expect.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 680.98,
+          "y": 911.41,
+          "width": 558.02,
+          "height": 46
+        },
+        "firstSeen": 118.231,
+        "lastSeen": 118.231,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          118.231
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 118.231,
+        "selector": "#cap37 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 653.75,
+          "top": 965.91,
+          "right": 1266.25,
+          "bottom": 998.91,
+          "width": 612.5,
+          "height": 33
+        },
+        "containerSelector": "#cap38 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "text": "soalan yang benar-benar patut saya jangkakan.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 653.75,
+          "y": 965.91,
+          "width": 612.5,
+          "height": 33
+        },
+        "firstSeen": 118.231,
+        "lastSeen": 118.231,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          118.231
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 146.607,
+        "selector": "#cap48 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 611.58,
+          "top": 911.41,
+          "right": 1308.42,
+          "bottom": 957.41,
+          "width": 696.84,
+          "height": 46
+        },
+        "containerSelector": "#cap49 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "text": "whether I really answered the question",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 611.58,
+          "y": 911.41,
+          "width": 696.84,
+          "height": 46
+        },
+        "firstSeen": 146.607,
+        "lastSeen": 146.607,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          146.607
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 146.607,
+        "selector": "#cap48 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 664.66,
+          "top": 965.91,
+          "right": 1255.34,
+          "bottom": 998.91,
+          "width": 590.68,
+          "height": 33
+        },
+        "containerSelector": "#cap49 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "text": "sama ada saya benar-benar menjawab soalan",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 664.66,
+          "y": 965.91,
+          "width": 590.68,
+          "height": 33
+        },
+        "firstSeen": 146.607,
+        "lastSeen": 146.607,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          146.607
+        ]
+      },
+      {
+        "code": "container_overflow",
+        "severity": "info",
+        "time": 172.443,
+        "selector": "#s07-fbot",
+        "message": "Element extends outside a clipping layout container.",
+        "rect": {
+          "left": 250,
+          "top": -270,
+          "right": 770,
+          "bottom": 250,
+          "width": 520,
+          "height": 520
+        },
+        "containerSelector": "#s07-present > div:nth-of-type(1)",
+        "fixHint": "Resize/reposition the child or container, or mark intentional overflow with data-layout-allow-overflow.",
+        "containerRect": {
+          "left": 0,
+          "top": 0,
+          "right": 1920,
+          "bottom": 1080,
+          "width": 1920,
+          "height": 1080
+        },
+        "overflow": {
+          "top": 270
+        },
+        "dataAttributes": {},
+        "sourceFile": "compositions/s07-present.html",
+        "bbox": {
+          "x": 250,
+          "y": -270,
+          "width": 520,
+          "height": 520
+        },
+        "firstSeen": 172.443,
+        "lastSeen": 172.443,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          172.443
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 249.074,
+        "selector": "#cap88 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 737.78,
+          "top": 911.41,
+          "right": 1182.22,
+          "bottom": 957.41,
+          "width": 444.44,
+          "height": 46
+        },
+        "containerSelector": "#cap89 > div:nth-of-type(1) > div:nth-of-type(1)",
+        "text": "It can't invent a problem.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 737.78,
+          "y": 911.41,
+          "width": 444.44,
+          "height": 46
+        },
+        "firstSeen": 249.074,
+        "lastSeen": 249.074,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          249.074
+        ]
+      },
+      {
+        "code": "content_overlap",
+        "severity": "info",
+        "time": 249.074,
+        "selector": "#cap88 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "message": "Two text blocks overlap and may render unreadable.",
+        "rect": {
+          "left": 726.5,
+          "top": 965.91,
+          "right": 1193.5,
+          "bottom": 998.91,
+          "width": 467,
+          "height": 33
+        },
+        "containerSelector": "#cap89 > div:nth-of-type(1) > div:nth-of-type(2)",
+        "text": "Ia tidak boleh mereka-reka masalah.",
+        "fixHint": "Give each block its own zone, or put data-layout-allow-overlap on the text or on a container inside the scene. A marker on the scene root does not apply. Decoration nobody needs to read can take data-layout-ignore.",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 726.5,
+          "y": 965.91,
+          "width": 467,
+          "height": 33
+        },
+        "firstSeen": 249.074,
+        "lastSeen": 249.074,
+        "occurrences": 1,
+        "heldMs": 0,
+        "times": [
+          249.074
+        ]
+      }
+    ],
+    "duration": 282.179,
+    "samples": [
+      15.677,
+      47.03,
+      78.383,
+      109.736,
+      141.09,
+      172.443,
+      203.796,
+      235.149,
+      266.502
+    ],
+    "transitionSamples": [],
+    "transitionSamplesDropped": 0,
+    "tolerance": 2,
+    "totalIssueCount": 27,
+    "truncated": false
+  },
+  "motion": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": [],
+    "enabled": false,
+    "samples": 0
+  },
+  "contrast": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 2,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "contrast_aa_failure",
+        "severity": "warning",
+        "message": "Contrast is 1.28:1; WCAG AA requires 3:1.",
+        "text": "First, I tell SpeechMate about myself:",
+        "fg": "rgb(255,250,240)",
+        "bg": "rgb(226,223,214)",
+        "ratio": 1.28,
+        "requiredRatio": 3,
+        "suggestedColor": "rgb(129,126,121)",
+        "large": true,
+        "selector": "div > div:nth-of-type(13) > div > div:nth-of-type(24) > div > div:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 554.203125,
+          "y": 911.40625,
+          "width": 811.578125,
+          "height": 47.5
+        },
+        "time": 78.383,
+        "times": [
+          78.383
+        ]
+      },
+      {
+        "code": "contrast_aa_failure",
+        "severity": "warning",
+        "message": "Contrast is 1.23:1; WCAG AA requires 3:1.",
+        "text": "Pertama, saya ceritakan tentang diri saya kepada S",
+        "fg": "rgb(164,212,197)",
+        "bg": "rgb(226,223,214)",
+        "ratio": 1.23,
+        "requiredRatio": 3,
+        "suggestedColor": "rgb(103,133,124)",
+        "large": true,
+        "selector": "div > div:nth-of-type(13) > div > div:nth-of-type(24) > div > div:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/captions.html",
+        "bbox": {
+          "x": 554.203125,
+          "y": 964.90625,
+          "width": 811.578125,
+          "height": 35.09375
+        },
+        "time": 78.383,
+        "times": [
+          78.383
+        ]
+      }
+    ],
+    "enabled": true,
+    "samples": [
+      15.677,
+      78.383,
+      141.09,
+      203.796,
+      266.502
+    ],
+    "checked": 23,
+    "passed": 21
+  },
+  "craft": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 15,
+    "infoCount": 0,
+    "findings": [
+      {
+        "code": "first_frame_empty",
+        "severity": "warning",
+        "message": "Frame 0 shows only the background, and the first frame is the thumbnail on social players: have the title or key image already on screen at 0 s instead of entering from nothing; see references/review.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 0
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 2 text elements stay under it for 0.5 s or more, the smallest \"YOUR FOOTAGE · S01-CAM\" at 18 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "YOUR FOOTAGE · S01-CAM",
+        "selector": "#s01-cam > div:nth-of-type(1) > div:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s01-mirror.html",
+        "bbox": {
+          "x": 813.05,
+          "y": 381.83,
+          "width": 293.9,
+          "height": 21
+        },
+        "time": 5.653,
+        "times": [
+          5.653,
+          5.653
+        ],
+        "fontPx": 18,
+        "floorPx": 28,
+        "seconds": 18.372,
+        "elements": [
+          {
+            "selector": "#s01-cam > div:nth-of-type(1) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S01-CAM",
+            "fontPx": 18,
+            "time": 5.653,
+            "seconds": 18.372
+          },
+          {
+            "selector": "#s01-cam > div:nth-of-type(1) > div:nth-of-type(3)",
+            "text": "Film from behind or the side. Hold on the silence after you finish.",
+            "fontPx": 23,
+            "time": 5.653,
+            "seconds": 18.372
+          }
+        ]
+      },
+      {
+        "code": "dead_stretch",
+        "severity": "warning",
+        "message": "Nothing on screen changes for 3.77 s (19.31–23.08 s): start the next move within 3 s, or put data-hold on the element whose stillness is deliberate; see references/motion.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 19.314,
+        "seconds": 3.769,
+        "floorSeconds": 3,
+        "until": 23.083
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 2 text elements stay under it for 0.5 s or more, the smallest \"JobStreet Malaysia, Graduate Employab...\" at 19 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "JobStreet Malaysia, Graduate Employability Survey 2025",
+        "selector": "#s02-k0 > div:nth-of-type(3)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s02-problem.html",
+        "bbox": {
+          "x": 216,
+          "y": 590.33,
+          "width": 509.41,
+          "height": 23
+        },
+        "time": 32.976,
+        "times": [
+          32.976,
+          36.273
+        ],
+        "fontPx": 19,
+        "floorPx": 28,
+        "seconds": 4.24,
+        "elements": [
+          {
+            "selector": "#s02-k0 > div:nth-of-type(3)",
+            "text": "JobStreet Malaysia, Graduate Employability Survey 2025",
+            "fontPx": 19,
+            "time": 32.976,
+            "seconds": 4.24
+          },
+          {
+            "selector": "#s02-k1 > div:nth-of-type(3)",
+            "text": "JobStreet Malaysia × Malaysian Employers Federation, 2025",
+            "fontPx": 19,
+            "time": 36.273,
+            "seconds": 0.943
+          }
+        ]
+      },
+      {
+        "code": "line_unread",
+        "severity": "warning",
+        "message": "\"cite weak communication & presentation skills\" (5 words) is on screen 0.77 s (±0.01 s), under its 1.50 s floor: hold it about 0.5 s + 0.3 s a word (2.00 s here) before it leaves or changes; see references/motion.md.",
+        "text": "cite weak communication & presentation skills",
+        "selector": "#s02-k1 > div:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s02-problem.html",
+        "bbox": {
+          "x": 1036,
+          "y": 444.56,
+          "width": 476.8800000000001,
+          "height": 88.99999999999994
+        },
+        "time": 36.185,
+        "words": 5,
+        "seconds": 0.766,
+        "floorSeconds": 1.5,
+        "measured": [
+          {
+            "time": 34.86,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 35.331,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 35.802,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 36.273,
+            "opacity": 0.87,
+            "heightPx": 89
+          },
+          {
+            "time": 36.745,
+            "opacity": 1,
+            "heightPx": 89
+          },
+          {
+            "time": 37.216,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 37.687,
+            "opacity": null,
+            "heightPx": null
+          },
+          {
+            "time": 38.158,
+            "opacity": null,
+            "heightPx": null
+          }
+        ]
+      },
+      {
+        "code": "dead_stretch",
+        "severity": "warning",
+        "message": "Nothing on screen changes for 3.30 s (43.81–47.11 s): start the next move within 3 s, or put data-hold on the element whose stillness is deliberate; see references/motion.md.",
+        "selector": "[data-composition-id]",
+        "dataAttributes": {},
+        "sourceFile": "index.html",
+        "bbox": {
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
+        },
+        "time": 43.811,
+        "seconds": 3.297,
+        "floorSeconds": 3,
+        "until": 47.108
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and \"Mate · your companion\" renders at 23 px for 10.36 s: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "Mate · your companion",
+        "selector": "#s03-matel",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s03-intro.html",
+        "bbox": {
+          "x": 1478.63,
+          "y": 373.57,
+          "width": 259.04,
+          "height": 27.86
+        },
+        "time": 55.117,
+        "times": [
+          55.117
+        ],
+        "fontPx": 23.36,
+        "floorPx": 28,
+        "seconds": 10.364,
+        "elements": [
+          {
+            "selector": "#s03-matel",
+            "text": "Mate · your companion",
+            "fontPx": 23.36,
+            "time": 55.117,
+            "seconds": 10.364
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 4 text elements stay under it for 0.5 s or more, the smallest \"speechmate · /profile\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "speechmate · /profile",
+        "selector": "#s04-a > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s04-profile.html",
+        "bbox": {
+          "x": 950.78,
+          "y": 122.5,
+          "width": 170.47,
+          "height": 20
+        },
+        "time": 79.142,
+        "times": [
+          79.142,
+          79.142,
+          79.142,
+          79.142
+        ],
+        "fontPx": 17,
+        "floorPx": 28,
+        "seconds": 10.364,
+        "elements": [
+          {
+            "selector": "#s04-a > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /profile",
+            "fontPx": 17,
+            "time": 79.142,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s04-a > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S04-A",
+            "fontPx": 18,
+            "time": 79.142,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s04-a > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Fill in study level, field, speaking level, goal, challenges and feedback style. Pause on .",
+            "fontPx": 23,
+            "time": 79.142,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s04-a > div:nth-of-type(2) > div:nth-of-type(3) > b:nth-of-type(1)",
+            "text": "How your coach uses this",
+            "fontPx": 23,
+            "time": 79.142,
+            "seconds": 10.364
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 11 text elements stay under it for 0.5 s or more, the smallest \"speechmate · /interview\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "speechmate · /interview",
+        "selector": "#s05-a > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s05-interview.html",
+        "bbox": {
+          "x": 939.39,
+          "y": 122.5,
+          "width": 192.63,
+          "height": 20
+        },
+        "time": 97.514,
+        "times": [
+          97.514,
+          97.514,
+          97.514,
+          106.465,
+          106.465,
+          106.465,
+          123.895,
+          123.895,
+          123.895,
+          127.193,
+          129.548
+        ],
+        "fontPx": 17,
+        "floorPx": 28,
+        "seconds": 8.48,
+        "elements": [
+          {
+            "selector": "#s05-a > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /interview",
+            "fontPx": 17,
+            "time": 97.514,
+            "seconds": 8.48
+          },
+          {
+            "selector": "#s05-p > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /interview · plan preview",
+            "fontPx": 17,
+            "time": 106.465,
+            "seconds": 16.959
+          },
+          {
+            "selector": "#s05-live > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /session",
+            "fontPx": 17,
+            "time": 123.895,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s05-a > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S05-A",
+            "fontPx": 18,
+            "time": 97.514,
+            "seconds": 8.48
+          },
+          {
+            "selector": "#s05-p > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S05-P",
+            "fontPx": 18,
+            "time": 106.465,
+            "seconds": 16.959
+          },
+          {
+            "selector": "#s05-live > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S05-LIVE",
+            "fontPx": 18,
+            "time": 123.895,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s05-a > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Type the position, company, level and job description slowly, then upload your resume.",
+            "fontPx": 23,
+            "time": 97.514,
+            "seconds": 8.48
+          },
+          {
+            "selector": "#s05-p > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Screenshot or record the plan preview. Zoom in on the question that clearly comes from your resume or the job description.",
+            "fontPx": 23,
+            "time": 106.465,
+            "seconds": 16.959
+          },
+          {
+            "selector": "#s05-live > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Your camera view with the AI interviewer. Give one short answer (under 25 words) so it asks a follow-up.",
+            "fontPx": 23,
+            "time": 123.895,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s05-w",
+            "text": "Waits until you've finished",
+            "fontPx": 26,
+            "time": 127.193,
+            "seconds": 7.066
+          },
+          {
+            "selector": "#s05-fu",
+            "text": "Short answer → one follow-up",
+            "fontPx": 26,
+            "time": 129.548,
+            "seconds": 4.711
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 4 text elements stay under it for 0.5 s or more, the smallest \"speechmate · /results\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "speechmate · /results",
+        "selector": "#s06-a > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s06-results.html",
+        "bbox": {
+          "x": 943.72,
+          "y": 122.5,
+          "width": 173.09,
+          "height": 20
+        },
+        "time": 135.201,
+        "times": [
+          135.201,
+          135.201,
+          135.201,
+          154.986
+        ],
+        "fontPx": 17,
+        "floorPx": 28,
+        "seconds": 22.141,
+        "elements": [
+          {
+            "selector": "#s06-a > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /results",
+            "fontPx": 17,
+            "time": 135.201,
+            "seconds": 22.141
+          },
+          {
+            "selector": "#s06-a > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S06-A",
+            "fontPx": 18,
+            "time": 135.201,
+            "seconds": 22.141
+          },
+          {
+            "selector": "#s06-a > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "From the session you just recorded: overall score, summary, four pillars, per-answer feedback, three drills.",
+            "fontPx": 23,
+            "time": 135.201,
+            "seconds": 22.141
+          },
+          {
+            "selector": "#s06-d",
+            "text": "3 drills · Practise this now",
+            "fontPx": 26,
+            "time": 154.986,
+            "seconds": 2.356
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 10 text elements stay under it for 0.5 s or more, the smallest \"speechmate · /presentations\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "speechmate · /presentations",
+        "selector": "#s07-u > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s07-present.html",
+        "bbox": {
+          "x": 951.14,
+          "y": 122.5,
+          "width": 228.75,
+          "height": 20
+        },
+        "time": 161.111,
+        "times": [
+          161.111,
+          161.111,
+          161.111,
+          172.888,
+          172.888,
+          172.888,
+          177.598,
+          179.483,
+          179.483,
+          179.483
+        ],
+        "fontPx": 17,
+        "floorPx": 28,
+        "seconds": 11.305,
+        "elements": [
+          {
+            "selector": "#s07-u > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /presentations",
+            "fontPx": 17,
+            "time": 161.111,
+            "seconds": 11.305
+          },
+          {
+            "selector": "#s07-v > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /session",
+            "fontPx": 17,
+            "time": 172.888,
+            "seconds": 6.124
+          },
+          {
+            "selector": "#s07-r > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /results",
+            "fontPx": 17,
+            "time": 179.483,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s07-u > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S07-U",
+            "fontPx": 18,
+            "time": 161.111,
+            "seconds": 11.305
+          },
+          {
+            "selector": "#s07-v > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S07-V",
+            "fontPx": 18,
+            "time": 172.888,
+            "seconds": 6.124
+          },
+          {
+            "selector": "#s07-r > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S07-R",
+            "fontPx": 18,
+            "time": 179.483,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s07-u > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Upload your .pptx or .pdf. Then scroll slowly through the insights page.",
+            "fontPx": 23,
+            "time": 161.111,
+            "seconds": 11.305
+          },
+          {
+            "selector": "#s07-v > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Move through your slides yourself. Explain one slide slightly wrong on purpose.",
+            "fontPx": 23,
+            "time": 172.888,
+            "seconds": 6.124
+          },
+          {
+            "selector": "#s07-r > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Zoom in on the slide where something was left out.",
+            "fontPx": 23,
+            "time": 179.483,
+            "seconds": 10.364
+          },
+          {
+            "selector": "#s07-q",
+            "text": "Your audience just listens",
+            "fontPx": 26,
+            "time": 177.598,
+            "seconds": 1.414
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 4 text elements stay under it for 0.5 s or more, the smallest \"speechmate · /session\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "speechmate · /session",
+        "selector": "#s07b-a > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s07b-qa.html",
+        "bbox": {
+          "x": 936.55,
+          "y": 122.5,
+          "width": 180.49,
+          "height": 20
+        },
+        "time": 203.979,
+        "times": [
+          203.979,
+          203.979,
+          203.979,
+          203.979
+        ],
+        "fontPx": 17,
+        "floorPx": 28,
+        "seconds": 8.951,
+        "elements": [
+          {
+            "selector": "#s07b-a > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /session",
+            "fontPx": 17,
+            "time": 203.979,
+            "seconds": 8.951
+          },
+          {
+            "selector": "#s07b-a > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S07B-A",
+            "fontPx": 18,
+            "time": 203.979,
+            "seconds": 8.951
+          },
+          {
+            "selector": "#s07b-a > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Click . Let the AI ask a question about one of your slides, then answer it.",
+            "fontPx": 23,
+            "time": 203.979,
+            "seconds": 8.951
+          },
+          {
+            "selector": "#s07b-a > div:nth-of-type(2) > div:nth-of-type(3) > b:nth-of-type(1)",
+            "text": "Start Q&A rehearsal",
+            "fontPx": 23,
+            "time": 203.979,
+            "seconds": 8.951
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 7 text elements stay under it for 0.5 s or more, the smallest \"speechmate · /conversation\" at 17 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "speechmate · /conversation",
+        "selector": "#s08-a > div:nth-of-type(1) > span:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s08-convo.html",
+        "bbox": {
+          "x": 936.23,
+          "y": 122.5,
+          "width": 222.97,
+          "height": 20
+        },
+        "time": 217.641,
+        "times": [
+          217.641,
+          217.641,
+          217.641,
+          217.641,
+          219.525,
+          221.88,
+          221.88
+        ],
+        "fontPx": 17,
+        "floorPx": 28,
+        "seconds": 8.479,
+        "elements": [
+          {
+            "selector": "#s08-a > div:nth-of-type(1) > span:nth-of-type(1)",
+            "text": "speechmate · /conversation",
+            "fontPx": 17,
+            "time": 217.641,
+            "seconds": 8.479
+          },
+          {
+            "selector": "#s08-a > div:nth-of-type(2) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S08-A",
+            "fontPx": 18,
+            "time": 217.641,
+            "seconds": 8.479
+          },
+          {
+            "selector": "#s08-ys > div:nth-of-type(1)",
+            "text": "YOU SAID",
+            "fontPx": 22,
+            "time": 221.88,
+            "seconds": 4.24
+          },
+          {
+            "selector": "#s08-ys > div:nth-of-type(2)",
+            "text": "TRY SAYING",
+            "fontPx": 22,
+            "time": 221.88,
+            "seconds": 4.24
+          },
+          {
+            "selector": "#s08-a > div:nth-of-type(2) > div:nth-of-type(3)",
+            "text": "Mix in some Manglish and show the transcript keeping it as spoken. End on the tips.",
+            "fontPx": 23,
+            "time": 217.641,
+            "seconds": 8.479
+          },
+          {
+            "selector": "#s08-a > div:nth-of-type(2) > div:nth-of-type(3) > b:nth-of-type(1)",
+            "text": "You said / Try saying",
+            "fontPx": 23,
+            "time": 217.641,
+            "seconds": 8.479
+          },
+          {
+            "selector": "#s08-m",
+            "text": "English · Bahasa Malaysia · Manglish, kept as spoken",
+            "fontPx": 24,
+            "time": 219.525,
+            "seconds": 6.595
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 8 text elements stay under it for 0.5 s or more, the smallest \"Interviewer · follow-ups\" at 18 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "Interviewer · follow-ups",
+        "selector": "#s09-n2 > div:nth-of-type(2)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s09-agents.html",
+        "bbox": {
+          "x": 1418.09,
+          "y": 619.61,
+          "width": 174.5,
+          "height": 44.22
+        },
+        "time": 236.955,
+        "times": [
+          233.657,
+          236.955,
+          240.253,
+          243.079,
+          247.319,
+          249.674,
+          253.443,
+          256.74
+        ],
+        "fontPx": 18.26,
+        "floorPx": 28,
+        "seconds": 26.852,
+        "elements": [
+          {
+            "selector": "#s09-n2 > div:nth-of-type(2)",
+            "text": "Interviewer · follow-ups",
+            "fontPx": 18.26,
+            "time": 236.955,
+            "seconds": 26.852
+          },
+          {
+            "selector": "#s09-n3 > div:nth-of-type(2)",
+            "text": "Deck reader · slide check",
+            "fontPx": 18.68,
+            "time": 240.253,
+            "seconds": 23.554
+          },
+          {
+            "selector": "#s09-n1 > div:nth-of-type(2)",
+            "text": "Question planner",
+            "fontPx": 19,
+            "time": 233.657,
+            "seconds": 30.15
+          },
+          {
+            "selector": "#s09-n4 > div:nth-of-type(2)",
+            "text": "Measured issues only",
+            "fontPx": 19,
+            "time": 243.079,
+            "seconds": 20.728
+          },
+          {
+            "selector": "#s09-n0 > div:nth-of-type(2)",
+            "text": "Learner profile",
+            "fontPx": 19,
+            "time": 249.674,
+            "seconds": 14.133
+          },
+          {
+            "selector": "#s09-n5 > div:nth-of-type(2)",
+            "text": "Progress",
+            "fontPx": 19,
+            "time": 256.74,
+            "seconds": 7.067
+          },
+          {
+            "selector": "#s09-inv",
+            "text": "It can't invent a problem",
+            "fontPx": 24,
+            "time": 247.319,
+            "seconds": 4.239
+          },
+          {
+            "selector": "#s09-ask",
+            "text": "“What should I practise next?”",
+            "fontPx": 26,
+            "time": 253.443,
+            "seconds": 1.884
+          }
+        ]
+      },
+      {
+        "code": "text_below_floor",
+        "severity": "warning",
+        "message": "Type floor is 28 px (2.6% of the 1080 px short side, what a phone can read) and 2 text elements stay under it for 0.5 s or more, the smallest \"YOUR FOOTAGE · S10-CAM\" at 18 px: set reading text to at least 28 px, or put data-layout-ignore on text that is texture rather than reading; see references/look.md.",
+        "text": "YOUR FOOTAGE · S10-CAM",
+        "selector": "#s10-cam > div:nth-of-type(1) > div:nth-of-type(1)",
+        "dataAttributes": {},
+        "sourceFile": "compositions/s10-close.html",
+        "bbox": {
+          "x": 813.05,
+          "y": 371.83,
+          "width": 293.9,
+          "height": 21
+        },
+        "time": 273.228,
+        "times": [
+          273.228,
+          273.228
+        ],
+        "fontPx": 18,
+        "floorPx": 28,
+        "seconds": 2.356,
+        "elements": [
+          {
+            "selector": "#s10-cam > div:nth-of-type(1) > div:nth-of-type(1)",
+            "text": "YOUR FOOTAGE · S10-CAM",
+            "fontPx": 18,
+            "time": 273.228,
+            "seconds": 2.356
+          },
+          {
+            "selector": "#s10-cam > div:nth-of-type(1) > div:nth-of-type(3)",
+            "text": "Same shot as the opening. Mate is added beside you in the edit.",
+            "fontPx": 23,
+            "time": 273.228,
+            "seconds": 2.356
+          }
+        ]
+      }
+    ],
+    "enabled": true,
+    "step": 0.47100000000000364,
+    "samples": 599
+  },
+  "audio": {
+    "ok": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "infoCount": 0,
+    "findings": []
+  },
+  "hdr": {
+    "autoPromotion": null,
+    "inspection": "available"
+  },
+  "snapshots": {
+    "enabled": false,
+    "files": [],
+    "times": [],
+    "findingFiles": []
+  }
+}

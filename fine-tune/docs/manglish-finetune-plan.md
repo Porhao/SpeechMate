@@ -25,7 +25,7 @@ Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcrib
 | Decision | Choice | Why |
 |---|---|---|
 | Method | LoRA (adapter weights only) | Full fine-tuning of a large model will not fit in 8 GB |
-| Base model | **Decided in F0 by the licence check.** If the Mesolitica licence allows derivatives, use `mesolitica/Malaysian-whisper-large-v3-turbo-v3`. If it doesn't, use `openai/whisper-large-v3-turbo`. | Fine-tuning the model you ship is the best chance of beating it. A LoRA on vanilla turbo trained on 5-10 h must close a big gap first. |
+| Base model | `mesolitica/Malaysian-whisper-large-v3-turbo-v3`. | Fine-tuning the model you ship is the best chance of beating it. A LoRA on vanilla turbo trained on 5-10 h must close a big gap first. |
 | Smoke-test model | `openai/whisper-small` | Fast to iterate; proves the pipeline works |
 | Precision | **bf16 first** (turbo is about 809M parameters, about 1.6 GB in bf16). Use 8-bit or 4-bit only if bf16 runs out of memory. | The 4060 (Ada) supports bf16. That avoids fp16 loss-scaling problems and the bitsandbytes setup. |
 | Language token | **Auto-detect at inference.** In training, give each clip the token of its main language (`en` or `ms`). | Forcing one token makes the model translate: US English came out as Malay (`stt-benchmark-2026-10-01.md`). Per-clip tokens match how Whisper was trained and how the app runs. |
@@ -33,15 +33,13 @@ Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcrib
 | Timestamp mode | **Train with timestamp tokens** (`<|0.00|> text <|end|>`) and evaluate with `return_timestamps=True` | faster-whisper decodes in timestamp mode by default. Mesolitica's model only works in that mode: without it, it never stops and loops ("5.5.5.5..."). This was found in the F4 smoke test. |
 | Final runtime | faster-whisper (CTranslate2), **int8 on CPU**, 8 threads | This is how the app runs in Docker (`asr._whisper_model`) |
 
-**Licences:** Whisper weights are MIT and Qwen3-ASR is Apache-2.0. Mesolitica's model card shows no licence. This affects both **shipping** the model (the app's current default) and **fine-tuning** it, so settle it once in F0: ask Mesolitica, or treat the model as unusable for both. Write the answer down in `RESULTS.md`.
-
 ---
 
 ## 3. Phases
 
 | Phase | What | Done when | Status (8 Oct) |
 |---|---|---|---|
-| F0 | Environment, licences, ethics | `nvidia-smi` shows the GPU. Packages install. Mesolitica licence answered (this picks the base model). Data licences written down. **University ethics approval** for recording people. WSL RAM raised (see §9). | **Partly.** Environment done (`.venv`, `.venv-app`, `.venv-convert`). Licence question and ethics approval still open. |
+| F0 | Environment, ethics | `nvidia-smi` shows the GPU. Packages install. **University ethics approval** for recording people. WSL RAM raised (see §9). | **Partly.** Environment done (`.venv`, `.venv-app`, `.venv-convert`). Ethics approval still open. |
 | F1 | Finish the bake-off (spec M1-M3) | Mostly done: `bench_stt.py` plus three reports in `docs/benchmarks/`. **Remaining: M1, real recordings.** All English and Manglish clips so far are synthetic TTS. | **Partly.** Public bake-off done; real recordings (M1) not started. |
 | F2 | Collect and clean data | 5+ hours of verified clips, speaker-split train/dev/test | **Partly.** Recording kit ready (`STYLE_GUIDE.md`, `RECORDING_PROMPTS.md`, consent form). Public substitute: 10.3 h (`scripts/prepare_public.py`). Own recordings not started. |
 | F3 | Build the manifest and the dataset | `data/` loads with `datasets`; test set locked; no clip over 30 s | **Done for public data** (`data/train.csv`, `dev.csv`, split by voice). |
@@ -49,7 +47,7 @@ Goal: fine-tune an open Whisper-family model on Manglish so SpeechMate transcrib
 | F5 | Real training run | Adapter saved; dev WER logged every epoch | **Done on public data.** Mesolitica base, lr 1e-4, dev WER 19.5% → 4.1% (`out/adapter/`). |
 | F6 | Evaluate vs the shipped baseline | Report with every metric in §7 | **Partly.** 400 public clips: English 9.4% → 6.7%, mixed 14.5% → 6.7%, silence 0/10 (`docs/benchmarks/stt-routing-and-finetune-2026-10-06.md`). Real speakers and noisy real speech still needed. |
 | F7 | Merge and convert | `/models/ct2/<name>` loads in faster-whisper (via `convert_whisper.sh`) | **Done** (`scripts/export.py` → `out/ct2/`). |
-| F8 | Plug into SpeechMate | `WHISPER_MODEL_SIZE` switch; code-switch routing and prompt handled (§8); A/B against baseline | Not started: waits on F6 with real speakers and the licence answer. |
+| F8 | Plug into SpeechMate | `WHISPER_MODEL_SIZE` switch; code-switch routing and prompt handled (§8); A/B against baseline | Not started: waits on F6 with real speakers. |
 | F9 | Improvement loop | Tap-to-correct data feeds the next training round | Not started. |
 
 **Do F1 (M1) before anything else.** A real test set is worth more than any fine-tune. Only fine-tune if the shipped model clearly fails on it.
@@ -137,7 +135,7 @@ fine-tune/
   out/
     adapter/  merged/
   STYLE_GUIDE.md         # transcription rules from 4.3
-  RESULTS.md             # table of every run: settings, dev WER, test WER; licences
+  RESULTS.md             # table of every run: settings, dev WER, test WER
 ```
 
 The repo already has the following, so reuse them rather than writing new versions:
@@ -383,7 +381,7 @@ Then, in order of preference:
 
 | Risk | Sign | Response |
 |---|---|---|
-| Baseline is too strong | The fine-tune beats vanilla but not the shipped Mesolitica model | Expected with a small dataset on a vanilla base. Fine-tune on Mesolitica if the licence allows, or collect more data. |
+| Baseline is too strong | The fine-tune beats vanilla but not the shipped Mesolitica model | Expected with a small dataset on a vanilla base. Fine-tune on Mesolitica, or collect more data. |
 | Overfitting to a few voices | Great train score, poor test score on new speakers | More speakers, lower rank, fewer epochs |
 | Forgetting plain English/Malay | Baseline beats you on non-Manglish clips | Raise the share of guard data |
 | Translating instead of transcribing | English comes out as Malay or the reverse | Check the per-clip language tags; keep auto-detect |
@@ -392,7 +390,6 @@ Then, in order of preference:
 | Transcribing the labeller's habits | Model copies a labeller's quirks | Use 2+ labellers; review samples |
 | Out of memory | CUDA OOM error or a killed WSL process | Section 9 |
 | Privacy, consent or ethics problem | User audio collected without clear opt-in or approval | Ethics approval before F2; opt-in only; document retention; deletion on request |
-| Licence problem | Data or base model licence forbids use | Record every licence in `RESULTS.md` before training |
 
 ---
 
@@ -405,7 +402,6 @@ Ship the fine-tune only if **all** of these hold on the locked test set, compare
 - Noise robustness, English-word accuracy and language preservation not worse than baseline
 - Speed (CPU int8) within your latency budget
 - Gains hold across speakers, not just one
-- Data and base-model licences are clear for your intended use
 
 If it fails, keep the baseline, look at the error types, and gather targeted data (for example more clips of the words it gets wrong) before the next round.
 
@@ -415,7 +411,7 @@ If it fails, keep the baseline, look at the error types, and gather targeted dat
 
 | Week | Work |
 |---|---|
-| 1 | F0: licences, ethics application, environment, style guide |
+| 1 | F0: ethics application, environment, style guide |
 | 2-3 | F1/F2: record real clips, lock the test set, run the shipped baseline on it (spec M1). Then label 3-5 h of training data (about 25-50 h of work). |
 | 4 | F3-F5: manifest, smoke test on `whisper-small`, first real run |
 | 5 | F5-F6: turbo LoRA run, evaluate against the shipped baseline |
@@ -443,7 +439,7 @@ From the earlier research:
 - Code-switching ASR fine-tuning evidence (Singapore languages incl. Malay-English): https://arxiv.org/html/2506.14177
 - Whisper adaptation on code-switched data (Mandarin-English): https://arxiv.org/pdf/2311.17382
 - Malaysian fine-tunes degrading noise and other-language performance: https://arxiv.org/html/2609.32560
-- Mesolitica Malaysian-STT-Whisper dataset (no licence stated): https://huggingface.co/datasets/mesolitica/Malaysian-STT-Whisper
+- Mesolitica Malaysian-STT-Whisper dataset: https://huggingface.co/datasets/mesolitica/Malaysian-STT-Whisper
 - Malaya-Speech datasets (incl. semisupervised Manglish, CC BY 4.0): https://malaya-speech.readthedocs.io/en/stable/Dataset.html
 - MagicHub ASR-MalCSC (CC BY-NC-ND 4.0): https://magichub.com/datasets/malay-conversational-speech-corpus/
 - IMDA National Speech Corpus: https://www2.imda.gov.sg/NationalSpeechCorpus

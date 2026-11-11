@@ -30,6 +30,13 @@ async function refreshTokens(): Promise<boolean> {
   return true;
 }
 
+/** The session is over (refresh token expired or gone): drop the stale token and go to sign-in. */
+function signedOut(): never {
+  localStorage.removeItem("access_token");
+  window.location.href = "/login";
+  throw new ApiError(401, "Your session has expired. Please sign in again.");
+}
+
 async function request<T>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const isForm = options.body instanceof FormData;
   let res: Response;
@@ -48,8 +55,10 @@ async function request<T>(path: string, options: RequestInit = {}, retried = fal
     throw new ApiError(0, `Can't reach the SpeechMate backend at ${API_BASE_URL}. Is it running?`);
   }
 
-  if (res.status === 401 && !retried && path !== "/auth/refresh" && (await refreshTokens())) {
-    return request<T>(path, options, true);
+  // /auth/* 401s are answers (wrong password…), not an expired session
+  if (res.status === 401 && !path.startsWith("/auth/")) {
+    if (!retried && (await refreshTokens())) return request<T>(path, options, true);
+    signedOut();
   }
   if (!res.ok) throw apiError(res.status, await res.json().catch(() => ({ detail: res.statusText })));
   if (res.status === 204) return undefined as T;
@@ -80,6 +89,8 @@ function uploadWithProgress<T>(path: string, form: FormData, onProgress: (fracti
       try { body = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
       if (xhr.status === 401 && !retried && (await refreshTokens())) {
         uploadWithProgress<T>(path, form, onProgress, true).then(resolve, reject);
+      } else if (xhr.status === 401) {
+        try { signedOut(); } catch (e) { reject(e); }
       } else if (xhr.status >= 200 && xhr.status < 300) {
         resolve(body as T);
       } else {
@@ -106,6 +117,7 @@ export const api = {
   blob: async (path: string): Promise<Blob> => {
     let res = await api.fetch(path);
     if (res.status === 401 && (await refreshTokens())) res = await api.fetch(path);
+    if (res.status === 401) signedOut();
     if (!res.ok) throw new ApiError(res.status, res.statusText || "Request failed");
     return res.blob();
   },

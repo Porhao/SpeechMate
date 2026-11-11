@@ -102,7 +102,7 @@ cd fine-tune
 LR=1e-4 .venv/bin/python scripts/train_lora.py mesolitica/Malaysian-whisper-large-v3-turbo-v3
 ```
 
-Then score it on the same `eval/real` clips (`scripts/eval_finetune.py` scores `eval/paper`; pointing it at `eval/real` is a small change).
+Then score it on the same `eval/real` clips (`scripts/archive/eval_finetune.py` scores `eval/paper`; pointing it at `eval/real` is a small change).
 
 ---
 

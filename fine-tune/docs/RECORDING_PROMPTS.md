@@ -111,4 +111,4 @@ s03_034.wav,A2,phone,cafe-noise,
 ```
 
 3. **Split** any clip over 30 s on a pause, and cut out any personal details.
-4. **Choose the test speakers before transcribing anyone's training clips.** The first 2-3 speakers (30-50 clips) are good candidates: they become `refs.json` for `bench_stt.py --real` and never go into training.
+4. **Choose the test speakers before transcribing anyone's training clips.** The first 2-3 speakers (30-50 clips) are good candidates: they become `refs.json` for `run_app_on_clips.py` + `study_stats.py asr` and never go into training.

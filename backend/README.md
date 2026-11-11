@@ -36,11 +36,12 @@ Docker bundles everything the pipeline needs: LibreOffice, poppler, ffmpeg, espe
 
 ```bash
 cp .env.example .env          # set SECRET_KEY; add LLM_* (Gemini) and OPENAI_* (Groq) for the cloud setup
-docker compose up --build     # API on http://localhost:8000, Postgres on :5432
-INSTALL_ML=false docker compose up --build    # slim image without the ~2 GB of local models
+cd ..                         # compose runs from the repository root (one compose file for the whole app)
+docker compose up --build db backend                     # API on http://localhost:8000, Postgres on :5432
+INSTALL_ML=false docker compose up --build db backend    # slim image without the ~2 GB of local models
 ```
 
-To run the whole app (backend + frontend + database), use `./start.sh` in the repository root instead. Migrations run automatically on startup. Then:
+To run the whole app (backend + frontend + database), use `./start.sh` in the repository root instead. Migrations run automatically on startup. The code is copied into the image, so rebuild after a change, or use the setup below for auto-reload. Then:
 
 - **Swagger UI:** http://localhost:8000/docs, where you can try every endpoint
 - **Health and capabilities:** http://localhost:8000/health shows which binaries, models and providers are available, and therefore which fallbacks apply
@@ -66,7 +67,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 pip install -r requirements-ml.txt          # optional: local models for live-session analysis
 cp .env.example .env                        # set DATABASE_URL to your Postgres
-docker compose up -d db                     # (or use your own Postgres)
+(cd .. && docker compose up -d db)          # the root compose's Postgres (or use your own)
 alembic upgrade head
 uvicorn app.main:app --reload
 ```

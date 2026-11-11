@@ -14,7 +14,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, Loader2, Play, Rot
 import { liveService } from "@/services/live";
 import { Button, Card, Dots, LinkButton, Notice, ScoreBar, StatusBadge, statusColor } from "@/components/ui/kit";
 import type { ContentFeedback, FullAnalysisResult, LiveSession, Pillar, SlideFeedback } from "@/types";
-import { formatDuration } from "@/utils/format";
+import { formatDateTime, formatDuration } from "@/lib/format";
 import SlideImage from "@/components/presentation/SlideImage";
 import { mascot } from "@/lib/mascot";
 
@@ -372,7 +372,7 @@ export default function ResultsPage() {
           <h1 className="font-display text-3xl" style={{ color: "var(--ink)" }}>{title}</h1>
           <p className="text-sm mt-1" style={{ color: "var(--muted)" }}>
             {subtitle ? `${subtitle} · ` : ""}{formatDuration(Math.round(a?.duration_sec ?? session.duration_sec))} ·{" "}
-            {new Date(session.created_at).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" })}
+            {formatDateTime(session.created_at)}
           </p>
         </div>
         <LinkButton href={practiceAgainHref(session)}><RotateCcw className="w-4 h-4" /> Practise again</LinkButton>

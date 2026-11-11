@@ -1,0 +1,386 @@
+{
+ "s01-mirror": {
+  "dur": 7.608,
+  "min": 15,
+  "chunks": [
+   {
+    "en": "I used to practise interviews and presentations alone, in front of a mirror.",
+    "ms": "Dulu saya berlatih temu duga dan pembentangan seorang diri, di hadapan cermin.",
+    "start": 0.005,
+    "end": 4.455
+   },
+   {
+    "en": "But a mirror can't tell you what to improve.",
+    "ms": "Tetapi cermin tidak dapat memberitahu apa yang perlu diperbaiki.",
+    "start": 4.998,
+    "end": 7.423
+   }
+  ]
+ },
+ "s02-problem": {
+  "dur": 9.197,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "Many Malaysian graduates face the same problem,",
+    "ms": "Ramai graduan Malaysia menghadapi masalah yang sama,",
+    "start": 0.039,
+    "end": 2.989
+   },
+   {
+    "en": "and employers say communication is where graduates fall short.",
+    "ms": "dan majikan berkata komunikasi ialah kelemahan utama graduan.",
+    "start": 3.089,
+    "end": 6.914
+   },
+   {
+    "en": "So I built SpeechMate.",
+    "ms": "Jadi saya membina SpeechMate.",
+    "start": 7.561,
+    "end": 8.986
+   }
+  ]
+ },
+ "s03-intro": {
+  "dur": 12.13,
+  "min": 15,
+  "chunks": [
+   {
+    "en": "An AI speaking coach for Malaysian speakers,",
+    "ms": "Jurulatih pertuturan AI untuk penutur Malaysia,",
+    "start": 0.013,
+    "end": 2.738
+   },
+   {
+    "en": "fluent in English, Bahasa Malaysia and Manglish.",
+    "ms": "yang memahami bahasa Inggeris, Bahasa Malaysia dan Manglish.",
+    "start": 2.875,
+    "end": 6.188
+   },
+   {
+    "en": "Three ways to practise, each with its own AI partner.",
+    "ms": "Tiga cara berlatih, setiap satu dengan rakan AI tersendiri.",
+    "start": 6.796,
+    "end": 10.196
+   },
+   {
+    "en": "Let me show you how it works.",
+    "ms": "Mari saya tunjukkan cara ia berfungsi.",
+    "start": 10.359,
+    "end": 11.946
+   }
+  ]
+ },
+ "s04-login": {
+  "dur": 3.024,
+  "min": 10,
+  "chunks": [
+   {
+    "en": "I sign in, and Mate, my companion, joins me.",
+    "ms": "Saya log masuk, dan Mate, teman saya, menyertai saya.",
+    "start": -0.003,
+    "end": 2.897
+   }
+  ]
+ },
+ "s05-home": {
+  "dur": 2.336,
+  "min": 7,
+  "chunks": [
+   {
+    "en": "Home shows three ways to practise.",
+    "ms": "Laman utama menunjukkan tiga cara berlatih.",
+    "start": 0.025,
+    "end": 2.175
+   }
+  ]
+ },
+ "s06-profile": {
+  "dur": 3.991,
+  "min": 11,
+  "chunks": [
+   {
+    "en": "My profile tells every AI partner my level and my goals.",
+    "ms": "Profil saya memberitahu setiap rakan AI tahap dan matlamat saya.",
+    "start": 0.014,
+    "end": 3.814
+   }
+  ]
+ },
+ "s07-form": {
+  "dur": 4.009,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "For a mock interview, I enter the job, the company, and my resume.",
+    "ms": "Untuk simulasi temu duga, saya masukkan jawatan, syarikat, dan resume saya.",
+    "start": 0.025,
+    "end": 3.9
+   }
+  ]
+ },
+ "s08-plan": {
+  "dur": 4.43,
+  "min": 12,
+  "chunks": [
+   {
+    "en": "The AI plans questions for this exact role, not generic ones.",
+    "ms": "AI merancang soalan untuk jawatan ini, bukan soalan umum.",
+    "start": -0.009,
+    "end": 4.266
+   }
+  ]
+ },
+ "s09-live": {
+  "dur": 6.085,
+  "min": 17,
+  "chunks": [
+   {
+    "en": "Alex, my AI interviewer, asks them one by one,",
+    "ms": "Alex, penemu duga AI saya, bertanya satu demi satu,",
+    "start": 0.034,
+    "end": 3.333
+   },
+   {
+    "en": "and follows up when my answer is too short.",
+    "ms": "dan bertanya susulan jika jawapan saya terlalu pendek.",
+    "start": 3.433,
+    "end": 5.933
+   }
+  ]
+ },
+ "s09b-analyse": {
+  "dur": 11.63,
+  "min": 17,
+  "chunks": [
+   {
+    "en": "When I finish, SpeechMate gets to work.",
+    "ms": "Selepas saya selesai, SpeechMate mula bekerja.",
+    "start": -0.016,
+    "end": 2.659
+   },
+   {
+    "en": "Whisper turns my voice into words, MediaPipe reads my eye contact and posture,",
+    "ms": "Whisper menukar suara saya kepada perkataan, MediaPipe membaca hubungan mata dan postur saya,",
+    "start": 2.821,
+    "end": 8.134
+   },
+   {
+    "en": "and Gaze Tunneling checks if I look away right when I stumble.",
+    "ms": "dan Gaze Tunneling menyemak sama ada saya mengalihkan pandangan tepat ketika tersekat-sekat.",
+    "start": 8.234,
+    "end": 11.534
+   }
+  ]
+ },
+ "s10-results": {
+  "dur": 5.167,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "Afterwards: four clear scores, feedback on every answer,",
+    "ms": "Selepas itu: empat skor yang jelas, maklum balas bagi setiap jawapan,",
+    "start": 0.025,
+    "end": 3.5
+   },
+   {
+    "en": "and drills for next time.",
+    "ms": "dan latihan untuk kali seterusnya.",
+    "start": 3.55,
+    "end": 5.05
+   }
+  ]
+ },
+ "s10b-factcheck": {
+  "dur": 7.36,
+  "min": 12,
+  "chunks": [
+   {
+    "en": "Every stronger answer is fact-checked.",
+    "ms": "Setiap jawapan yang lebih kukuh disemak faktanya.",
+    "start": 0.017,
+    "end": 2.367
+   },
+   {
+    "en": "If the AI adds a name or a number I never said, it's caught and removed.",
+    "ms": "Jika AI menambah nama atau nombor yang tidak pernah saya sebut, ia dikesan dan dibuang.",
+    "start": 2.492,
+    "end": 7.217
+   }
+  ]
+ },
+ "s11-deck": {
+  "dur": 6.704,
+  "min": 17,
+  "chunks": [
+   {
+    "en": "For presentations, I upload my slides.",
+    "ms": "Untuk pembentangan, saya muat naik slaid saya.",
+    "start": 0.009,
+    "end": 2.709
+   },
+   {
+    "en": "The AI reads the deck first, and notes each slide's key point.",
+    "ms": "AI membaca slaid dahulu, dan mencatat isi utama setiap slaid.",
+    "start": 2.834,
+    "end": 6.559
+   }
+  ]
+ },
+ "s12-talk": {
+  "dur": 3.591,
+  "min": 12,
+  "chunks": [
+   {
+    "en": "Then I present at my own pace, while my audience listens.",
+    "ms": "Kemudian saya membentang mengikut rentak sendiri, sementara penonton mendengar.",
+    "start": 0.03,
+    "end": 3.431
+   }
+  ]
+ },
+ "s13-match": {
+  "dur": 3.954,
+  "min": 11,
+  "chunks": [
+   {
+    "en": "It checks whether what I said matches each slide, and what I left out.",
+    "ms": "Ia menyemak sama ada apa yang saya sebut sepadan dengan setiap slaid, dan apa yang tertinggal.",
+    "start": -0.007,
+    "end": 3.793
+   }
+  ]
+ },
+ "s14-qa": {
+  "dur": 3.249,
+  "min": 10,
+  "chunks": [
+   {
+    "en": "Then a Q&A, with questions from my own slides.",
+    "ms": "Kemudian sesi soal jawab, dengan soalan daripada slaid saya sendiri.",
+    "start": 0.022,
+    "end": 3.072
+   }
+  ]
+ },
+ "s15-convo": {
+  "dur": 4.32,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "Daily conversation is for everyday practice, Manglish included.",
+    "ms": "Perbualan harian untuk latihan setiap hari, termasuk Manglish.",
+    "start": 0.001,
+    "end": 4.2
+   }
+  ]
+ },
+ "s16-tips": {
+  "dur": 3.715,
+  "min": 8,
+  "chunks": [
+   {
+    "en": "Afterwards, it suggests more natural ways to say things.",
+    "ms": "Selepas itu, ia mencadangkan cara yang lebih semula jadi untuk menyebutnya.",
+    "start": 0.03,
+    "end": 3.555
+   }
+  ]
+ },
+ "s17-progress": {
+  "dur": 2.763,
+  "min": 9,
+  "chunks": [
+   {
+    "en": "And Progress tracks how I improve over time.",
+    "ms": "Dan halaman Progress menjejaki perkembangan saya.",
+    "start": -0.003,
+    "end": 2.647
+   }
+  ]
+ },
+ "s17b-mate": {
+  "dur": 6.249,
+  "min": 13,
+  "chunks": [
+   {
+    "en": "Stuck? I just ask Mate.",
+    "ms": "Buntu? Saya cuma tanya Mate.",
+    "start": 0.076,
+    "end": 1.751
+   },
+   {
+    "en": "It knows my profile and my sessions, and tells me what to practise next.",
+    "ms": "Ia tahu profil dan sesi saya, dan memberitahu apa yang perlu dilatih seterusnya.",
+    "start": 1.876,
+    "end": 6.076
+   }
+  ]
+ },
+ "s17c-measured": {
+  "dur": 4.512,
+  "min": 10,
+  "chunks": [
+   {
+    "en": "And every number is explained: the method, the model, and how to read it.",
+    "ms": "Dan setiap nombor diterangkan: kaedahnya, modelnya, dan cara membacanya.",
+    "start": -0.007,
+    "end": 4.343
+   }
+  ]
+ },
+ "s18-agents": {
+  "dur": 13.637,
+  "min": 20,
+  "chunks": [
+   {
+    "en": "Behind it is a team of AI agents.",
+    "ms": "Di sebaliknya ialah satu pasukan ejen AI.",
+    "start": -0.009,
+    "end": 2.591
+   },
+   {
+    "en": "One plans, one interviews, one reads the deck,",
+    "ms": "Satu merancang, satu menemu duga, satu membaca slaid,",
+    "start": 2.741,
+    "end": 5.891
+   },
+   {
+    "en": "and a coach picks drills only from what was measured.",
+    "ms": "dan jurulatih memilih latihan hanya daripada apa yang diukur.",
+    "start": 5.991,
+    "end": 8.841
+   },
+   {
+    "en": "Mate keeps the loop going: practise, get feedback, practise again.",
+    "ms": "Mate meneruskan kitaran: berlatih, terima maklum balas, berlatih semula.",
+    "start": 9.467,
+    "end": 13.492
+   }
+  ]
+ },
+ "s19-close": {
+  "dur": 9.025,
+  "min": 15,
+  "chunks": [
+   {
+    "en": "Built for Malaysian speakers. Private by design. Every score explained.",
+    "ms": "Dibina untuk penutur Malaysia. Privasi terjamin. Setiap skor diterangkan.",
+    "start": 0.041,
+    "end": 4.742
+   },
+   {
+    "en": "No more practising to the mirror.",
+    "ms": "Tiada lagi berlatih di hadapan cermin.",
+    "start": 5.399,
+    "end": 7.224
+   },
+   {
+    "en": "SpeechMate.",
+    "ms": "SpeechMate.",
+    "start": 7.913,
+    "end": 8.863
+   }
+  ]
+ }
+}

@@ -10,7 +10,7 @@ import { liveService } from "@/services/live";
 import { authService } from "@/services/auth";
 import { Card, LinkButton, Notice, PageHeader, statusColor } from "@/components/ui/kit";
 import type { LiveSession, MetricStatus } from "@/types";
-import { formatDuration } from "@/utils/format";
+import { formatDate, formatDateTime, formatDay, formatDuration } from "@/lib/format";
 import { mascot } from "@/lib/mascot";
 import { useExit } from "@/hooks/useExit";
 import DeleteButton from "@/components/ui/DeleteButton";
@@ -77,7 +77,6 @@ function Trend({ points, height = 140, title }: { points: Point[]; height?: numb
   const d = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
   const best = points.reduce((bi, p, i) => (p.v > points[bi].v ? i : bi), 0);
   const last = points.length - 1;
-  const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-MY", { day: "numeric", month: "short" });
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - r.left) / r.width) * w;
@@ -98,7 +97,7 @@ function Trend({ points, height = 140, title }: { points: Point[]; height?: numb
           <tbody>
             {points.map((p, i) => (
               <tr key={i} style={{ borderTop: "1px solid var(--line-2)", color: "var(--ink-2)" }}>
-                <td className="py-1.5">{fmtDate(p.date)}{i === best ? " · best" : ""}</td>
+                <td className="py-1.5">{formatDay(p.date)}{i === best ? " · best" : ""}</td>
                 <td className="py-1.5 text-right tabular-nums">{p.label ?? p.v}</td>
               </tr>
             ))}
@@ -136,7 +135,7 @@ function Trend({ points, height = 140, title }: { points: Point[]; height?: numb
           {h && (
             <div className="absolute top-0 pointer-events-none px-2.5 py-1.5 rounded-md text-xs shadow-md"
               style={{ left: `${(x(hover!) / w) * 100}%`, transform: `translateX(${hover! > last / 2 ? "-105%" : "5%"})`, background: "var(--surface)", border: "1px solid var(--line)", color: "var(--ink)" }}>
-              <b className="tabular-nums">{h.label ?? h.v}</b> <span style={{ color: "var(--muted)" }}>· {fmtDate(h.date)}</span>
+              <b className="tabular-nums">{h.label ?? h.v}</b> <span style={{ color: "var(--muted)" }}>· {formatDay(h.date)}</span>
             </div>
           )}
         </div>
@@ -187,7 +186,7 @@ export default function ProgressPage() {
     }
   };
   // Search the session list by type, topic, role or deck
-  const listed = shown.filter((s) => matches(query, rowTitle(s), new Date(s.created_at).toLocaleDateString("en-MY", { dateStyle: "medium" })));
+  const listed = shown.filter((s) => matches(query, rowTitle(s), formatDate(s.created_at)));
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto space-y-5">
@@ -277,7 +276,7 @@ export default function ProgressPage() {
                           <Highlight text={rowTitle(s)} query={query} />
                         </span>
                         <span className="block text-xs" style={{ color: "var(--muted)" }}>
-                          {new Date(s.created_at).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" })} · {formatDuration(s.duration_sec)}
+                          {formatDateTime(s.created_at)} · {formatDuration(s.duration_sec)}
                           {s.status !== "complete" && ` · ${s.status === "analyzing" ? "analysing…" : s.status === "failed" ? "analysis failed" : "not analysed"}`}
                         </span>
                       </span>

@@ -38,6 +38,7 @@ Only record video if the speaker ticked the video box on the consent form.
 
 ## After the session
 
+
 - [ ] Copy the files into `fine-tune/data/own/<code>/`: `001.m4a`, `002.m4a`, ... and `video.mp4`.
 - [ ] Copy `fine-tune/templates/clips_eval.csv` into the same folder as `clips.csv` and write the transcripts (`STYLE_GUIDE.md`). Leave 035 empty.
 - [ ] Copy `video.mp4` to `fine-tune/eval/video/<code>.mp4` for the rating study.

@@ -77,7 +77,7 @@ export function VoiceBeam({ stream, listening, thinking, color, children }: {
 // ── Volume meter — how loud the user is, live, against a comfortable band ──────
 // ponytail: thresholds on the browser's average spectrum level (0–1), set by ear on a laptop mic;
 // calibrate per mic, or map to the analysis' loudness metric if the two need to agree.
-export const VOL_FULL = 0.4, VOL_QUIET = 0.03, VOL_LOUD = 0.3;
+const VOL_FULL = 0.4, VOL_QUIET = 0.03, VOL_LOUD = 0.3;
 export function VolumeMeter({ level, muted, speaking }: { level: number; muted: boolean; speaking: boolean }) {
   const [label, color] =
     muted ? ["Muted", "var(--muted)"] :
@@ -128,13 +128,13 @@ export function LiveTranscript({ transcript, newest, status, color }: {
 // ── Partner character (bot-avatars) ───────────────────────────────────────────
 // One character per mode. It sleeps before the session, looks around while you talk,
 // and hops while it thinks or speaks.
-export const PARTNER_BOTS = {
+const PARTNER_BOTS = {
   Conversation: { type: "cat", face: "mouth", headphones: true },
   Interview:    { type: "mech", face: "mouth", glasses: "square", bowTie: true },
   Presentation: { type: "droid", face: "mouth", hat: "beret", glasses: "round" },
 } as const;
 
-export function useResolvedTheme() {
+function useResolvedTheme() {
   return useSyncExternalStore(subscribeTheme, () => document.documentElement.dataset.theme === "dark" ? "dark" : "light", () => "light" as const);
 }
 

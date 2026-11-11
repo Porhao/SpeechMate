@@ -115,6 +115,11 @@ def merge_csv(path: Path, rows: list[dict]) -> None:
 def prepare(own: Path, data: Path, real: Path, test: set[str], dev: set[str]) -> list[str]:
     problems: list[str] = []
     speakers = sorted(p for p in own.iterdir() if p.is_dir()) if own.exists() else []
+    # Folders made ahead of a session hold only clips.csv / SESSION.md: skip them, don't fail
+    waiting = [p for p in speakers if not any(f.suffix.lower() not in {".csv", ".md"} for f in p.iterdir())]
+    if waiting:
+        problems.append(f"warning: no recordings yet, skipped: {', '.join(p.name for p in waiting)}")
+        speakers = [p for p in speakers if p not in waiting]
     if not speakers:
         return [f"no speaker folders in {own}"]
     unknown = (test | dev) - {p.name for p in speakers}
@@ -185,6 +190,8 @@ def selftest() -> None:
                 for name, prompt, text, lang in rows:
                     w.writerow([name, prompt, "laptop", "quiet", text, lang, ""])
         merge_csv(data / "train.csv", [{"file_name": "pub.wav", "transcript": "x", "language": "en", "speaker": "p", "source": "fleurs"}])
+        (own / "s03").mkdir()   # made ahead of its session: only the blank sheet, no recordings
+        (own / "s03" / "clips.csv").write_text("file_name,prompt,device,condition,transcript,language,notes\n001.m4a,A1,phone,quiet,,,\n")
 
         for _ in range(2):  # re-running must not duplicate rows
             problems = prepare(own, data, real, test={"s01"}, dev=set())
@@ -198,12 +205,14 @@ def selftest() -> None:
         assert (real / "groups.csv").read_text().split() == ["clip_id,group", "001,mixed", "002,silent"]
         assert any("no transcript" in p for p in problems) and any("over 30 s" in p for p in problems), problems
         assert any("language must be" in p for p in problems), problems
+        assert any("no recordings yet, skipped: s03" in p for p in problems), problems
+        assert not any(p.startswith("s03") for p in problems), problems        # skipped, not reported as broken
     print("selftest ok")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--test", nargs="*", default=[], help="speakers kept out of training, for bench_stt.py --real")
+    ap.add_argument("--test", nargs="*", default=[], help="speakers kept out of training, scored with run_app_on_clips.py + study_stats.py asr")
     ap.add_argument("--dev", nargs="*", default=[], help="speakers used to choose the best training epoch")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()

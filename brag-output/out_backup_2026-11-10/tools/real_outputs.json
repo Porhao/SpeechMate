@@ -1,0 +1,73 @@
+{
+ "interview": [
+  {
+   "question": "To start things off, could you tell me a bit about yourself and what drew you to apply for this data analyst role with us?",
+   "assesses": "Overall background, communication style, and motivation for the role"
+  },
+  {
+   "question": "Looking at your internship experience, you built weekly sales dashboards and cleaned data using Python. Could you walk me through your exact process for cleaning a messy dataset before you start building a dashboard?",
+   "assesses": "Technical data preparation skills, attention to detail, and practical Python experience"
+  },
+  {
+   "question": "Our job description emphasizes presenting insights to non-technical managers. Can you tell me about a time when you had to explain a technical concept or complex data finding to someone without a technical background?",
+   "assesses": "Communication skills, ability to simplify complex data, and stakeholder management"
+  },
+  {
+   "question": "You mentioned building an AI speaking-coach web app as your final-year project, which is really interesting. Since presentation skills and confidence are a big focus there, how do you personally manage your own speaking pace and eye contact when presenting data to a large group?",
+   "assesses": "Self-awareness regarding presentation delivery, confidence, and non-verbal communication"
+  },
+  {
+   "question": "Imagine a non-technical retail manager comes to you asking for a sales forecast, but the historical data they provided is incomplete and inconsistent. How would you handle this request and what would you tell them?",
+   "assesses": "Problem-solving, business acumen, and professional communication under constraints"
+  },
+  {
+   "question": "Tell me about a time you led a team under pressure, like your university hackathon experience. How did you delegate tasks and keep everyone aligned to hit your deadline?",
+   "assesses": "Leadership, teamwork, time management, and conflict resolution"
+  },
+  {
+   "question": "That covers all the questions I have prepared for you today. Do you have any questions for us about the role, the team, or Nusantara Retail Group?",
+   "assesses": "Candidate engagement, curiosity, and preparation for the role"
+  }
+ ],
+ "deck": {
+  "title": "Five Strategies for Effective Time Management",
+  "summary": "This concise three-slide presentation outlines practical time management strategies tailored for first-year students.",
+  "main_message": "Mastering simple daily habits like task prioritization and focused sprints will transform your academic and professional success.",
+  "structure": [
+   {
+    "slides": [
+     1
+    ],
+    "section": "Introduction"
+   },
+   {
+    "slides": [
+     2,
+     3
+    ],
+    "section": "Actionable Strategies"
+   }
+  ],
+  "slides": [
+   {
+    "title": "Five Strategies for Effective Time Management",
+    "key_point": "Introduce the five time management strategies and why they matter for new students."
+   },
+   {
+    "title": "Plan and Prioritize",
+    "key_point": "Explain how to plan and prioritize using the Eisenhower matrix and daily task lists."
+   },
+   {
+    "title": "Protect Your Focus",
+    "key_point": "Demonstrate how to protect focus through time-blocking and short work sprints."
+   }
+  ],
+  "qa": [
+   "Could you explain a bit more about how we should use the Eisenhower matrix on slide 2 when most of our daily tasks feel urgent?",
+   "You mentioned five strategies in just three minutes on slide 1, but what is the single best habit for a beginner to start with tomorrow?",
+   "How do we handle it when our schedule changes completely day-to-day, making the rigid time-blocking on slide 3 hard to maintain?",
+   "Do you have any specific evidence or examples from your own experience showing that short work sprints actually improve study quality?",
+   "Are there specific free apps or tools you suggest for managing daily task lists and time blocking, or is paper better?"
+  ]
+ }
+}

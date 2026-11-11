@@ -2,7 +2,7 @@
 
 A LoRA fine-tune of Mesolitica's Malaysian Whisper large-v3-turbo-v3. It is trained to transcribe Malaysian speakers, including English/Malay code-switching (Manglish), verbatim, for SpeechMate's coaching metrics.
 
-**Status (8 Oct 2026): trained, evaluated on public data, NOT deployed.** It beats the model SpeechMate ships on every public test group. It has not yet been tested on real Malaysian speakers, which is the go/no-go condition (§10). The app still runs the original Mesolitica model.
+**Status (8 Oct 2026): trained, evaluated on public data, NOT deployed.** It beats the model SpeechMate ships on every public test group. It has not yet been tested on real Malaysian speakers, which is the go/no-go condition (§9). The app still runs the original Mesolitica model.
 
 | Test group (never trained on) | Shipped model | **This fine-tune** |
 |---|---|---|
@@ -17,13 +17,12 @@ Contents:
 4. [Training procedure](#4-training-procedure)
 5. [Evaluation](#5-evaluation)
 6. [Limitations and risks](#6-limitations-and-risks)
-7. [Licences and attribution](#7-licences-and-attribution)
-8. [Reproduce it](#8-reproduce-it)
-9. [Deploy it in SpeechMate](#9-deploy-it-in-speechmate)
-10. [Go / no-go checklist](#10-go--no-go-checklist)
-11. [Adding your own recordings](#11-adding-your-own-recordings)
-12. [Problems found and how they were fixed](#12-problems-found-and-how-they-were-fixed)
-13. [File map](#13-file-map)
+7. [Reproduce it](#7-reproduce-it)
+8. [Deploy it in SpeechMate](#8-deploy-it-in-speechmate)
+9. [Go / no-go checklist](#9-go--no-go-checklist)
+10. [Adding your own recordings](#10-adding-your-own-recordings)
+11. [Problems found and how they were fixed](#11-problems-found-and-how-they-were-fixed)
+12. [File map](#12-file-map)
 
 Related: the plan and rationale are in [`docs/manglish-finetune-plan.md`](docs/manglish-finetune-plan.md). Every run, including failed ones, is in [`RESULTS.md`](RESULTS.md). The benchmark write-up is [`../docs/benchmarks/stt-routing-and-finetune-2026-10-06.md`](../docs/benchmarks/stt-routing-and-finetune-2026-10-06.md).
 
@@ -122,32 +121,20 @@ Dev WER is in-domain (same TTS system and spelling conventions as training), so 
 - **English gain:** real word fixes on real speakers. But FLEURS en_us *train* clips were in the training mix (same recording style), so it's near-domain.
 - **Mixed gain:** in-domain. The test voices are held out, but they come from the same TTS system and sentence style. The references keep the corpus's raw spellings ("wei", "la") while the model writes the style guide's ("weh", "lah"), so the fine-tune is slightly *penalised* here.
 - **Plain Whisper large-v3** is the model behind VoiceStudio's transcription. It's best on US English but worse than both Mesolitica models on Manglish.
-- **Not measured yet:** real Malaysian speakers, natural fillers and hesitations, noisy real-world speech. Malay-only (100 FLEURS ms_my clips) is set up in `eval/paper/` but the run was stopped before finishing (§12).
+- **Not measured yet:** real Malaysian speakers, natural fillers and hesitations, noisy real-world speech. Malay-only (100 FLEURS ms_my clips) is set up in `eval/paper/` but the run was stopped before finishing (§11).
 
 ## 6. Limitations and risks
 
 | Limitation | Effect | What would fix it |
 |---|---|---|
-| **No real Malaysian speakers in training or test** | The Manglish gain may partly be "learned the TTS voices" | Your own recordings (§11), then `bench_stt.py --real` |
+| **No real Malaysian speakers in training or test** | The Manglish gain may partly be "learned the TTS voices" | Your own recordings (§10), then `run_app_on_clips.py` + `study_stats.py asr` (done 2026-11-11: `docs/RESULTS.md`) |
 | Synthetic Manglish has almost no fillers ("um" appears 5 times in 2,457 texts) | Filler behaviour is unproven. The app's filler metrics depend on it. | Real recordings with fillers, transcribed with `STYLE_GUIDE.md` |
 | It learns the style guide's spellings | Output says "lah", "weh", "okay", even if a reference spells them differently | Intended. Keep references in the same style. |
 | Numbers | Written as digits ("3 lagi bom"), like Whisper and Mesolitica. FLEURS references sometimes spell them out. | Style guide §6 chooses digits |
 | Language tag by lexicon | Some Malay-framed sentences may be tagged `en` | A real language-ID model, if it matters |
-| Base model licence unknown | Mesolitica's model card states no licence. This affects both the shipped model and this fine-tune. | Ask Mesolitica before any distribution |
 | Training hardware is tight | 7.6 GB RAM: training or evaluation at the same time as the app stack can get processes killed | Run when the app is idle; raise WSL memory |
 
-## 7. Licences and attribution
-
-| Item | Licence | Use here |
-|---|---|---|
-| Synth-Manglish (emhaihsan) | CC BY 4.0 | Training (18 voices), dev (3 voices), mixed test group |
-| Google FLEURS | CC BY 4.0 | Train splits as guard data, validation as dev, test splits as English/Malay test groups |
-| Mesolitica Malaysian-whisper-large-v3-turbo-v3 | **Not stated** | Base model. **Open question:** ask before distributing |
-| OpenAI Whisper large-v3 / turbo | MIT | Comparison and smoke tests |
-
-CC BY 4.0 requires attribution. Credit Synth-Manglish and FLEURS in the report and wherever the model is shared.
-
-## 8. Reproduce it
+## 7. Reproduce it
 
 Three Python environments, kept separate so the app's pinned versions stay exact:
 
@@ -162,7 +149,7 @@ Steps (from `fine-tune/`; **stop using the app while these run**, see §6):
 ```bash
 # 1. Data: 10.3 h public training set → data/   (~20 min, streams ~2 GB from Hugging Face)
 .venv/bin/python scripts/prepare_public.py
-#    optional: add your own recordings (§11)
+#    optional: add your own recordings (§10)
 .venv/bin/python scripts/prepare_own.py --test s01 s02
 
 # 2. Train (~80 min on an RTX 4060)
@@ -175,14 +162,14 @@ LR=1e-4 .venv/bin/python scripts/train_lora.py mesolitica/Malaysian-whisper-larg
 .venv/bin/python scripts/make_paper_eval.py
 .venv-convert/bin/ct2-transformers-converter --model mesolitica/Malaysian-whisper-large-v3-turbo-v3 \
     --output_dir out/ct2_base --quantization int8 --copy_files tokenizer.json preprocessor_config.json --low_cpu_mem_usage
-cd /tmp && WHISPER_CPU_THREADS=8 <repo>/fine-tune/.venv-app/bin/python <repo>/fine-tune/scripts/eval_finetune.py
+cd /tmp && WHISPER_CPU_THREADS=8 <repo>/fine-tune/.venv-app/bin/python <repo>/fine-tune/scripts/archive/eval_finetune.py
 ```
 
 Run the evaluation from a folder **without** a `.env` (for example `/tmp`). The app's config reads `.env` from the working directory, and `backend/.env` would override the model under test.
 
-## 9. Deploy it in SpeechMate
+## 8. Deploy it in SpeechMate
 
-Only after the go/no-go checks (§10) pass.
+Only after the go/no-go checks (§9) pass.
 
 1. **Copy the model into the app's model volume, under a name containing `malaysian-whisper`.** The name matters: `asr.is_malaysian_model()` checks it, and only then does the app skip the code-switch routing. Routing sends mixed speech to a wav2vec2 model that **more than doubles WER** (15.4% → 36.7%, benchmark report). Run from the repo root:
    ```bash
@@ -199,20 +186,19 @@ Only after the go/no-go checks (§10) pass.
    `docker compose up -d --no-deps backend`
 4. **Roll back** by setting `WHISPER_MODEL_SIZE=/models/ct2/malaysian-whisper-large-v3-turbo-v3` and restarting.
 
-## 10. Go / no-go checklist
+## 9. Go / no-go checklist
 
 From the plan (§11). Ship only if all hold on a test set of **real speakers** the model never trained on:
 
 - [x] Beats the shipped model on public data (English 9.4% → 6.7%, mixed 14.5% → 6.7%)
 - [x] Silence safety: no text on silent or noise-only clips
 - [x] Same speed as the shipped model (CPU int8)
-- [ ] **Beats the shipped model on real Malaysian speakers** (`bench_stt.py --real`, own recordings)
-- [ ] Not worse on Malay-only speech (100 FLEURS ms_my clips are set up; run `eval_finetune.py` to finish)
-- [ ] Keeps fillers at least as well as the shipped model (filler retention in `bench_stt.py --real`)
+- [ ] **Beats the shipped model on real Malaysian speakers** (own recordings: `run_app_on_clips.py` + `study_stats.py asr` for the app; the fine-tune needs a local run on `eval/real/`)
+- [ ] Not worse on Malay-only speech (100 FLEURS ms_my clips are set up; run `archive/eval_finetune.py` on the backend at `6f89bed` to finish)
+- [ ] Keeps fillers at least as well as the shipped model (filler retention on `eval/real/`)
 - [ ] Gains hold across speakers, not just one
-- [ ] Base-model licence answered by Mesolitica
 
-## 11. Adding your own recordings
+## 10. Adding your own recordings
 
 The missing ingredient is real Malaysian speech. The kit is ready:
 
@@ -225,9 +211,9 @@ The missing ingredient is real Malaysian speech. The kit is ready:
 | `templates/clips.csv` | The per-speaker clip sheet |
 | `scripts/prepare_own.py` | Turns recordings into training rows plus a locked test set (`eval/real/` + `refs.json`). `--selftest` checks it. |
 
-Then retrain (§8 step 2), re-export, and score both models on `eval/real/` with `backend/scripts/benchmark/bench_stt.py --real`.
+Then retrain (§7 step 2), re-export, and score both on `eval/real/`: the app with `run_app_on_clips.py` + `study_stats.py asr`, the fine-tune with a local faster-whisper run (`bench_stt.py` was removed with the local speech-to-text: `docs/project/local-stt-removal.md`).
 
-## 12. Problems found and how they were fixed
+## 11. Problems found and how they were fixed
 
 | Problem | Symptom | Fix |
 |---|---|---|
@@ -238,12 +224,12 @@ Then retrain (§8 step 2), re-export, and score both models on `eval/real/` with
 | Out of memory | The evaluation running alongside the app stack got Ollama and the backend killed, interrupting a session's analysis | Run training and evaluation only when the app is idle. The interrupted session can be re-analysed from its results page. |
 | Background jobs and session restarts | A 2-hour tool timeout and a session restart killed evaluation runs | Long jobs are started detached (`setsid nohup`), and the evaluation scripts resume from saved results |
 
-## 13. File map
+## 12. File map
 
 ```
 fine-tune/
   README.md                 this document
-  RESULTS.md                every run (incl. failed), evaluation tables, licences
+  RESULTS.md                every run (incl. failed), evaluation tables
   docs/manglish-finetune-plan.md   plan, phases F0-F9 with status, design decisions
   STYLE_GUIDE.md            transcription rules + disfluency marking
   RECORDING_PROMPTS.md  SPEAKER_SCRIPT.md  OWN_DATA_GUIDE.md  templates/clips.csv
@@ -255,11 +241,11 @@ fine-tune/
     train_lora.py           LoRA training (smoke: `<model> 200`; full: `LR=1e-4 … <model>`)
     export.py               merge adapter + convert to CTranslate2 int8 → out/merged, out/ct2
     make_paper_eval.py      500-clip test set → eval/paper/ (English, Malay, mixed)
-    eval_finetune.py        shipped vs fine-tune vs Whisper large-v3, through the app's code
-    eval_routing.py         code-switch routing on vs off (paper)
+    archive/                eval_finetune.py, eval_routing.py: the October results (need the
+                            removed local speech-to-text; see archive/README.md)
   data/   (git-ignored)     clips/, train.csv, dev.csv, own/<speaker>/
   eval/   (git-ignored)     paper/ (clips, manifest, results), real/ (own test speakers)
   out/    (git-ignored)     adapter/, merged/, ct2/, ct2_base/, run logs
 ```
 
-The audio, models and venvs are git-ignored (about 33 GB in total). Everything can be rebuilt with §8.
+The audio, models and venvs are git-ignored (about 33 GB in total). Everything can be rebuilt with §7.

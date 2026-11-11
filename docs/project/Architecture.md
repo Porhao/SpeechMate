@@ -68,12 +68,13 @@ Background work runs in-process (`services/tasks.py` `spawn`), so **restarting t
 ### Live session
 1. Interview/Q&A: setup page builds or loads a **question plan** (interview: LLM from role/resume; Q&A: cached on the deck). `POST /live` creates the session.
 2. Session page: AI opening line → user turn. `VoiceTurnListener` cuts each spoken turn, `POST /stt` (with context) → text → after 1.2 s (or "I'm done") `POST /chat/message` → reply → `POST /tts/speak` → playback → next turn.
+   A turn that comes back mostly Malay is transcribed again with English forced; the English text is kept only if Whisper is clearly surer of it (Groq sometimes translates Malaysian English into Malay: `fine-tune/docs/RESULTS.md`).
 3. End: `POST /live/{id}/end` (turns, client metrics) → upload recording → `POST /live/{id}/analyze` → results page polls `GET /live/{id}`.
 
 ### Analysis pipeline (`services/live/pipeline.py`)
 ```
 recording → 16 kHz WAV ─┬─ content feedback (LLM, started immediately, in parallel)
-                        ├─ speech: ASR (Groq, FLAC, silence filter) → fluency/fillers/stutter → pronunciation (+ prosody in parallel)
+                        ├─ speech: ASR (Groq, FLAC, silence + low-confidence filter) → fluency/fillers/stutter → pronunciation (+ prosody in parallel; pronunciation < 50 → re-transcribe as English, keep the better fit)
                         └─ then vision: frames → eye contact ‖ (posture → gestures) ‖ emotion
                               → Gaze Tunneling (2 fps gaze stream vs disfluency word timings, permutation test)
 → confidence (11 cues) → communication score → pillars → coaching plan (LLM) → usage (STT seconds, LLM tokens)

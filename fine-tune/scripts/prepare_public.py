@@ -11,7 +11,6 @@ real-recording test set. Transcripts follow STYLE_GUIDE.md particle spellings.
 Replaces the smoke-test data (prepare_smoke.py rebuilds that). Attribution: RESULTS.md.
 """
 import csv
-import io
 import re
 import shutil
 import subprocess

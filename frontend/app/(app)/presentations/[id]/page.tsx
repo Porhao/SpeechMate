@@ -18,7 +18,7 @@ import DeckInsightsPanel from "@/components/presentation/DeckInsightsPanel";
 import SlideImage from "@/components/presentation/SlideImage";
 import { Card, Notice, statusColor } from "@/components/ui/kit";
 import type { DeckStatusResponse, LiveSession } from "@/types";
-import { formatDuration } from "@/utils/format";
+import { formatDateTime, formatDuration } from "@/lib/format";
 
 const POLL_MS = 3000;
 
@@ -193,7 +193,7 @@ export default function PresentationWorkspace() {
                         <span className="flex-1 min-w-0">
                           <span className="block text-sm font-medium" style={{ color: "var(--ink)" }}>{talk ? "Presented the deck" : "Q&A rehearsal"}</span>
                           <span className="block text-xs" style={{ color: "var(--muted)" }}>
-                            {new Date(s.created_at).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short" })} · {formatDuration(s.duration_sec)}
+                            {formatDateTime(s.created_at)} · {formatDuration(s.duration_sec)}
                             {s.status !== "complete" && ` · ${s.status === "analyzing" ? "analysing…" : s.status === "failed" ? "analysis failed" : "not finished"}`}
                           </span>
                         </span>

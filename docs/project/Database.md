@@ -42,10 +42,10 @@ All foreign keys cascade on delete, except `sessions.user_id` (SET NULL).
 | status | varchar(50) | `active` → `analyzing` → `complete` / `failed` |
 | duration_sec | int | |
 | recording_storage_path | text | under `storage/live/<id>/` |
-| context | json | topic; interview `setup`, `resume_text`, `plan`, `progress`; presentation: deck id/title/summary + `kind` (`talk` with `slides` [{index, title, text, key_point}], or `qa` with `plan`); `llm_usage` {calls, prompt_tokens, completion_tokens} of the AI partner's turns |
+| context | json | topic; interview `setup`, `resume_text`, `plan`, `progress`; presentation: deck id/title/summary + `kind` (`talk` with `slides` [{index, title, text, key_point}], or `qa` with `plan`); `llm_usage` {calls, prompt_tokens, completion_tokens, fallback_calls} of the AI partner's turns |
 | turns | json | `[{role, text, t_sec}]` (text includes the user's "Fix" corrections) |
 | client_metrics | json | `response_latency_sec` [s], `stt_audio_sec` [seconds of each turn sent to speech recognition]; talk: `slide_times` [{slide_index, t_sec}]. Older sessions may hold a browser `gaze_tunneling` value: ignored since 2026-10-15 |
-| analysis | json | full result: transcript, speech, vision, `communication_score`, `pillars`, `recommendations`, `content_feedback`, `details` (incl. `confidence.cues`; `gaze_tunneling` {r, p, label, windows, events} or null; `usage` {stt: {turn_requests, turn_audio_sec, analysis_audio_sec, billed_sec, usd}, llm: {calls, prompt_tokens, completion_tokens, turns, analysis}}, both absent on sessions analysed before 2026-10-15) |
+| analysis | json | full result: transcript, speech, vision, `communication_score`, `pillars`, `recommendations`, `content_feedback`, `details` (incl. `confidence.cues`; `gaze_tunneling` {r, p, label, windows, events} or null; `usage` {stt: {turn_requests, turn_audio_sec, analysis_audio_sec, billed_sec, usd}, llm: {calls, prompt_tokens, completion_tokens, fallback_calls, turns, analysis}}, both absent on sessions analysed before 2026-10-15; `fallback_calls` = answered by `LLM_FALLBACK_MODEL`, absent before 2026-11-12) |
 | warnings | json | what couldn't be measured |
 | error_detail | text | |
 | created_at | timestamptz | |

@@ -110,7 +110,7 @@ Keep it light: a capital at the start of a sentence, `.` or `?` at the end, and 
 
 ## 9. Files
 
-**Test set** (scored by `bench_stt.py --real`): put `001.wav`, `002.wav`, ... and `refs.json` in one folder.
+**Test set** (scored by `run_app_on_clips.py` + `study_stats.py asr`): put `001.wav`, `002.wav`, ... and `refs.json` in one folder.
 ```json
 {"001": "Um, so basically, saya rasa the project okay lah.", "002": ""}
 ```
@@ -158,3 +158,5 @@ Add new cases here as they come up (date, case, rule).
 | Date | Case | Rule |
 |---|---|---|
 | 2026-10-02 | Initial guide | §1-10 |
+| 2026-11-09 | Particle attached to a Malay word ("taklah", "bolehlah") | Separate, like §3: `tak lah`, `boleh lah` |
+| 2026-11-09 | Accented English word ("engkautin") | Write the English word meant: `accounting` |

@@ -13,6 +13,7 @@ import ClayArt from "@/components/three/ClayArt";
 import TaskList from "@/components/home/TaskList";
 import { presentationService } from "@/services/presentation";
 import type { DeckListItem, LiveSession } from "@/types";
+import { formatDay } from "@/lib/format";
 
 const FUNCTIONS = [
   {
@@ -134,7 +135,7 @@ export default function HomePage() {
                   <Link href={`/results/${s.id}`} className="flex items-center gap-3 py-2.5">
                     <span className="w-9 font-display text-lg tabular-nums" style={{ color: score(s) != null ? "var(--ink)" : "var(--faint)" }}>{score(s) ?? "—"}</span>
                     <span className="flex-1 text-sm truncate" style={{ color: "var(--ink-2)" }}>{s.context?.kind === "talk" ? "Presentation" : TYPE_LABEL[s.session_type] ?? s.session_type}</span>
-                    <span className="text-xs" style={{ color: "var(--muted)" }}>{new Date(s.created_at).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}</span>
+                    <span className="text-xs" style={{ color: "var(--muted)" }}>{formatDay(s.created_at)}</span>
                   </Link>
                 </li>
               ))}

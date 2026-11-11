@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_timeout_sec: float = 300.0  # local models on CPU can be slow
     llm_model: str = "gpt-4o-mini"
+    # Sent the same request when LLM_MODEL answers 503 (overloaded); empty = no fallback
+    llm_fallback_model: str = ""
     # List price of LLM_MODEL per million tokens, for the per-session cost (details.usage.llm.usd).
     # Defaults: Gemini 3.5 Flash-Lite paid tier (ai.google.dev/gemini-api/docs/pricing, 2026-10-20)
     llm_usd_per_m_input: float = 0.30

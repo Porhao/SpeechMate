@@ -26,6 +26,13 @@ def test_silence_hallucinations_dropped_real_speech_kept():
     assert asr.is_hallucination("Thanks for watching!") and not asr.is_hallucination("Okay.")
 
 
+def test_low_confidence_sentence_on_silence_dropped():
+    # (text, no_speech_prob, avg_logprob) from the 10-speaker study: silent clips vs the worst real speech
+    assert asr.is_hallucination("I'm going to the gym, and I'm going to the gym.", 0.364, -1.38)
+    assert asr.is_hallucination("I'm going to the airport to get my passport.", 0.031, -1.58)
+    assert not asr.is_hallucination("Hello, my name is Muhammad Iqbal, I live in Australia.", 0.0, -0.75)
+
+
 def test_keep_speech_drops_only_the_hallucinated_segment():
     segs = [{"text": " I built the dashboard.", "no_speech_prob": 0.02, "start": 0.0, "end": 2.0},
             {"text": " Subtitles by the Amara.org community", "no_speech_prob": 0.3, "start": 2.0, "end": 6.0}]
@@ -95,12 +102,13 @@ def test_gaze_tunneling_finds_a_real_link_and_ignores_chance():
 
 
 def test_session_usage_bills_each_turn_at_least_10_seconds():
-    u = session_usage({"calls": 3, "prompt_tokens": 900, "completion_tokens": 120},
+    u = session_usage({"calls": 3, "prompt_tokens": 900, "completion_tokens": 120, "fallback_calls": 1},
                       {"calls": 2, "prompt_tokens": 2000, "completion_tokens": 400},
                       {"stt_audio_sec": [4.0, 12.0, 0, "x"]}, 150.0)
     assert u["stt"]["turn_requests"] == 2 and u["stt"]["billed_sec"] == 10 + 12 + 150
     assert u["stt"]["usd"] == round(172 / 3600 * 0.111, 5)
     assert u["llm"]["calls"] == 5 and u["llm"]["prompt_tokens"] == 2900 and u["llm"]["completion_tokens"] == 520
+    assert u["llm"]["fallback_calls"] == 1   # older tallies without the key count as 0
     assert u["llm"]["usd"] == round((2900 * 0.30 + 520 * 2.50) / 1e6, 5)   # Gemini 3.5 Flash-Lite list price
 
 
@@ -123,3 +131,62 @@ async def test_quiet_recording_is_not_read_as_silence(tmp_path):
     silences = await detect_silences(path, min_duration=0.25)
     speech = 5.0 - sum(e - s for s, e in silences)
     assert 2.5 < speech < 3.5, silences
+
+
+async def test_llm_503_retried_once_on_the_fallback_model(monkeypatch):
+    import json
+
+    import httpx
+
+    from app.services.ai import _count_usage, _FallbackModelTransport, track_llm_usage
+    monkeypatch.setattr(settings, "llm_model", "busy")
+    seen, busy = [], {"busy"}
+
+    def reply(request):
+        model = json.loads(request.content)["model"]
+        seen.append(model)
+        return httpx.Response(503 if model in busy else 200, json={"model": model})
+
+    async with httpx.AsyncClient(transport=_FallbackModelTransport(httpx.MockTransport(reply), "spare"),
+                                 event_hooks={"response": [_count_usage]}) as c:
+        with track_llm_usage() as tally:
+            r = await c.post("https://llm.test/v1/chat/completions", json={"model": "busy", "messages": []})
+        assert r.status_code == 200 and seen == ["busy", "spare"]
+        assert tally["calls"] == 1 and tally["fallback_calls"] == 1   # the session shows the backup answered
+        seen.clear(); busy.add("spare")   # the fallback overloaded too: one retry only, the 503 comes back
+        r = await c.post("https://llm.test/v1/chat/completions", json={"model": "busy", "messages": []})
+        assert r.status_code == 503 and seen == ["busy", "spare"]
+
+
+def _fake_whisper(monkeypatch, replies: dict):
+    """Groq stand-in: replies[language or 'auto'] = (text, avg_logprob). Records the languages asked for."""
+    asked = []
+
+    async def create(**kw):
+        asked.append(kw.get("language", "auto"))
+        text, lp = replies[kw.get("language", "auto")]
+        return SimpleNamespace(text=text, segments=[{"text": text, "avg_logprob": lp, "no_speech_prob": 0.0,
+                                                     "tokens": list(range(20)), "start": 0, "end": 5}])
+    monkeypatch.setattr(asr, "get_openai_client", lambda: SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create))))
+    monkeypatch.setattr(settings, "stt_language", "")
+    return asked
+
+
+async def test_live_turn_translated_into_malay_is_transcribed_again_as_english(monkeypatch, tmp_path):
+    # Clip s08/014 of the study: auto mean log-prob -0.520 (Malay translation), English forced -0.210
+    audio = tmp_path / "turn.webm"; audio.write_bytes(b"x")
+    asked = _fake_whisper(monkeypatch, {
+        "auto": ("Untuk lebih spesifik, saya rasa saya boleh jelaskan tentang dua masalah yang saya selesaikan", -0.520),
+        "en": ("To be specific, I think I might explain about two problems that I solved", -0.210)})
+    assert (await asr.transcribe_turn(audio)).startswith("To be specific") and asked == ["auto", "en"]
+
+
+async def test_live_turn_in_real_malay_stays_malay(monkeypatch, tmp_path):
+    # Clip s07/023: genuine Malay, auto -0.196 vs English forced -0.198
+    audio = tmp_path / "turn.webm"; audio.write_bytes(b"x")
+    _fake_whisper(monkeypatch, {"auto": ("Pasal keluarga saya, saya ada empat orang adik-beradik", -0.196),
+                                "en": ("Pasal keluarga saya, saya ada empat orang adik-beradik", -0.198)})
+    assert (await asr.transcribe_turn(audio)).startswith("Pasal keluarga")
+    # English or Manglish turns are not re-checked at all (no extra Groq call)
+    asked = _fake_whisper(monkeypatch, {"auto": ("Last weekend I just pergi jalan-jalan with my friends", -0.13)})
+    assert await asr.transcribe_turn(audio) and asked == ["auto"]

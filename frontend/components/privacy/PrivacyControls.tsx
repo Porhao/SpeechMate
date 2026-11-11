@@ -9,6 +9,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { authService } from "@/services/auth";
 import { mascot } from "@/lib/mascot";
 import { Button, Notice, inputClass, inputStyle } from "@/components/ui/kit";
+import { formatDate } from "@/lib/format";
 
 export function Row({ label, description, children }: { label: string; description?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -42,7 +43,7 @@ export default function PrivacyControls() {
     <div>
       <Row label="Cloud processing"
         description={consented
-          ? `You agreed on ${new Date(user!.cloud_consent_at!).toLocaleDateString("en-MY", { dateStyle: "medium" })}: your voice goes to Groq (speech-to-text), text to Google Gemini.`
+          ? `You agreed on ${formatDate(user!.cloud_consent_at!)}: your voice goes to Groq (speech-to-text), text to Google Gemini.`
           : "Not agreed: practice sessions, interview plans and deck uploads are off until you agree."}>
         <Button variant="secondary" disabled={!hydrated || busy === "consent"}
           onClick={() => run("consent", async () => setUser(await authService.setConsent(!consented)))}>

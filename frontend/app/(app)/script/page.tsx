@@ -15,7 +15,7 @@ import { authService } from "@/services/auth";
 import SlideImage from "@/components/presentation/SlideImage";
 import { Button, Card, Field, LinkButton, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import { mascot } from "@/lib/mascot";
-import { formatDuration } from "@/utils/format";
+import { formatDuration } from "@/lib/format";
 import type { DeckListItem, DeckScript, DeckStatusResponse, ScriptStyle } from "@/types";
 
 const STYLES: { id: ScriptStyle; label: string; hint: string }[] = [

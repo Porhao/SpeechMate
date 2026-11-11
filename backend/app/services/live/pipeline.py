@@ -199,10 +199,12 @@ def session_usage(turn_llm: dict | None, analysis_llm: dict, client_metrics: dic
     """What one session used: speech-to-text requests and billed audio (each live turn is billed at
     least 10 s, plus one upload of the user's speech for the analysis) and LLM tokens (the partner's
     turns + the analysis), each priced at list rates (STT_USD_PER_HOUR; LLM_USD_PER_M_INPUT / _OUTPUT
-    are settings because the LLM is configurable). A free tier makes the real bill $0."""
+    are settings because the LLM is configurable). Calls answered by the cheaper LLM_FALLBACK_MODEL
+    are priced as LLM_MODEL too, so the LLM figure is an upper bound. A free tier makes the real bill $0."""
     turns = [float(x) for x in (client_metrics or {}).get("stt_audio_sec") or [] if isinstance(x, (int, float)) and x > 0]
     billed = sum(max(STT_MIN_BILLED_SEC, x) for x in turns) + max(STT_MIN_BILLED_SEC, analysis_audio_sec)
-    llm = {k: (turn_llm or {}).get(k, 0) + analysis_llm.get(k, 0) for k in ("calls", "prompt_tokens", "completion_tokens")}
+    llm = {k: (turn_llm or {}).get(k, 0) + analysis_llm.get(k, 0)
+           for k in ("calls", "prompt_tokens", "completion_tokens", "fallback_calls")}
     return {
         "stt": {"turn_requests": len(turns), "turn_audio_sec": round(sum(turns), 1),
                 "analysis_audio_sec": round(analysis_audio_sec, 1), "billed_sec": round(billed, 1),
@@ -246,7 +248,9 @@ async def _pronunciation(wav, transcript: str, words: list[dict], warnings: list
         return None
 
 
-TRANSLATION_SUSPECT, MIN_WORDS_FOR_CHECK, BETTER_BY = 40.0, 5, 15.0
+# 50: on the 10-speaker study (fine-tune/eval/real, 2026-11-11) the three translated clips scored
+# 40.8-45.4 and genuine speech never below 54.7; the old 40 missed all three
+TRANSLATION_SUSPECT, MIN_WORDS_FOR_CHECK, BETTER_BY = 50.0, 5, 15.0
 
 
 async def _check_translation(wav, asr_result, pron, warnings: list[str]):

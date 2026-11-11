@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, CircleAlert, CircleCheck } from "lucide-react";
 import { notificationService, type AppNotification } from "@/services/notifications";
 import { authService } from "@/services/auth";
+import { formatDay } from "@/lib/format";
 
 const POLL_MS = 20_000;
 
@@ -16,7 +17,7 @@ function ago(iso: string) {
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  return new Date(iso).toLocaleDateString("en-MY", { day: "numeric", month: "short" });
+  return formatDay(iso);
 }
 
 export default function NotificationBell() {

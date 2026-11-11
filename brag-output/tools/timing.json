@@ -1,0 +1,1265 @@
+{
+ "s01-mirror": {
+  "dur": 10.25,
+  "min": 15,
+  "chunks": [
+   {
+    "en": "When I prepared for interviews or presentations, I practised alone, in front of a mirror.",
+    "ms": "Semasa bersedia untuk temu duga atau pembentangan, saya berlatih seorang diri, di hadapan cermin.",
+    "start": -0.009,
+    "end": 5.341,
+    "word_ends": [
+     0.104,
+     0.216,
+     0.716,
+     0.866,
+     1.391,
+     1.491,
+     2.691,
+     2.941,
+     3.441,
+     4.091,
+     4.341,
+     4.529,
+     4.604,
+     4.666,
+     5.341
+    ]
+   },
+   {
+    "en": "But when I finished, nobody could tell me how I did, or what to improve.",
+    "ms": "Tetapi selepas selesai, tiada siapa boleh memberitahu prestasi saya, atau apa yang perlu diperbaiki.",
+    "start": 5.887,
+    "end": 10.087,
+    "word_ends": [
+     5.999,
+     6.124,
+     6.274,
+     6.887,
+     7.387,
+     7.512,
+     7.699,
+     7.837,
+     7.999,
+     8.137,
+     8.637,
+     8.937,
+     9.112,
+     9.212,
+     10.087
+    ]
+   }
+  ]
+ },
+ "s02-problem": {
+  "dur": 13.188,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "Many Malaysian students and fresh graduates practise the same way, on their own.",
+    "ms": "Ramai pelajar dan graduan baharu Malaysia berlatih dengan cara yang sama, seorang diri.",
+    "start": 0.042,
+    "end": 5.142,
+    "word_ends": [
+     0.267,
+     0.767,
+     1.329,
+     1.479,
+     1.792,
+     2.429,
+     2.917,
+     3.054,
+     3.392,
+     3.917,
+     4.204,
+     4.392,
+     5.142
+    ]
+   },
+   {
+    "en": "Yet employers say weak English and communication are why many graduates fail interviews.",
+    "ms": "Namun majikan berkata kelemahan bahasa Inggeris dan komunikasi menyebabkan ramai graduan gagal temu duga.",
+    "start": 5.329,
+    "end": 10.917,
+    "word_ends": [
+     5.567,
+     6.192,
+     6.417,
+     6.704,
+     7.192,
+     7.317,
+     8.442,
+     8.617,
+     8.842,
+     9.067,
+     9.692,
+     10.017,
+     10.917
+    ]
+   },
+   {
+    "en": "So I built SpeechMate.",
+    "ms": "Jadi saya membina SpeechMate.",
+    "start": 11.552,
+    "end": 12.977,
+    "word_ends": [
+     11.64,
+     11.752,
+     12.027,
+     12.402,
+     12.977
+    ]
+   }
+  ]
+ },
+ "s03-intro": {
+  "dur": 18.612,
+  "min": 15,
+  "chunks": [
+   {
+    "en": "SpeechMate is an AI speaking coach for Malaysian speakers.",
+    "ms": "SpeechMate ialah jurulatih pertuturan AI untuk penutur Malaysia.",
+    "start": 0.06,
+    "end": 3.86,
+    "word_ends": [
+     0.41,
+     0.723,
+     0.848,
+     0.985,
+     1.523,
+     1.96,
+     2.285,
+     2.398,
+     2.885,
+     3.86
+    ]
+   },
+   {
+    "en": "It understands English, Bahasa Malaysia and Manglish, the way we really talk.",
+    "ms": "Ia memahami bahasa Inggeris, Bahasa Malaysia dan Manglish, seperti cara kita bercakap.",
+    "start": 3.985,
+    "end": 8.935,
+    "word_ends": [
+     4.123,
+     4.723,
+     5.31,
+     5.91,
+     6.51,
+     6.635,
+     7.41,
+     7.635,
+     7.835,
+     7.985,
+     8.285,
+     8.935
+    ]
+   },
+   {
+    "en": "You can practise job interviews, presentations and daily conversation, each with its own AI partner.",
+    "ms": "Anda boleh berlatih temu duga, pembentangan dan perbualan harian, setiap satu dengan rakan AI tersendiri.",
+    "start": 9.527,
+    "end": 16.077,
+    "word_ends": [
+     9.627,
+     9.777,
+     10.24,
+     10.49,
+     11.202,
+     12.227,
+     12.352,
+     12.727,
+     13.702,
+     14.127,
+     14.265,
+     14.465,
+     14.815,
+     15.177,
+     16.077
+    ]
+   },
+   {
+    "en": "Let me show you, step by step.",
+    "ms": "Mari saya tunjukkan, langkah demi langkah.",
+    "start": 16.265,
+    "end": 18.427,
+    "word_ends": [
+     16.415,
+     16.577,
+     16.89,
+     17.202,
+     17.602,
+     17.815,
+     18.427
+    ]
+   }
+  ]
+ },
+ "s04-login": {
+  "dur": 7.915,
+  "min": 10,
+  "chunks": [
+   {
+    "en": "First, I sign in with my account.",
+    "ms": "Mula-mula, saya log masuk ke akaun saya.",
+    "start": 0.056,
+    "end": 2.356,
+    "word_ends": [
+     0.406,
+     0.619,
+     0.956,
+     1.144,
+     1.294,
+     1.456,
+     2.356
+    ]
+   },
+   {
+    "en": "Mate, my friendly companion, appears in the corner and stays with me on every page.",
+    "ms": "Mate, teman saya, muncul di sudut skrin dan menemani saya di setiap halaman.",
+    "start": 2.531,
+    "end": 7.731,
+    "word_ends": [
+     3.081,
+     3.369,
+     3.706,
+     4.531,
+     5.044,
+     5.119,
+     5.206,
+     5.644,
+     5.794,
+     6.169,
+     6.319,
+     6.481,
+     6.694,
+     7.031,
+     7.731
+    ]
+   }
+  ]
+ },
+ "s05-home": {
+  "dur": 5.502,
+  "min": 7,
+  "chunks": [
+   {
+    "en": "The home page shows the three ways to practise.",
+    "ms": "Laman utama menunjukkan tiga cara berlatih.",
+    "start": 0.006,
+    "end": 2.756,
+    "word_ends": [
+     0.081,
+     0.331,
+     0.718,
+     1.031,
+     1.168,
+     1.406,
+     1.731,
+     1.831,
+     2.756
+    ]
+   },
+   {
+    "en": "Before I start, I set up my profile.",
+    "ms": "Sebelum bermula, saya lengkapkan profil saya.",
+    "start": 2.881,
+    "end": 5.381,
+    "word_ends": [
+     3.218,
+     3.356,
+     3.831,
+     4.068,
+     4.243,
+     4.343,
+     4.481,
+     5.381
+    ]
+   }
+  ]
+ },
+ "s06-profile": {
+  "dur": 12.042,
+  "min": 11,
+  "chunks": [
+   {
+    "en": "In my profile, I choose my level of study, my field, and my goal: job interviews.",
+    "ms": "Dalam profil, saya pilih tahap pengajian, bidang, dan matlamat saya: temu duga kerja.",
+    "start": 0.023,
+    "end": 5.448,
+    "word_ends": [
+     0.111,
+     0.248,
+     0.873,
+     1.123,
+     1.473,
+     1.648,
+     1.936,
+     2.023,
+     2.448,
+     2.736,
+     3.148,
+     3.311,
+     3.498,
+     4.023,
+     4.461,
+     5.448
+    ]
+   },
+   {
+    "en": "Then my speaking level, and how I like my feedback.",
+    "ms": "Kemudian tahap pertuturan saya, dan gaya maklum balas yang saya suka.",
+    "start": 5.561,
+    "end": 8.698,
+    "word_ends": [
+     5.736,
+     5.911,
+     6.373,
+     6.848,
+     7.048,
+     7.248,
+     7.398,
+     7.623,
+     7.811,
+     8.698
+    ]
+   },
+   {
+    "en": "Every AI partner uses this to match my level.",
+    "ms": "Setiap rakan AI menggunakan ini untuk menyesuaikan tahap saya.",
+    "start": 8.861,
+    "end": 11.923,
+    "word_ends": [
+     9.211,
+     9.598,
+     10.061,
+     10.473,
+     10.698,
+     10.823,
+     11.123,
+     11.298,
+     11.923
+    ]
+   }
+  ]
+ },
+ "s07-form": {
+  "dur": 11.149,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "Now, the mock interview. I type the job title and the company,",
+    "ms": "Sekarang, simulasi temu duga. Saya taip jawatan dan nama syarikat,",
+    "start": 0.067,
+    "end": 3.992,
+    "word_ends": [
+     0.367,
+     0.542,
+     0.842,
+     1.692,
+     2.117,
+     2.367,
+     2.479,
+     2.792,
+     3.167,
+     3.279,
+     3.367,
+     3.992
+    ]
+   },
+   {
+    "en": "paste the job description, add a little about myself, and upload my resume.",
+    "ms": "tampal huraian kerja, tulis sedikit tentang diri saya, dan muat naik resume saya.",
+    "start": 4.104,
+    "end": 8.817,
+    "word_ends": [
+     4.429,
+     4.529,
+     4.817,
+     5.617,
+     5.954,
+     6.017,
+     6.229,
+     6.479,
+     7.067,
+     7.304,
+     7.767,
+     7.942,
+     8.817
+    ]
+   },
+   {
+    "en": "Then I click Preview questions.",
+    "ms": "Kemudian saya klik Preview questions.",
+    "start": 8.967,
+    "end": 10.992,
+    "word_ends": [
+     9.292,
+     9.442,
+     9.717,
+     10.092,
+     10.992
+    ]
+   }
+  ]
+ },
+ "s08-plan": {
+  "dur": 10.728,
+  "min": 12,
+  "chunks": [
+   {
+    "en": "The AI writes questions for this exact job: from my resume, the job description, and my own project.",
+    "ms": "AI menulis soalan untuk jawatan ini: daripada resume saya, huraian kerja, dan projek saya sendiri.",
+    "start": -0.007,
+    "end": 6.668,
+    "word_ends": [
+     0.143,
+     0.656,
+     0.993,
+     1.543,
+     1.656,
+     1.843,
+     2.281,
+     2.968,
+     3.231,
+     3.393,
+     3.968,
+     4.181,
+     4.518,
+     5.118,
+     5.281,
+     5.468,
+     5.718,
+     6.668
+    ]
+   },
+   {
+    "en": "No generic questions. When I'm ready, I start the interview.",
+    "ms": "Bukan soalan umum. Apabila sudah bersedia, saya mulakan temu duga.",
+    "start": 6.818,
+    "end": 10.593,
+    "word_ends": [
+     7.093,
+     7.543,
+     8.443,
+     8.681,
+     8.843,
+     9.243,
+     9.468,
+     9.756,
+     9.843,
+     10.593
+    ]
+   }
+  ]
+ },
+ "s09-live": {
+  "dur": 12.504,
+  "min": 17,
+  "chunks": [
+   {
+    "en": "Alex, my AI interviewer, asks one question at a time and waits while I answer.",
+    "ms": "Alex, penemu duga AI saya, bertanya satu soalan pada satu masa dan menunggu saya menjawab.",
+    "start": 0.03,
+    "end": 5.03,
+    "word_ends": [
+     0.43,
+     0.667,
+     1.017,
+     1.73,
+     2.205,
+     2.43,
+     2.817,
+     2.892,
+     2.955,
+     3.492,
+     3.63,
+     3.98,
+     4.167,
+     4.305,
+     5.03
+    ]
+   },
+   {
+    "en": "My answer was too short, so Alex asks a follow-up, just like a real interviewer.",
+    "ms": "Jawapan saya terlalu pendek, jadi Alex bertanya soalan susulan, seperti penemu duga sebenar.",
+    "start": 5.62,
+    "end": 10.52,
+    "word_ends": [
+     5.795,
+     6.145,
+     6.333,
+     6.57,
+     7.12,
+     7.408,
+     7.795,
+     8.083,
+     8.145,
+     8.745,
+     9.058,
+     9.208,
+     9.308,
+     9.62,
+     10.52
+    ]
+   },
+   {
+    "en": "When I'm done, I click End.",
+    "ms": "Apabila selesai, saya klik End.",
+    "start": 10.645,
+    "end": 12.37,
+    "word_ends": [
+     10.783,
+     10.945,
+     11.295,
+     11.52,
+     11.77,
+     12.37
+    ]
+   }
+  ]
+ },
+ "s09b-analyse": {
+  "dur": 17.74,
+  "min": 17,
+  "chunks": [
+   {
+    "en": "Then SpeechMate analyses my session. First, it turns my voice into text.",
+    "ms": "Kemudian SpeechMate menganalisis sesi saya. Mula-mula, ia menukar suara saya kepada teks.",
+    "start": 0.04,
+    "end": 5.39,
+    "word_ends": [
+     0.253,
+     0.64,
+     0.953,
+     1.615,
+     1.79,
+     2.64,
+     3.315,
+     3.54,
+     3.84,
+     4.015,
+     4.328,
+     4.54,
+     5.39
+    ]
+   },
+   {
+    "en": "Next, it checks my pace, filler words and pronunciation, and the camera checks my eye contact and posture.",
+    "ms": "Seterusnya, ia menyemak rentak, perkataan pengisi dan sebutan, dan kamera menyemak hubungan mata dan postur saya.",
+    "start": 5.565,
+    "end": 12.615,
+    "word_ends": [
+     6.115,
+     6.328,
+     6.64,
+     6.828,
+     7.415,
+     7.865,
+     8.265,
+     8.39,
+     9.565,
+     9.778,
+     9.878,
+     10.328,
+     10.64,
+     10.853,
+     11.078,
+     11.69,
+     11.815,
+     12.615
+    ]
+   },
+   {
+    "en": "It even notices if I look away when I get stuck, and then it scores my confidence.",
+    "ms": "Ia juga perasan jika saya mengalihkan pandangan ketika tersekat, kemudian menilai keyakinan saya.",
+    "start": 12.739,
+    "end": 17.589,
+    "word_ends": [
+     12.852,
+     13.139,
+     13.764,
+     13.877,
+     14.014,
+     14.189,
+     14.477,
+     14.602,
+     14.689,
+     14.902,
+     15.589,
+     15.802,
+     15.939,
+     16.064,
+     16.439,
+     16.614,
+     17.589
+    ]
+   }
+  ]
+ },
+ "s10-results": {
+  "dur": 10.532,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "My results show four simple scores, and for each answer, what went well and a stronger version.",
+    "ms": "Keputusan saya menunjukkan empat skor mudah, dan bagi setiap jawapan, apa yang baik serta versi yang lebih kukuh.",
+    "start": 0.039,
+    "end": 6.163,
+    "word_ends": [
+     0.214,
+     0.676,
+     0.976,
+     1.351,
+     1.701,
+     2.489,
+     2.713,
+     2.864,
+     3.088,
+     3.739,
+     3.976,
+     4.138,
+     4.513,
+     4.626,
+     4.701,
+     5.239,
+     6.163
+    ]
+   },
+   {
+    "en": "It also gives me one main focus, and I can practise it straight away.",
+    "ms": "Ia juga memberi saya satu fokus utama, dan saya boleh terus berlatih.",
+    "start": 6.288,
+    "end": 10.413,
+    "word_ends": [
+     6.438,
+     6.788,
+     7.026,
+     7.176,
+     7.413,
+     7.688,
+     8.413,
+     8.626,
+     8.739,
+     8.864,
+     9.313,
+     9.463,
+     9.764,
+     10.413
+    ]
+   }
+  ]
+ },
+ "s10b-factcheck": {
+  "dur": 11.432,
+  "min": 12,
+  "chunks": [
+   {
+    "en": "The stronger answer is checked against what I really said.",
+    "ms": "Jawapan yang lebih kukuh disemak dengan apa yang benar-benar saya sebut.",
+    "start": 0.001,
+    "end": 3.276,
+    "word_ends": [
+     0.101,
+     0.601,
+     1.088,
+     1.276,
+     1.626,
+     1.988,
+     2.113,
+     2.251,
+     2.563,
+     3.276
+    ]
+   },
+   {
+    "en": "Here, the AI added a company and a number I never mentioned, so SpeechMate removes them.",
+    "ms": "Di sini, AI menambah nama syarikat dan nombor yang tidak pernah saya sebut, jadi SpeechMate membuangnya.",
+    "start": 3.451,
+    "end": 9.426,
+    "word_ends": [
+     3.951,
+     4.213,
+     4.663,
+     4.963,
+     5.026,
+     5.588,
+     5.713,
+     5.776,
+     6.126,
+     6.276,
+     6.576,
+     7.301,
+     7.626,
+     8.076,
+     8.376,
+     8.851,
+     9.426
+    ]
+   },
+   {
+    "en": "Only my own facts stay.",
+    "ms": "Hanya fakta saya sendiri yang kekal.",
+    "start": 9.563,
+    "end": 11.326,
+    "word_ends": [
+     9.876,
+     10.076,
+     10.326,
+     10.676,
+     11.326
+    ]
+   }
+  ]
+ },
+ "s11-deck": {
+  "dur": 13.249,
+  "min": 17,
+  "chunks": [
+   {
+    "en": "For presentation practice, I drag in my slides and say who my audience is.",
+    "ms": "Untuk latihan pembentangan, saya seret slaid saya dan nyatakan siapa penonton saya.",
+    "start": 0.016,
+    "end": 5.141,
+    "word_ends": [
+     0.141,
+     0.891,
+     1.691,
+     1.954,
+     2.279,
+     2.379,
+     2.554,
+     3.141,
+     3.279,
+     3.541,
+     3.666,
+     3.879,
+     4.403,
+     5.141
+    ]
+   },
+   {
+    "en": "Before I speak, the AI reads the whole deck and notes the key point of every slide.",
+    "ms": "Sebelum saya bercakap, AI membaca semua slaid dan mencatat isi utama setiap slaid.",
+    "start": 5.253,
+    "end": 10.866,
+    "word_ends": [
+     5.616,
+     5.766,
+     6.391,
+     6.653,
+     7.178,
+     7.516,
+     7.628,
+     7.891,
+     8.303,
+     8.441,
+     8.741,
+     8.878,
+     9.153,
+     9.516,
+     9.641,
+     9.979,
+     10.866
+    ]
+   },
+   {
+    "en": "My talk will be checked against these.",
+    "ms": "Pembentangan saya akan disemak berdasarkan isi ini.",
+    "start": 11.028,
+    "end": 13.091,
+    "word_ends": [
+     11.229,
+     11.528,
+     11.628,
+     11.778,
+     12.053,
+     12.416,
+     13.091
+    ]
+   }
+  ]
+ },
+ "s12-talk": {
+  "dur": 8.085,
+  "min": 12,
+  "chunks": [
+   {
+    "en": "Then I present at my own pace, while the AI listens quietly.",
+    "ms": "Kemudian saya membentang mengikut rentak sendiri, sementara AI mendengar dengan senyap.",
+    "start": 0.001,
+    "end": 3.926,
+    "word_ends": [
+     0.113,
+     0.251,
+     0.638,
+     0.713,
+     0.876,
+     1.101,
+     1.676,
+     1.938,
+     2.088,
+     2.551,
+     2.926,
+     3.926
+    ]
+   },
+   {
+    "en": "On slide two, I skip the main point on purpose, to test it.",
+    "ms": "Pada slaid dua, saya sengaja tidak menyebut isi utama, untuk mengujinya.",
+    "start": 4.088,
+    "end": 7.951,
+    "word_ends": [
+     4.338,
+     4.738,
+     5.176,
+     5.438,
+     5.688,
+     5.776,
+     6.101,
+     6.388,
+     6.526,
+     7.026,
+     7.201,
+     7.526,
+     7.951
+    ]
+   }
+  ]
+ },
+ "s13-match": {
+  "dur": 8.118,
+  "min": 11,
+  "chunks": [
+   {
+    "en": "Afterwards, it compares what I said with each slide, and it caught the missing point on slide two.",
+    "ms": "Selepas itu, ia membandingkan apa yang saya sebut dengan setiap slaid, dan ia mengesan isi yang tertinggal pada slaid dua.",
+    "start": 0.03,
+    "end": 5.73,
+    "word_ends": [
+     0.63,
+     0.78,
+     1.28,
+     1.418,
+     1.568,
+     1.843,
+     2.005,
+     2.243,
+     3.005,
+     3.218,
+     3.305,
+     3.555,
+     3.693,
+     4.043,
+     4.43,
+     4.643,
+     5.068,
+     5.73
+    ]
+   },
+   {
+    "en": "So I know exactly what to fix.",
+    "ms": "Jadi saya tahu dengan tepat apa yang perlu dibaiki.",
+    "start": 5.893,
+    "end": 7.955,
+    "word_ends": [
+     6.08,
+     6.23,
+     6.43,
+     7.03,
+     7.168,
+     7.28,
+     7.955
+    ]
+   }
+  ]
+ },
+ "s14-qa": {
+  "dur": 5.814,
+  "min": 10,
+  "chunks": [
+   {
+    "en": "Next, a Q&A rehearsal, with questions my audience might ask about my own slides.",
+    "ms": "Seterusnya, latihan soal jawab, dengan soalan yang mungkin ditanya penonton tentang slaid saya sendiri.",
+    "start": 0.045,
+    "end": 5.671,
+    "word_ends": [
+     0.52,
+     0.72,
+     1.208,
+     1.333,
+     1.395,
+     2.27,
+     2.571,
+     3.12,
+     3.333,
+     3.82,
+     4.021,
+     4.258,
+     4.483,
+     4.646,
+     4.896,
+     5.671
+    ]
+   }
+  ]
+ },
+ "s15-convo": {
+  "dur": 11.257,
+  "min": 14,
+  "chunks": [
+   {
+    "en": "Daily conversation is for relaxed, everyday practice. I pick a topic and just chat.",
+    "ms": "Perbualan harian untuk latihan santai setiap hari. Saya pilih topik dan terus berbual.",
+    "start": 0.073,
+    "end": 5.898,
+    "word_ends": [
+     0.423,
+     1.198,
+     1.348,
+     1.473,
+     2.173,
+     2.723,
+     3.723,
+     3.998,
+     4.16,
+     4.223,
+     4.76,
+     4.898,
+     5.135,
+     5.898
+    ]
+   },
+   {
+    "en": "I can speak naturally, even in Manglish, and my words are kept exactly as I said them.",
+    "ms": "Saya boleh bercakap secara biasa, termasuk Manglish, dan perkataan saya dikekalkan seperti yang disebut.",
+    "start": 6.048,
+    "end": 11.148,
+    "word_ends": [
+     6.173,
+     6.298,
+     6.598,
+     7.248,
+     7.61,
+     7.723,
+     8.448,
+     8.66,
+     8.823,
+     9.11,
+     9.223,
+     9.498,
+     10.123,
+     10.235,
+     10.385,
+     10.61,
+     11.148
+    ]
+   }
+  ]
+ },
+ "s16-tips": {
+  "dur": 5.416,
+  "min": 8,
+  "chunks": [
+   {
+    "en": "Afterwards, it shows what I said next to a more natural way to say it, and explains why.",
+    "ms": "Selepas itu, ia menunjukkan apa yang saya sebut di sebelah cara yang lebih semula jadi, dan menerangkan sebabnya.",
+    "start": 0.034,
+    "end": 5.309,
+    "word_ends": [
+     0.684,
+     0.922,
+     1.247,
+     1.372,
+     1.522,
+     1.784,
+     2.059,
+     2.147,
+     2.209,
+     2.434,
+     2.884,
+     3.109,
+     3.247,
+     3.484,
+     3.884,
+     4.097,
+     4.684,
+     5.309
+    ]
+   }
+  ]
+ },
+ "s17-progress": {
+  "dur": 5.012,
+  "min": 9,
+  "chunks": [
+   {
+    "en": "The Progress page shows how my scores improve over time, for each type of practice.",
+    "ms": "Halaman Progress menunjukkan peningkatan skor saya dari semasa ke semasa, bagi setiap jenis latihan.",
+    "start": 0.004,
+    "end": 4.879,
+    "word_ends": [
+     0.078,
+     0.528,
+     0.954,
+     1.253,
+     1.416,
+     1.553,
+     1.929,
+     2.341,
+     2.554,
+     3.179,
+     3.429,
+     3.653,
+     3.891,
+     3.978,
+     4.879
+    ]
+   }
+  ]
+ },
+ "s17b-mate": {
+  "dur": 8.703,
+  "min": 13,
+  "chunks": [
+   {
+    "en": "Not sure what to do next? I just ask Mate.",
+    "ms": "Tidak pasti apa seterusnya? Saya cuma tanya Mate.",
+    "start": 0.055,
+    "end": 3.18,
+    "word_ends": [
+     0.318,
+     0.53,
+     0.668,
+     0.755,
+     0.93,
+     1.63,
+     1.905,
+     2.13,
+     2.48,
+     3.18
+    ]
+   },
+   {
+    "en": "Mate knows my profile and past sessions, so it tells me exactly what to practise next.",
+    "ms": "Mate tahu profil dan sesi lepas saya, jadi ia memberitahu dengan tepat apa yang perlu dilatih seterusnya.",
+    "start": 3.33,
+    "end": 8.53,
+    "word_ends": [
+     3.58,
+     3.855,
+     4.03,
+     4.63,
+     4.755,
+     5.055,
+     5.78,
+     6.018,
+     6.105,
+     6.393,
+     6.53,
+     7.155,
+     7.293,
+     7.38,
+     7.83,
+     8.53
+    ]
+   }
+  ]
+ },
+ "s17c-measured": {
+  "dur": 9.553,
+  "min": 10,
+  "chunks": [
+   {
+    "en": "And every score is explained: how it's measured, which model is used, and how to read it.",
+    "ms": "Dan setiap skor diterangkan: cara ia diukur, model yang digunakan, dan cara membacanya.",
+    "start": -0.007,
+    "end": 5.743,
+    "word_ends": [
+     0.18,
+     0.53,
+     0.918,
+     1.043,
+     1.968,
+     2.305,
+     2.493,
+     3.118,
+     3.43,
+     3.818,
+     3.98,
+     4.443,
+     4.618,
+     4.818,
+     4.943,
+     5.168,
+     5.743
+    ]
+   },
+   {
+    "en": "If something can't be measured, it says so instead of guessing.",
+    "ms": "Jika sesuatu tidak dapat diukur, ia dinyatakan, bukan diteka.",
+    "start": 5.893,
+    "end": 9.443,
+    "word_ends": [
+     6.093,
+     6.418,
+     6.655,
+     6.793,
+     7.393,
+     7.655,
+     7.98,
+     8.243,
+     8.58,
+     8.668,
+     9.443
+    ]
+   }
+  ]
+ },
+ "s18-agents": {
+  "dur": 20.538,
+  "min": 20,
+  "chunks": [
+   {
+    "en": "Behind SpeechMate is a team of AI agents, each with one job.",
+    "ms": "Di sebalik SpeechMate ialah satu pasukan ejen AI, setiap satu dengan satu tugas.",
+    "start": -0.011,
+    "end": 4.513,
+    "word_ends": [
+     0.413,
+     0.738,
+     1.038,
+     1.151,
+     1.251,
+     1.576,
+     1.701,
+     2.126,
+     2.864,
+     3.276,
+     3.439,
+     3.663,
+     4.513
+    ]
+   },
+   {
+    "en": "One plans the questions, one runs the interview, and one reads the slides to check my talk.",
+    "ms": "Satu merancang soalan, satu menjalankan temu duga, dan satu membaca slaid untuk menyemak pembentangan saya.",
+    "start": 4.763,
+    "end": 10.614,
+    "word_ends": [
+     5.088,
+     5.426,
+     5.513,
+     6.288,
+     6.701,
+     7.001,
+     7.114,
+     7.813,
+     8.101,
+     8.476,
+     8.788,
+     8.926,
+     9.413,
+     9.551,
+     9.813,
+     9.989,
+     10.614
+    ]
+   },
+   {
+    "en": "A coach picks drills only from what was measured, so it can't make up problems.",
+    "ms": "Jurulatih memilih latihan hanya daripada apa yang diukur, jadi ia tidak boleh mereka-reka masalah.",
+    "start": 10.804,
+    "end": 15.279,
+    "word_ends": [
+     10.892,
+     11.267,
+     11.592,
+     12.017,
+     12.354,
+     12.492,
+     12.617,
+     12.779,
+     13.479,
+     13.742,
+     13.829,
+     14.067,
+     14.242,
+     14.404,
+     15.279
+    ]
+   },
+   {
+    "en": "And Mate keeps the loop going: practise, get feedback, and practise again.",
+    "ms": "Dan Mate meneruskan kitaran: berlatih, terima maklum balas, dan berlatih semula.",
+    "start": 15.893,
+    "end": 20.393,
+    "word_ends": [
+     16.043,
+     16.343,
+     16.618,
+     16.718,
+     16.943,
+     17.543,
+     18.393,
+     18.668,
+     19.143,
+     19.293,
+     19.743,
+     20.393
+    ]
+   }
+  ]
+ },
+ "s19-close": {
+  "dur": 9.974,
+  "min": 15,
+  "chunks": [
+   {
+    "en": "Built for Malaysian speakers, private by design, and every score explained.",
+    "ms": "Dibina untuk penutur Malaysia, privasi terjamin, dan setiap skor diterangkan.",
+    "start": 0.036,
+    "end": 4.786,
+    "word_ends": [
+     0.311,
+     0.424,
+     0.911,
+     1.611,
+     2.061,
+     2.236,
+     2.986,
+     3.249,
+     3.599,
+     3.911,
+     4.786
+    ]
+   },
+   {
+    "en": "No more practising alone in front of the mirror.",
+    "ms": "Tiada lagi berlatih seorang diri di hadapan cermin.",
+    "start": 5.436,
+    "end": 8.211,
+    "word_ends": [
+     5.611,
+     5.836,
+     6.436,
+     7.048,
+     7.211,
+     7.398,
+     7.473,
+     7.561,
+     8.211
+    ]
+   },
+   {
+    "en": "SpeechMate.",
+    "ms": "SpeechMate.",
+    "start": 8.862,
+    "end": 9.812,
+    "word_ends": [
+     9.187,
+     9.812
+    ]
+   }
+  ]
+ }
+}

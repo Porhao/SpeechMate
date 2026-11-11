@@ -1,0 +1,149 @@
+<template>
+  <style>
+#root{position:absolute;inset:0;overflow:hidden;background:#FFFAF0;font-family:Inter,sans-serif;color:#0A0A0A}
+.h{opacity:0}
+.abs{position:absolute}
+.disp{font-weight:600;letter-spacing:-0.035em;line-height:1.04}
+.card{position:absolute;border-radius:28px;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -7px 0 rgba(0,0,0,.12),0 22px 44px rgba(10,26,26,.16)}
+.chip{position:absolute;display:inline-flex;align-items:center;gap:12px;padding:12px 24px;border-radius:999px;font-size:30px;font-weight:600;white-space:nowrap;box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 0 rgba(0,0,0,.1),0 10px 22px rgba(10,26,26,.12)}
+.bot{position:absolute}
+.bot img{position:absolute;inset:0;width:100%;height:100%}
+.row{position:absolute;display:flex;align-items:center;gap:16px;font-size:29px;font-weight:500}
+.row i{flex:none;width:15px;height:15px;border-radius:50%}
+.win{position:absolute;border-radius:22px;background:#FFFAF0;overflow:hidden;box-shadow:0 30px 70px rgba(10,26,26,.24),0 0 0 1px rgba(10,26,26,.08)}
+.win .bar{position:absolute;left:0;right:0;top:0;height:46px;display:flex;align-items:center;gap:9px;padding:0 18px;background:#F3EEE3;border-bottom:1px solid rgba(10,26,26,.08);z-index:5}
+.win .bar b{width:13px;height:13px;border-radius:50%;background:#D9D2C3}
+.win .bar span{margin-left:16px;padding:4px 16px;border-radius:999px;background:#fff;font-size:20px;color:#5C6766}
+.wc{position:absolute;left:0;right:0;top:46px;bottom:0;overflow:hidden}
+.nav{position:absolute;left:0;right:0;top:0;height:62px;display:flex;align-items:center;gap:30px;padding:0 34px;border-bottom:1px solid rgba(10,26,26,.07);font-size:19px;color:#5C6766}
+.nav .wm{font-weight:600;letter-spacing:-0.03em;font-size:23px;color:#0A0A0A;margin-right:26px;display:flex;align-items:center;gap:10px}
+.nav .wm i{width:22px;height:22px;border-radius:50%;background:#FFB084;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12)}
+.nav .on{color:#0A0A0A;font-weight:600}
+.lbl{position:absolute;font-size:19px;font-weight:600;color:#0A0A0A}
+.inp{position:absolute;height:50px;border-radius:12px;background:#fff;border:1.5px solid rgba(10,26,26,.14);font-size:20px;padding:12px 16px;color:#0A0A0A;white-space:nowrap;overflow:hidden}
+.ta{position:absolute;border-radius:12px;background:#fff;border:1.5px solid rgba(10,26,26,.14);font-size:19px;line-height:1.45;padding:12px 16px;color:#0A0A0A}
+.typ{display:inline-block;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+.opt{position:absolute;padding:9px 18px;border-radius:999px;font-size:18px;font-weight:600;background:#fff;color:#0A0A0A;border:1.5px solid rgba(10,26,26,.14);white-space:nowrap}
+.btn{position:absolute;padding:14px 26px;border-radius:12px;font-size:20px;font-weight:600;background:#0A0A0A;color:#fff;white-space:nowrap}
+.pane{position:absolute;border-radius:18px;background:#fff;box-shadow:0 8px 24px rgba(10,26,26,.08),0 0 0 1px rgba(10,26,26,.06)}
+.dark{background:#0A1A1A;color:#FFFAF0}
+.dpane{position:absolute;border-radius:18px;background:#13201F;color:#FFFAF0}
+.turn{position:absolute;display:flex;align-items:center;gap:12px;padding:12px 22px;border-radius:14px;font-size:20px;font-weight:600}
+.illus{position:absolute;right:20px;top:78px;padding:6px 14px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:16px;font-weight:700;letter-spacing:.06em;z-index:6}
+.cur{position:absolute;left:0;top:0;width:40px;height:48px;z-index:40;pointer-events:none}
+.bubble{position:absolute;padding:16px 22px;border-radius:20px;font-size:22px;line-height:1.35}
+
+#root{background:#FFFAF0}
+
+.pg{position:absolute;left:0;top:0;width:1440px;height:760px;transform:scale(1.1);transform-origin:0 0;overflow:hidden;font-family:Inter,sans-serif;color:#0A0A0A}
+.layer{position:absolute;inset:0}
+.navp{position:absolute;z-index:8;left:30px;right:30px;top:10px;height:50px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(10,26,26,.08);display:flex;align-items:center;padding:0 14px 0 10px;gap:6px;font-size:15px}
+.navp .lg{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-right:auto}
+.navp .lg i{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#FFD9C2,#F5A27C)}
+.navp .it{padding:8px 16px;border-radius:999px;color:#3A4645}
+.navp .it.on{background:#0A0A0A;color:#fff;font-weight:600}
+.navp .me{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:14px}
+.navp .me b{width:34px;height:34px;border-radius:50%;background:#0A0A0A;color:#fff;font-size:12px;display:grid;place-items:center}
+.navp .bell{width:22px;height:22px;border-radius:6px;border:2px solid #3A4645;position:relative;margin-right:10px}
+.navp .bell:after{content:"3";position:absolute;right:-9px;top:-9px;width:16px;height:16px;border-radius:50%;background:#E5484D;color:#fff;font-size:10px;display:grid;place-items:center}
+.rail{position:absolute;z-index:8;left:10px;top:90px;width:42px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(10,26,26,.08);padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:12px}
+.rail i{width:24px;height:24px;border-radius:8px;background:#EDE6D8}
+.rail i.dk{background:#0A0A0A;border-radius:50%}
+.eb{position:absolute;font-size:13px;font-weight:700;letter-spacing:.14em}
+.h1{position:absolute;font-size:42px;font-weight:700;letter-spacing:-0.03em;line-height:1.08}
+.sub{position:absolute;font-size:16px;line-height:1.5;color:#3A4645}
+.wcard{position:absolute;border-radius:18px;background:#fff;box-shadow:0 1px 0 rgba(10,26,26,.04),0 0 0 1px rgba(10,26,26,.07)}
+.lb{position:absolute;font-size:15px;font-weight:600}
+.lb em{font-style:normal;font-weight:400;color:#7A8584;margin-left:6px;font-size:13px}
+.in{position:absolute;height:42px;border-radius:10px;background:#fff;border:1.5px solid rgba(10,26,26,.16);font-size:16px;padding:10px 14px;white-space:nowrap;overflow:hidden;color:#0A0A0A}
+.in .ph{color:#9AA3A2}
+.tile{position:absolute;border-radius:10px;background:#fff;border:1.5px solid rgba(10,26,26,.14);padding:9px 14px;font-size:15px;font-weight:600}
+.tile small{display:block;font-weight:400;font-size:12px;color:#5C6766;margin-top:2px}
+.tile.sel{border-color:#0A0A0A;background:#FBF4E6}
+.pill{position:absolute;border-radius:10px;border:1.5px solid rgba(10,26,26,.14);background:#fff;padding:8px 13px;font-size:14px}
+.bk{position:absolute;border-radius:12px;background:#0A0A0A;color:#fff;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.wt{position:absolute;border-radius:12px;background:#fff;color:#0A0A0A;border:1.5px solid rgba(10,26,26,.15);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.typ{display:inline-block;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+.caret{position:absolute;width:2px;height:22px;background:#0A0A0A;opacity:0}
+.mate{position:absolute;z-index:8;right:16px;bottom:10px;width:92px;height:92px}
+.mate img{position:absolute;inset:0;width:100%;height:100%}
+.mb{position:absolute;z-index:8;right:96px;bottom:70px;max-width:280px;padding:8px 14px;border-radius:14px 14px 4px 14px;background:#fff;font-size:15px;font-weight:600;box-shadow:0 8px 20px rgba(10,26,26,.15);opacity:0}
+.illus{position:absolute;padding:5px 12px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:12px;font-weight:800;letter-spacing:.08em}
+.dk{background:#0A1A1A;color:#FFFAF0}
+.dp{position:absolute;border-radius:16px;background:#13201F;color:#FFFAF0}
+.turn{position:absolute;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:12px;font-size:16px;font-weight:600;opacity:0}
+.bars{position:absolute;display:flex;gap:4px;align-items:flex-end;height:26px}
+.bars i{width:5px;height:6px;border-radius:3px;background:#5EEAD4}
+.load{position:absolute;left:0;top:0;height:3px;width:100%;background:#1F6F6B;transform-origin:0 50%;z-index:9}
+.rip{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(31,111,107,.28);border:2px solid rgba(31,111,107,.5);opacity:0;z-index:39;pointer-events:none}
+.dots i{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px}
+
+  </style>
+  <div id="root" data-composition-id="s01-mirror" data-width="1920" data-height="1080">
+    <div class="abs" style="inset:0;background:linear-gradient(#F4EADB 0 72%,#E3D2B8 72%)"></div>
+    <div class="abs" style="left:120px;top:120px;width:300px;height:230px;border-radius:14px;background:#D6E6E8;box-shadow:inset 0 0 0 14px #FBF5EA"></div>
+    <div class="abs" style="left:255px;top:120px;width:14px;height:230px;background:#FBF5EA"></div>
+    <div class="abs" style="left:1560px;top:520px;width:200px;height:250px;border-radius:16px;background:#C9A77A"></div><div class="abs" style="left:1600px;top:420px;width:110px;height:110px;border-radius:50%;background:#7FA88E"></div>
+    <div class="abs" style="left:800px;top:50px;width:600px;height:860px;border-radius:300px 300px 26px 26px;background:#B98F55;box-shadow:inset 0 4px 0 rgba(255,255,255,.35),0 26px 50px rgba(60,40,10,.25)"></div>
+    <div id="s01-glass" class="abs" style="left:826px;top:76px;width:548px;height:808px;border-radius:274px 274px 16px 16px;overflow:hidden;background:radial-gradient(120% 90% at 50% 30%,#E7F1F2,#BFD5D9)"><div class="abs" style="left:0;right:0;bottom:0;height:200px;background:#D1C3AB;opacity:.55"></div><svg viewBox="0 0 400 600" style="position:absolute;left:64px;top:170px;width:420px;height:630px;overflow:visible;opacity:.95"><g id="p01r" class="pbody" style="transform-box:fill-box;transform-origin:50% 100%">
+  <path d="M84 600 C84 452 126 392 200 392 C274 392 316 452 316 600 Z" fill="#2F6B6B"/>
+  <path d="M150 400 C160 440 240 440 250 400 C236 392 164 392 150 400 Z" fill="#245656"/>
+  <rect x="181" y="336" width="38" height="62" rx="12" fill="#B57A50"/>
+  <g class="parm" style="transform-box:view-box;transform-origin:292px 452px">
+    <path d="M276 440 C318 452 340 500 334 546 L300 552 C300 516 290 490 266 474 Z" fill="#245656"/>
+    <circle cx="318" cy="552" r="22" fill="#C98B5E"/>
+  </g>
+  <g class="phead" style="transform-box:view-box;transform-origin:200px 350px">
+    <circle cx="122" cy="268" r="15" fill="#B57A50"/><circle cx="278" cy="268" r="15" fill="#B57A50"/>
+    <ellipse cx="200" cy="262" rx="78" ry="90" fill="#C98B5E"/>
+    <path d="M118 258 C108 170 156 146 206 148 C258 150 296 178 284 258 C272 214 240 198 204 202 C168 206 138 220 118 258 Z" fill="#1D1A18"/>
+    <g class="pbrow"><rect x="156" y="238" width="32" height="8" rx="4" fill="#1D1A18"/><rect x="212" y="238" width="32" height="8" rx="4" fill="#1D1A18"/></g>
+    <g class="peyes" style="transform-box:fill-box;transform-origin:50% 50%"><ellipse cx="172" cy="272" rx="8.5" ry="10.5" fill="#1D1A18"/><ellipse cx="228" cy="272" rx="8.5" ry="10.5" fill="#1D1A18"/></g>
+    <ellipse cx="156" cy="300" rx="13" ry="7" fill="#E07A6A" opacity=".35"/><ellipse cx="244" cy="300" rx="13" ry="7" fill="#E07A6A" opacity=".35"/>
+    <g style="transform-box:fill-box;transform-origin:50% 50%"><ellipse class="pmouth" cx="200" cy="318" rx="15" ry="5" fill="#6B2A22"/></g>
+  </g>
+  
+</g></svg><div class="abs" style="left:-80px;top:0;width:90px;height:1000px;background:rgba(255,255,255,.35);transform:rotate(18deg)"></div><div class="abs" style="left:60px;top:0;width:30px;height:1000px;background:rgba(255,255,255,.28);transform:rotate(18deg)"></div></div>
+    <svg viewBox="0 0 400 600" class="abs" style="left:430px;top:420px;width:470px;height:705px;overflow:visible"><g id="p01b" class="pbody">
+  <path d="M70 600 C70 446 120 386 200 386 C280 386 330 446 330 600 Z" fill="#2F6B6B"/>
+  <path d="M120 420 C140 470 260 470 280 420 C260 396 140 396 120 420 Z" fill="#245656"/>
+  <rect x="180" y="326" width="40" height="70" rx="14" fill="#B57A50"/>
+  <g class="phead"><circle cx="120" cy="262" r="15" fill="#B57A50"/><circle cx="280" cy="262" r="15" fill="#B57A50"/>
+  <ellipse cx="200" cy="250" rx="82" ry="94" fill="#1D1A18"/></g>
+</g></svg>
+    <div id="s01-c0" class="chip h" style="left:140px;top:430px;background:#B8A4ED;color:#0A0A0A;font-size:32px" >Presentation</div>
+    <div id="s01-c1" class="chip h" style="left:140px;top:520px;background:#A4D4C5;color:#0A0A0A;font-size:32px" >Job interview</div>
+    <div id="s01-dim" class="abs h" style="inset:0;background:#0A1A1A" ></div>
+    <div id="s01-tb" class="bubble h" style="left:130px;top:190px;background:#fff;color:#0A0A0A;font-size:40px;font-weight:600;box-shadow:0 14px 30px rgba(10,26,26,.15);border-radius:30px;padding:22px 34px" >…so how did I do?</div>
+    <div id="s01-q0" class="bubble h" style="left:110px;top:170px;background:#fff;color:#0A0A0A;font-size:31px;font-weight:600;box-shadow:0 12px 26px rgba(10,26,26,.14)" >Did my answer make sense? <span style="color:#C21E57;margin-left:10px">?</span></div>
+    <div id="s01-q1" class="bubble h" style="left:110px;top:290px;background:#fff;color:#0A0A0A;font-size:31px;font-weight:600;box-shadow:0 12px 26px rgba(10,26,26,.14)" >Did I sound nervous? <span style="color:#C21E57;margin-left:10px">?</span></div>
+    <div id="s01-q2" class="bubble h" style="left:110px;top:410px;background:#fff;color:#0A0A0A;font-size:31px;font-weight:600;box-shadow:0 12px 26px rgba(10,26,26,.14)" >What should I work on? <span style="color:#C21E57;margin-left:10px">?</span></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s01-c0",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},2.796);
+    tl.fromTo("#s01-c1",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},4.134);
+    tl.to("#p01r .pmouth",{scaleY:2.4,transformOrigin:"50% 50%",duration:0.1,yoyo:true,repeat:61,ease:"sine.inOut"},0.4);
+    tl.to("#p01r .parm",{rotation:-24,svgOrigin:"292 452",duration:0.35,yoyo:true,repeat:5,ease:"sine.inOut"},2.796);
+    tl.to("#p01b .phead",{rotation:-3,svgOrigin:"200 380",duration:0.5,yoyo:true,repeat:5,ease:"sine.inOut"},0.5);
+    tl.to("#p01r .peyes",{scaleY:0.1,transformOrigin:"50% 50%",duration:0.07,yoyo:true,repeat:1},0.9);
+    tl.to("#p01r .peyes",{scaleY:0.1,transformOrigin:"50% 50%",duration:0.07,yoyo:true,repeat:1},4.936);
+    tl.to("#p01r .peyes",{scaleY:0.1,transformOrigin:"50% 50%",duration:0.07,yoyo:true,repeat:1},9.187);
+    tl.to("#p01r .peyes",{scaleY:0.1,transformOrigin:"50% 50%",duration:0.07,yoyo:true,repeat:1},12);
+    tl.to("#s01-c0",{opacity:0,filter:"blur(8px)",duration:0.25,ease:"power2.in"},6.837);
+    tl.to("#s01-c1",{opacity:0,filter:"blur(8px)",duration:0.25,ease:"power2.in"},6.837);
+    tl.fromTo("#s01-dim",{opacity:0},{opacity:0.18,duration:0.8,ease:"power2.inOut"},7.087);
+    tl.fromTo("#s01-tb",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},7.297);
+    tl.to("#s01-tb",{opacity:0,filter:"blur(8px)",duration:0.25,ease:"power2.in"},8.947);
+    tl.fromTo("#s01-q0",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},9.297);
+    tl.to("#s01-q0",{opacity:0.35,duration:0.6},13.4);
+    tl.fromTo("#s01-q1",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},9.897);
+    tl.to("#s01-q1",{opacity:0.35,duration:0.6},13.4);
+    tl.fromTo("#s01-q2",{opacity:0,scale:0.55},{opacity:1,scale:1,duration:0.75,ease:"back.out(1.5)"},10.497);
+    tl.to("#s01-q2",{opacity:0.35,duration:0.6},13.4);
+    tl.to("#p01r .phead",{rotation:6,y:14,svgOrigin:"200 350",duration:0.9,ease:"power2.inOut"},12.8);
+    tl.to("#p01b .phead",{y:16,duration:0.9,ease:"power2.inOut"},12.8);
+    tl.set({}, {}, 15);
+    window.__timelines["s01-mirror"] = tl;
+  </script>
+</template>

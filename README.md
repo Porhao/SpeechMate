@@ -109,6 +109,7 @@ recording → 16 kHz audio → speech recognition → language mix & Manglish pa
 |---|---|
 | `SECRET_KEY` | Signs login tokens. Generate one with `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | The LLM: Gemini's OpenAI-compatible endpoint `https://generativelanguage.googleapis.com/v1beta/openai/`, a key from aistudio.google.com, and a model such as `gemini-3.5-flash-lite` |
+| `LLM_FALLBACK_MODEL` | Model used when `LLM_MODEL` answers 503 (overloaded), e.g. `gemini-3.1-flash-lite`. Empty = no fallback |
 | `TTS_BASE_URL`, `LOCAL_TTS_VOICE` | The AI partner's voice. `http://kokoro:8880/v1` runs the bundled Kokoro; voices include `af_heart`, `am_michael`, `bf_emma` |
 | `OPENAI_BASE_URL`, `TRANSCRIPTION_MODEL` | Speech recognition (cloud): Groq is `https://api.groq.com/openai/v1` with `whisper-large-v3`, key in `OPENAI_API_KEY` |
 | `STT_LANGUAGE` | Empty = auto-detect (recommended); `ms` / `en` forces a language |

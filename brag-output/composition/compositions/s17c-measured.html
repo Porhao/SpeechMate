@@ -1,0 +1,127 @@
+<template>
+  <style>
+#root{position:absolute;inset:0;overflow:hidden;background:#FFFAF0;font-family:Inter,sans-serif;color:#0A0A0A}
+.h{opacity:0}
+.abs{position:absolute}
+.disp{font-weight:600;letter-spacing:-0.035em;line-height:1.04}
+.card{position:absolute;border-radius:28px;box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -7px 0 rgba(0,0,0,.12),0 22px 44px rgba(10,26,26,.16)}
+.chip{position:absolute;display:inline-flex;align-items:center;gap:12px;padding:12px 24px;border-radius:999px;font-size:30px;font-weight:600;white-space:nowrap;box-shadow:inset 0 2px 0 rgba(255,255,255,.4),inset 0 -4px 0 rgba(0,0,0,.1),0 10px 22px rgba(10,26,26,.12)}
+.bot{position:absolute}
+.bot img{position:absolute;inset:0;width:100%;height:100%}
+.row{position:absolute;display:flex;align-items:center;gap:16px;font-size:29px;font-weight:500}
+.row i{flex:none;width:15px;height:15px;border-radius:50%}
+.win{position:absolute;border-radius:22px;background:#FFFAF0;overflow:hidden;box-shadow:0 30px 70px rgba(10,26,26,.24),0 0 0 1px rgba(10,26,26,.08)}
+.win .bar{position:absolute;left:0;right:0;top:0;height:46px;display:flex;align-items:center;gap:9px;padding:0 18px;background:#F3EEE3;border-bottom:1px solid rgba(10,26,26,.08);z-index:5}
+.win .bar b{width:13px;height:13px;border-radius:50%;background:#D9D2C3}
+.win .bar span{margin-left:16px;padding:4px 16px;border-radius:999px;background:#fff;font-size:20px;color:#5C6766}
+.wc{position:absolute;left:0;right:0;top:46px;bottom:0;overflow:hidden}
+.nav{position:absolute;left:0;right:0;top:0;height:62px;display:flex;align-items:center;gap:30px;padding:0 34px;border-bottom:1px solid rgba(10,26,26,.07);font-size:19px;color:#5C6766}
+.nav .wm{font-weight:600;letter-spacing:-0.03em;font-size:23px;color:#0A0A0A;margin-right:26px;display:flex;align-items:center;gap:10px}
+.nav .wm i{width:22px;height:22px;border-radius:50%;background:#FFB084;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12)}
+.nav .on{color:#0A0A0A;font-weight:600}
+.lbl{position:absolute;font-size:19px;font-weight:600;color:#0A0A0A}
+.inp{position:absolute;height:50px;border-radius:12px;background:#fff;border:1.5px solid rgba(10,26,26,.14);font-size:20px;padding:12px 16px;color:#0A0A0A;white-space:nowrap;overflow:hidden}
+.ta{position:absolute;border-radius:12px;background:#fff;border:1.5px solid rgba(10,26,26,.14);font-size:19px;line-height:1.45;padding:12px 16px;color:#0A0A0A}
+.typ{display:inline-block;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+.opt{position:absolute;padding:9px 18px;border-radius:999px;font-size:18px;font-weight:600;background:#fff;color:#0A0A0A;border:1.5px solid rgba(10,26,26,.14);white-space:nowrap}
+.btn{position:absolute;padding:14px 26px;border-radius:12px;font-size:20px;font-weight:600;background:#0A0A0A;color:#fff;white-space:nowrap}
+.pane{position:absolute;border-radius:18px;background:#fff;box-shadow:0 8px 24px rgba(10,26,26,.08),0 0 0 1px rgba(10,26,26,.06)}
+.dark{background:#0A1A1A;color:#FFFAF0}
+.dpane{position:absolute;border-radius:18px;background:#13201F;color:#FFFAF0}
+.turn{position:absolute;display:flex;align-items:center;gap:12px;padding:12px 22px;border-radius:14px;font-size:20px;font-weight:600}
+.illus{position:absolute;right:20px;top:78px;padding:6px 14px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:16px;font-weight:700;letter-spacing:.06em;z-index:6}
+.cur{position:absolute;left:0;top:0;width:40px;height:48px;z-index:40;pointer-events:none}
+.bubble{position:absolute;padding:16px 22px;border-radius:20px;font-size:22px;line-height:1.35}
+
+#root{background:#FFFAF0}
+
+.pg{position:absolute;left:0;top:0;width:1440px;height:760px;transform:scale(1.1);transform-origin:0 0;overflow:hidden;font-family:Inter,sans-serif;color:#0A0A0A}
+.layer{position:absolute;inset:0}
+.navp{position:absolute;z-index:8;left:30px;right:30px;top:10px;height:50px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(10,26,26,.08);display:flex;align-items:center;padding:0 14px 0 10px;gap:6px;font-size:15px}
+.navp .lg{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin-right:auto}
+.navp .lg i{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#FFD9C2,#F5A27C)}
+.navp .it{padding:8px 16px;border-radius:999px;color:#3A4645}
+.navp .it.on{background:#0A0A0A;color:#fff;font-weight:600}
+.navp .me{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:14px}
+.navp .me b{width:34px;height:34px;border-radius:50%;background:#0A0A0A;color:#fff;font-size:12px;display:grid;place-items:center}
+.navp .bell{width:22px;height:22px;border-radius:6px;border:2px solid #3A4645;position:relative;margin-right:10px}
+.navp .bell:after{content:"3";position:absolute;right:-9px;top:-9px;width:16px;height:16px;border-radius:50%;background:#E5484D;color:#fff;font-size:10px;display:grid;place-items:center}
+.rail{position:absolute;z-index:8;left:10px;top:90px;width:42px;border-radius:999px;background:#fff;box-shadow:0 6px 18px rgba(10,26,26,.08);padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:12px}
+.rail i{width:24px;height:24px;border-radius:8px;background:#EDE6D8}
+.rail i.dk{background:#0A0A0A;border-radius:50%}
+.eb{position:absolute;font-size:13px;font-weight:700;letter-spacing:.14em}
+.h1{position:absolute;font-size:42px;font-weight:700;letter-spacing:-0.03em;line-height:1.08}
+.sub{position:absolute;font-size:16px;line-height:1.5;color:#3A4645}
+.wcard{position:absolute;border-radius:18px;background:#fff;box-shadow:0 1px 0 rgba(10,26,26,.04),0 0 0 1px rgba(10,26,26,.07)}
+.lb{position:absolute;font-size:15px;font-weight:600}
+.lb em{font-style:normal;font-weight:400;color:#7A8584;margin-left:6px;font-size:13px}
+.in{position:absolute;height:42px;border-radius:10px;background:#fff;border:1.5px solid rgba(10,26,26,.16);font-size:16px;padding:10px 14px;white-space:nowrap;overflow:hidden;color:#0A0A0A}
+.in .ph{color:#9AA3A2}
+.tile{position:absolute;border-radius:10px;background:#fff;border:1.5px solid rgba(10,26,26,.14);padding:9px 14px;font-size:15px;font-weight:600}
+.tile small{display:block;font-weight:400;font-size:12px;color:#5C6766;margin-top:2px}
+.tile.sel{border-color:#0A0A0A;background:#FBF4E6}
+.pill{position:absolute;border-radius:10px;border:1.5px solid rgba(10,26,26,.14);background:#fff;padding:8px 13px;font-size:14px}
+.bk{position:absolute;border-radius:12px;background:#0A0A0A;color:#fff;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px}
+.wt{position:absolute;border-radius:12px;background:#fff;color:#0A0A0A;border:1.5px solid rgba(10,26,26,.15);font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.typ{display:inline-block;white-space:nowrap;clip-path:inset(0 100% 0 0)}
+.caret{position:absolute;width:2px;height:22px;background:#0A0A0A;opacity:0}
+.mate{position:absolute;z-index:8;right:16px;bottom:10px;width:92px;height:92px}
+.mate img{position:absolute;inset:0;width:100%;height:100%}
+.mb{position:absolute;z-index:8;right:96px;bottom:70px;max-width:280px;padding:8px 14px;border-radius:14px 14px 4px 14px;background:#fff;font-size:15px;font-weight:600;box-shadow:0 8px 20px rgba(10,26,26,.15);opacity:0}
+.illus{position:absolute;padding:5px 12px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:12px;font-weight:800;letter-spacing:.08em}
+.dk{background:#0A1A1A;color:#FFFAF0}
+.dp{position:absolute;border-radius:16px;background:#13201F;color:#FFFAF0}
+.turn{position:absolute;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:12px;font-size:16px;font-weight:600;opacity:0}
+.bars{position:absolute;display:flex;gap:4px;align-items:flex-end;height:26px}
+.bars i{width:5px;height:6px;border-radius:3px;background:#5EEAD4}
+.load{position:absolute;left:0;top:0;height:3px;width:100%;background:#1F6F6B;transform-origin:0 50%;z-index:9}
+.rip{position:absolute;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(31,111,107,.28);border:2px solid rgba(31,111,107,.5);opacity:0;z-index:39;pointer-events:none}
+.dots i{display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:4px}
+
+  </style>
+  <div id="root" data-composition-id="s17c-measured" data-width="1920" data-height="1080">
+    <div id="s17c-cam" class="abs" style="left:0;top:0;width:1920px;height:1080px">
+    <div id="s17c-w" class="win" style="left:168px;top:18px;width:1584px;height:882px" ><div class="bar"><b></b><b></b><b></b><span style="position:relative;min-width:420px"><span id="s17c-url">speechmate.app/progress</span><span id="s17c-url2" style="position:absolute;left:0;top:0;opacity:0">speechmate.app/methodology</span></span></div><div class="wc"><div class="load" id="s17c-load" style="transform:scaleX(0)"></div><div class="pg"><div id="s17c-p3" class="layer" style="opacity:1;background:#FFFAF0"><div class="navp" data-layout-allow-overlap data-layout-allow-occlusion><span class="lg"><i></i>SpeechMate</span><span class="it">Home</span><span class="it">Conversation</span><span class="it">Interview</span><span class="it">Presentation</span><span class="it">Script</span><span class="it on">Progress</span><span class="me"><span class="bell"></span><b>AR</b><span><b style="all:unset;font-weight:600;display:block">Aisyah Rahman</b><span style="font-size:12px;color:#7A8584">demo@speechmate.dev</span></span></span></div><div class="rail"><i class="dk"></i><i></i><i></i><i></i><i></i></div><div id="s17c-p3-mate-br" style="position:absolute;right:16px;bottom:10px;width:92px;height:92px;z-index:8"><div id="s17c-p3-mate" style="position:absolute;inset:0"><img id="s17c-p3-mate-default" src="assets/bots/mate-default.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:1;"><img id="s17c-p3-mate-left" src="assets/bots/mate-left.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-p3-mate-right" src="assets/bots/mate-right.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-p3-mate-down" src="assets/bots/mate-down.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-p3-mate-tiltl" src="assets/bots/mate-tiltl.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-p3-mate-tiltr" src="assets/bots/mate-tiltr.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-p3-mate-working" src="assets/bots/mate-working.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-p3-mate-sleeping" src="assets/bots/mate-sleeping.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:2;"></div></div><div class="mb" id="s17c-p3-mb"></div></div><div id="s17c-me" class="layer" style="opacity:0;background:#FFFAF0"><div class="navp" data-layout-allow-overlap data-layout-allow-occlusion><span class="lg"><i></i>SpeechMate</span><span class="it">Home</span><span class="it">Conversation</span><span class="it">Interview</span><span class="it">Presentation</span><span class="it">Script</span><span class="it">Progress</span><span class="me"><span class="bell"></span><b>AR</b><span><b style="all:unset;font-weight:600;display:block">Aisyah Rahman</b><span style="font-size:12px;color:#7A8584">demo@speechmate.dev</span></span></span></div><div class="rail"><i class="dk"></i><i></i><i></i><i></i><i></i></div><div id="s17c-me-mate-br" style="position:absolute;right:16px;bottom:10px;width:92px;height:92px;z-index:8"><div id="s17c-me-mate" style="position:absolute;inset:0"><img id="s17c-me-mate-default" src="assets/bots/mate-default.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:1;"><img id="s17c-me-mate-left" src="assets/bots/mate-left.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-me-mate-right" src="assets/bots/mate-right.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-me-mate-down" src="assets/bots/mate-down.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-me-mate-tiltl" src="assets/bots/mate-tiltl.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-me-mate-tiltr" src="assets/bots/mate-tiltr.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-me-mate-working" src="assets/bots/mate-working.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;"><img id="s17c-me-mate-sleeping" src="assets/bots/mate-sleeping.png" alt="" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;z-index:2;"></div></div><div class="mb" id="s17c-me-mb"></div><div class="eb" style="left:200px;top:84px;color:#5C6766">REFERENCE</div><div class="h1" style="left:200px;top:104px;font-size:38px">How it's measured</div><div class="sub" style="left:200px;top:152px;width:900px">Every score: the method, the model, and how to read it. Anything that could not be measured is shown as not measured, never estimated.</div><div style="position:absolute;left:200px;top:200px;width:1060px;height:540px"><div style="position:absolute;left:18px;top:14px;font-size:13px;font-weight:700;letter-spacing:.1em;color:#7A8584">METRIC</div><div style="position:absolute;left:250px;top:14px;font-size:13px;font-weight:700;letter-spacing:.1em;color:#7A8584">METHOD · MODEL</div><div style="position:absolute;left:700px;top:14px;font-size:13px;font-weight:700;letter-spacing:.1em;color:#7A8584">WHAT YOU SEE</div><div id="s17c-r0" style="position:absolute;left:0;top:56px;width:1060px;height:84px;border-radius:12px;background:#FBF8F1;opacity:0"><div style="position:absolute;left:18px;top:28px;width:220px;font-size:17px;font-weight:700">Speech recognition</div><div style="position:absolute;left:250px;top:18px;width:420px;font-size:14px;font-family:monospace;line-height:1.45;color:#2A3A39">Whisper large-v3 (Groq) · auto language · Manglish prompt</div><div style="position:absolute;left:700px;top:20px;width:340px;font-size:15px;line-height:1.4">Word error: 4.9% English, 7.3% Malay</div></div><div id="s17c-r1" style="position:absolute;left:0;top:148px;width:1060px;height:84px;border-radius:12px;background:#FBF8F1;opacity:0"><div style="position:absolute;left:18px;top:28px;width:220px;font-size:17px;font-weight:700">Pronunciation</div><div style="position:absolute;left:250px;top:18px;width:420px;font-size:14px;font-family:monospace;line-height:1.45;color:#2A3A39">wav2vec2 phonemes + forced alignment</div><div style="position:absolute;left:700px;top:20px;width:340px;font-size:15px;line-height:1.4">Malaysian English counts as regional, not error</div></div><div id="s17c-r2" style="position:absolute;left:0;top:240px;width:1060px;height:84px;border-radius:12px;background:#FBF8F1;opacity:0"><div style="position:absolute;left:18px;top:28px;width:220px;font-size:17px;font-weight:700">Eye contact</div><div style="position:absolute;left:250px;top:18px;width:420px;font-size:14px;font-family:monospace;line-height:1.45;color:#2A3A39">MediaPipe Face Mesh · iris position</div><div style="position:absolute;left:700px;top:20px;width:340px;font-size:15px;line-height:1.4">% of the time you look at the camera</div></div><div id="s17c-r3" style="position:absolute;left:0;top:332px;width:1060px;height:84px;border-radius:12px;background:#FBF8F1;opacity:0"><div style="position:absolute;left:18px;top:28px;width:220px;font-size:17px;font-weight:700">Gaze Tunneling</div><div style="position:absolute;left:250px;top:18px;width:420px;font-size:14px;font-family:monospace;line-height:1.45;color:#2A3A39">gaze stream vs. stumble timings · significance test</div><div style="position:absolute;left:700px;top:20px;width:340px;font-size:15px;line-height:1.4">Whether you look away as you lose your words</div></div><div id="s17c-r4" style="position:absolute;left:0;top:424px;width:1060px;height:84px;border-radius:12px;background:#FBF8F1;opacity:0"><div style="position:absolute;left:18px;top:28px;width:220px;font-size:17px;font-weight:700">Confidence</div><div style="position:absolute;left:250px;top:18px;width:420px;font-size:14px;font-family:monospace;line-height:1.45;color:#2A3A39">11 measured cues, weakest listed first</div><div style="position:absolute;left:700px;top:20px;width:340px;font-size:15px;line-height:1.4">No score unless 30% of the evidence was measured</div></div></div></div></div></div></div>
+    <div id="s17c-step" class="abs" style="right:182px;top:23px;height:36px;display:flex;align-items:center;gap:10px;padding:0 16px;border-radius:999px;background:#E8B94A;color:#0A0A0A;font-size:20px;font-weight:600;z-index:45;white-space:nowrap;box-shadow:0 6px 18px rgba(10,26,26,.25)" ><b style="font-weight:800">After practice</b><span style="opacity:.8">Step 3 of 3</span><span>· How it's measured</span></div>
+    <div id="s17c-cur" class="cur h" style="" ><svg viewBox="0 0 40 48"><path d="M4 3 L4 38 L13 30 L19 44 L26 41 L20 27 L32 27 Z" fill="#fff" stroke="#0A0A0A" stroke-width="3" stroke-linejoin="round"/></svg></div>
+    <div id="s17c-rip0" class="rip" style="left:203px;top:350px" ></div>
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.set("#s17c-cur",{opacity:1,x:1684,y:838},0.0);
+    tl.to("#s17c-cur",{x:203,y:350,duration:0.7,ease:"power2.inOut"},0.2);
+    tl.to("#s17c-cur",{scale:0.8,duration:0.07,ease:"power2.out"},0.9);tl.to("#s17c-cur",{scale:1,duration:0.15,ease:"power2.out"},0.97);
+    tl.fromTo("#s17c-rip0",{opacity:0.9,scale:0.3},{opacity:0,scale:1.5,duration:0.5,ease:"power2.out",immediateRender:false},0.9);
+    tl.fromTo("#s17c-load",{scaleX:0,opacity:1},{scaleX:1,duration:0.45,ease:"power2.out"},0.9);tl.to("#s17c-load",{opacity:0,duration:0.2},1.35);
+    tl.to("#s17c-p3",{opacity:0,duration:0.18,ease:"power2.in"},1.05);
+    tl.fromTo("#s17c-me",{opacity:0,y:14},{opacity:1,y:0,duration:0.45,ease:"expo.out"},1.2);
+    tl.set("#s17c-url",{opacity:0},0.95);tl.set("#s17c-url2",{opacity:1},0.95);
+    tl.fromTo("#s17c-r0",{opacity:0,x:-20},{opacity:1,x:0,duration:0.4,ease:"expo.out"},1.5);
+    tl.fromTo("#s17c-r1",{opacity:0,x:-20},{opacity:1,x:0,duration:0.4,ease:"expo.out"},1.78);
+    tl.fromTo("#s17c-r2",{opacity:0,x:-20},{opacity:1,x:0,duration:0.4,ease:"expo.out"},2.06);
+    tl.fromTo("#s17c-r3",{opacity:0,x:-20},{opacity:1,x:0,duration:0.4,ease:"expo.out"},2.34);
+    tl.fromTo("#s17c-r4",{opacity:0,x:-20},{opacity:1,x:0,duration:0.4,ease:"expo.out"},2.62);
+    tl.to("#s17c-cur",{x:1004,y:392,duration:0.5,ease:"power2.inOut"},2.118);
+    tl.to("#s17c-r0",{backgroundColor:"#F1ECFD",boxShadow:"0 0 0 2px rgba(75,47,168,.35)",duration:0.25},2.518);
+    tl.to("#s17c-cur",{x:1004,y:695,duration:0.5,ease:"power2.inOut"},3.556);
+    tl.to("#s17c-r3",{backgroundColor:"#F1ECFD",boxShadow:"0 0 0 2px rgba(75,47,168,.35)",duration:0.25},3.956);
+    tl.to("#s17c-cur",{x:1004,y:797,duration:0.5,ease:"power2.inOut"},4.993);
+    tl.to("#s17c-r4",{backgroundColor:"#F1ECFD",boxShadow:"0 0 0 2px rgba(75,47,168,.35)",duration:0.25},5.393000000000001);
+    tl.set("#s17c-w",{transformOrigin:"0px 0px"},2.693);tl.to("#s17c-w",{scale:1.12,x:-95,y:-106,duration:0.9,ease:"power2.inOut"},2.693);
+    tl.set("#s17c-me-mate-left",{opacity:1},0.91);tl.set("#s17c-me-mate-default",{opacity:0},0.944);
+    tl.set("#s17c-me-mate-default",{opacity:1},2.323);tl.set("#s17c-me-mate-left",{opacity:0},2.357);
+    tl.set("#s17c-me-mate-sleeping",{opacity:1},4.013);tl.set("#s17c-me-mate-sleeping",{opacity:0},4.143);
+    tl.set("#s17c-me-mate-down",{opacity:1},5.956);tl.set("#s17c-me-mate-default",{opacity:0},5.99);
+    tl.set("#s17c-me-mate-default",{opacity:1},8.512);tl.set("#s17c-me-mate-down",{opacity:0},8.546);
+    tl.fromTo("#s17c-me-mate-br",{y:0,scaleY:1,scaleX:1},{y:-4,scaleY:1.03,scaleX:0.985,transformOrigin:"50% 100%",duration:1.2,ease:"sine.inOut",yoyo:true,repeat:7},0.3);
+    tl.set("#s17c-p3-mate-left",{opacity:1},1.264);tl.set("#s17c-p3-mate-default",{opacity:0},1.298);
+    tl.set("#s17c-p3-mate-default",{opacity:1},3.439);tl.set("#s17c-p3-mate-left",{opacity:0},3.473);
+    tl.set("#s17c-p3-mate-sleeping",{opacity:1},6.206);tl.set("#s17c-p3-mate-sleeping",{opacity:0},6.336);
+    tl.set("#s17c-p3-mate-sleeping",{opacity:1},8.327);tl.set("#s17c-p3-mate-sleeping",{opacity:0},8.457);
+    tl.fromTo("#s17c-p3-mate-br",{y:0,scaleY:1,scaleX:1},{y:-4,scaleY:1.03,scaleX:0.985,transformOrigin:"50% 100%",duration:1.2,ease:"sine.inOut",yoyo:true,repeat:7},0.3);
+    tl.fromTo("#s17c-cam",{scale:1},{scale:1.018,transformOrigin:"50% 42%",duration:5.377,ease:"sine.inOut",yoyo:true,repeat:1},0);
+    tl.set({}, {}, 10.753);
+    window.__timelines["s17c-measured"] = tl;
+  </script>
+</template>

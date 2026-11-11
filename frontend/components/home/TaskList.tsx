@@ -15,6 +15,7 @@ import { mascot } from "@/lib/mascot";
 import { deckProgress } from "@/lib/deckPipeline";
 import { DECK_IN_PROGRESS } from "@/services/presentation";
 import type { DeckListItem, LiveSession } from "@/types";
+import { formatDay } from "@/lib/format";
 
 type Priority = "Urgent" | "High" | null;
 // Titles are dictionary keys plus their details, translated when shown
@@ -41,7 +42,7 @@ function dueLabel(due: Date): { text: string; late: boolean } {
   if (days < 0) return { text: days === -1 ? "Yesterday" : `${-days} days late`, late: true };
   if (days === 0) return { text: "Today", late: false };
   if (days === 1) return { text: "Tomorrow", late: false };
-  return { text: due.toLocaleDateString("en-MY", { day: "numeric", month: "short" }), late: false };
+  return { text: formatDay(due), late: false };
 }
 
 const modeOf = (s: LiveSession): keyof typeof TAGS => (s.session_type in TAGS ? s.session_type as keyof typeof TAGS : "Conversation");

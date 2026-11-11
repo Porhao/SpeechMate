@@ -42,12 +42,12 @@ The local Mesolitica model scored 6.1% WER on it, and standard Whisper `medium` 
 | `backend/app/config.py` | `cloud_stt`, `whisper_model_size`, `whisper_cpu_threads` |
 | `backend/requirements-ml.txt` | `faster-whisper==1.0.3` (torch/transformers stay: pronunciation, emotion, TTS) |
 | `backend/.env`, `.env.example` | `CLOUD_STT`, `WHISPER_MODEL_SIZE`, `WHISPER_CPU_THREADS` |
-| Deleted files | `backend/scripts/convert_whisper.sh`, `backend/scripts/benchmark/bench_stt.py`, `backend/scripts/benchmark/prepare_data.sh`, `backend/tests/test_asr_silence.py` |
+| Deleted files | `backend/scripts/convert_whisper.sh`, `backend/scripts/benchmark/` (`bench_stt.py`, `prepare_data.sh`, `make_synth_kokoro.py`), `backend/tests/test_asr_silence.py` |
 | Frontend | session page checks only `providers.openai`; methodology page text; comments in `voiceTurns.ts`, `services/live.ts` |
 | `README.md`, `docs/project/Testing.md` | Speech-recognition rows and the "everything local" claim |
 
 Not touched: `fine-tune/` (LoRA fine-tune of the local model) and `docs/benchmarks/`. They are research
-records. The fine-tune eval scripts (`eval_routing.py`, `eval_finetune.py`) import the removed
+records. The fine-tune eval scripts (`fine-tune/scripts/archive/eval_routing.py`, `eval_finetune.py`) import the removed
 `asr.whisper_segments` / `asr._transcribe_local`, so they only run against `6f89bed` or after a restore.
 The model weights in the `speechmate_model_cache` Docker volume (`/models/ct2/...`) were also left in place.
 

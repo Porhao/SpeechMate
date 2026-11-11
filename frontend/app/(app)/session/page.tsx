@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any -- MediaPipe handles have no bundled types */
 
 import { Suspense, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -15,18 +14,18 @@ import { presentationService } from "@/services/presentation";
 import { ApiError } from "@/services/api";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
 import SlideImage from "@/components/presentation/SlideImage";
-import { analyzeLighting, type FaceBox, type LightingReport } from "@/lib/lighting";
+import { analyzeLighting, type LightingReport } from "@/lib/lighting";
 import type { SessionType, LiveSession } from "@/types";
-import { formatDuration } from "@/utils/format";
+import { formatDuration } from "@/lib/format";
 import {
   BACKCHANNEL_TEXTS, CHECKIN_MESSAGES, FILLER_WORDS, MODE_ACKS, MODE_PROMPTS, MODE_TITLES, MOOD_STATES, RANDOM_TOPICS,
-  clamp, ema, inferMood, paceWpm, type Blendshape, type MoodLabel,
+  paceWpm, type MoodLabel,
 } from "./script";
+import { useAudioMeter, useFaceTracking } from "./hooks";
 import { HeaderPulse, LiveTranscript, PartnerBot, UserBubble, VoiceBeam, VolumeMeter, type OrbState } from "./widgets";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Message  = { role: "ai" | "user"; text: string; ts: number };
-type MpStatus = "idle" | "loading" | "ready" | "error";
 
 // ── Session ───────────────────────────────────────────────────────────────────
 function SessionContent() {
@@ -51,10 +50,6 @@ function SessionContent() {
   const [aiTyping,       setAiTyping]       = useState(false);
   const [aiSpeaking,     setAiSpeaking]     = useState(false);
   const [isEnding,       setIsEnding]       = useState(false);
-  const [mpStatus,       setMpStatus]       = useState<MpStatus>("idle");
-  const [faceDetected,   setFaceDetected]   = useState(false);
-  const [poseDetected,   setPoseDetected]   = useState(false);
-  const [mood,           setMood]           = useState<{ label: MoodLabel; score: number } | null>(null);
   // true while the mic is open for the user's turn (not tied to the recogniser's internal restarts)
   const [speechActive,   setSpeechActive]   = useState(false);
   // Camera's real aspect ratio, so the tracking inset shows the full frame and the
@@ -109,7 +104,6 @@ function SessionContent() {
   const streamRef  = useRef<MediaStream | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const animRef    = useRef<number>(0);
   // Speech-to-text for the user's turns is the backend's (cloud Whisper, e.g. Groq).
   // No browser fallback: Chrome's recogniser sends audio to Google and is English-only
   // (fine-tune/docs/manglish-transcription-spec.md). Without a backend model the user types instead.
@@ -118,20 +112,10 @@ function SessionContent() {
   const sttFailsRef      = useRef(0);  // consecutive failed transcriptions
   const [sttNotice,      setSttNotice]      = useState("");
   const voiceListenerRef = useRef<VoiceTurnListener | null>(null);
-  const mpRef      = useRef<any>(null);
   const mediaRecorderRef    = useRef<MediaRecorder | null>(null);
   const recordedChunksRef   = useRef<Blob[]>([]);
   const backendSessionIdRef = useRef<string | null>(null);
 
-  // Live audio metering — real mic amplitude driving the orb + waveform,
-  // not a canned animation. audioLevelRef is read every frame by anything
-  // that draws imperatively (waveform bars); audioLevel (state) is a
-  // throttled ~12Hz copy for React-rendered elements like the orb's scale.
-  const audioCtxRef   = useRef<AudioContext | null>(null);
-  const analyserRef   = useRef<AnalyserNode | null>(null);
-  const audioLevelRef = useRef(0);
-  const audioMeterRafRef = useRef<number>(0);
-  const [audioLevel, setAudioLevel] = useState(0);
   // What the user is answering, sent with each turn so speech recognition gets topic words right
   const sttContextRef = useRef("");
 
@@ -142,10 +126,6 @@ function SessionContent() {
   const voiceEnabledRef     = useRef(true);
   const isRecordingRef      = useRef(false);
   const modeRef             = useRef(mode);
-  const moodRef             = useRef<{ label: MoodLabel; score: number } | null>(null);
-  const moodBoxRef          = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-  // Face box in normalised frame coordinates, for the lighting check
-  const faceNormRef         = useRef<FaceBox | null>(null);
   // Response time: from the end of the AI's turn to the first sound of the user's answer
   const turnOpenedAtRef     = useRef<number | null>(null);
   const latenciesRef        = useRef<number[]>([]);
@@ -153,9 +133,7 @@ function SessionContent() {
   const wordListRef         = useRef<string[]>([]);
   const fillerCntRef        = useRef(0);
   const startTimeRef        = useRef(0);
-  const lastUpdateRef       = useRef(0);
   const lastPrevRef         = useRef(0);
-  const lastTsRef           = useRef(0);
   const lastSpeechTimeRef   = useRef(0);
   const checkinAskedRef     = useRef(false);
   const silenceCheckRef     = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -183,6 +161,13 @@ function SessionContent() {
   const messagesRef     = useRef<Message[]>([]);
   const replyGenRef     = useRef(0);
   const currentTopicRef = useRef(currentTopic);
+
+  // ── Mic level and face/pose tracking (hooks.ts) ──────────────────────────
+  const { audioLevel, start: startMeter, stop: stopMeter } = useAudioMeter();
+  const { mpStatus, faceDetected, poseDetected, mood, faceNormRef,
+          start: startTracking, stop: stopTracking, dispose: disposeTracking } =
+    useFaceTracking(videoRef, canvasRef, activeRef,
+      (now) => setWpm(paceWpm(wordListRef.current.length, (now - startTimeRef.current) / 1000)));
 
   // ── Sync refs ─────────────────────────────────────────────────────────────
   useEffect(() => { aiTypingRef.current      = aiTyping; },       [aiTyping]);
@@ -399,136 +384,6 @@ function SessionContent() {
     return () => { if (backchannelTimerRef.current) clearInterval(backchannelTimerRef.current); };
   }, [speechActive, aiSpeaking, sessionStarted, playBackchannel]);
 
-  // ── MediaPipe ────────────────────────────────────────────────────────────
-  const initMediaPipe = useCallback(async () => {
-    if (mpRef.current) return;
-    setMpStatus("loading");
-    try {
-      const { FaceLandmarker, PoseLandmarker, FilesetResolver, DrawingUtils } =
-        await import("@mediapipe/tasks-vision");
-      // The WASM must be the same version as the JS package (pinned exactly in package.json)
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
-      const [fl, pl] = await Promise.all([
-        FaceLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task", delegate: "GPU" },
-          outputFaceBlendshapes: true, runningMode: "VIDEO", numFaces: 1,
-        }),
-        PoseLandmarker.createFromOptions(vision, {
-          baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task", delegate: "GPU" },
-          runningMode: "VIDEO", numPoses: 1,
-        }),
-      ]);
-      mpRef.current = { faceLandmarker: fl, poseLandmarker: pl, FaceLandmarker, PoseLandmarker, DrawingUtils };
-      setMpStatus("ready");
-    } catch { setMpStatus("error"); }
-  }, []);
-
-  // FaceLandmarker/PoseLandmarker each hold a WASM instance and a GPU
-  // delegate that outlive the JS object — letting the ref just get garbage
-  // collected leaks both. This was never called anywhere, so every session
-  // that got navigated away from (rather than ended) leaked a GPU context;
-  // a few of those in one tab is exactly what shows up as "junk" on the
-  // next page — stuttering paints, stale WebGL warnings in the console.
-  const disposeMediaPipe = useCallback(() => {
-    const mp = mpRef.current;
-    if (!mp) return;
-    try { mp.faceLandmarker?.close(); } catch { /* already gone */ }
-    try { mp.poseLandmarker?.close(); } catch { /* already gone */ }
-    mpRef.current = null;
-  }, []);
-
-  const runDetection = useCallback(() => {
-    if (!activeRef.current) return;
-    const video = videoRef.current, canvas = canvasRef.current, mp = mpRef.current;
-    const now = performance.now();
-    if (mp && video && canvas && video.readyState >= 2 && video.videoWidth > 0 && now > lastTsRef.current) {
-      const w = canvas.parentElement?.offsetWidth ?? video.videoWidth;
-      const h = canvas.parentElement?.offsetHeight ?? video.videoHeight;
-      if (canvas.width !== w) canvas.width = w;
-      if (canvas.height !== h) canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.clearRect(0, 0, w, h); lastTsRef.current = now;
-        if (!mp._du) mp._du = new mp.DrawingUtils(ctx);
-        const du = mp._du;
-        try {
-          const fr = mp.faceLandmarker.detectForVideo(video, now);
-          if (fr.faceLandmarks.length > 0) {
-            setFaceDetected(true); const fl = fr.faceLandmarks[0];
-            du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "#FFFFFF10", lineWidth: 0.4 });
-            du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "#00E5FF", lineWidth: 1.5 });
-            du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_LEFT_EYE,  { color: "#00E5FF", lineWidth: 1.5 });
-            du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_LIPS, { color: "#FF804060", lineWidth: 1 });
-
-            // Mood — inferred from the same detector's blendshape output.
-            const shapes = fr.faceBlendshapes?.[0]?.categories as Blendshape[] | undefined;
-            if (shapes?.length) {
-              const next = inferMood(shapes);
-              const smoothedScore = moodRef.current?.label === next.label
-                ? Math.round(ema(moodRef.current.score, next.score, 0.2))
-                : next.score;
-              moodRef.current = { label: next.label, score: smoothedScore };
-            }
-
-            // Face bounding box (canvas pixel space) for the overlay tag.
-            let minX = 1, minY = 1, maxX = 0, maxY = 0;
-            for (const p of fl) {
-              if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-              if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
-            }
-            const pad = 0.04;
-            const bx = clamp((minX - pad) * w, 0, w), by = clamp((minY - pad * 1.4) * h, 0, h);
-            const bw = clamp((maxX - minX + pad * 2) * w, 0, w - bx), bh = clamp((maxY - minY + pad * 2.4) * h, 0, h - by);
-            moodBoxRef.current = { x: bx, y: by, w: bw, h: bh };
-            faceNormRef.current = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-
-            // Draw bracket-corner box + mood tag, matching a HUD-style ID overlay.
-            if (moodRef.current) {
-              const mc2 = MOOD_STATES[moodRef.current.label].color;
-              const corner = Math.min(18, bw * 0.18, bh * 0.18);
-              ctx.strokeStyle = `${mc2}CC`; ctx.lineWidth = 1.6; ctx.lineCap = "round";
-              const drawCorner = (cx: number, cy: number, dx: number, dy: number) => {
-                ctx.beginPath();
-                ctx.moveTo(cx, cy + dy * corner); ctx.lineTo(cx, cy); ctx.lineTo(cx + dx * corner, cy);
-                ctx.stroke();
-              };
-              drawCorner(bx, by, 1, 1);
-              drawCorner(bx + bw, by, -1, 1);
-              drawCorner(bx, by + bh, 1, -1);
-              drawCorner(bx + bw, by + bh, -1, -1);
-
-              const label = `${moodRef.current.label} · ${moodRef.current.score}%`;
-              ctx.font = "600 11px Inter, sans-serif";
-              const tw = ctx.measureText(label).width;
-              const tagX = clamp(bx, 0, w - tw - 16), tagY = Math.max(0, by - 22);
-              ctx.fillStyle = `${mc2}E6`;
-              ctx.beginPath();
-              ctx.roundRect?.(tagX, tagY, tw + 16, 20, 6);
-              ctx.fill();
-              ctx.fillStyle = "#FFFFFF";
-              ctx.fillText(label, tagX + 8, tagY + 14);
-            }
-          } else { setFaceDetected(false); moodBoxRef.current = null; faceNormRef.current = null; }
-        } catch { /* transient */ }
-        try {
-          const pr = mp.poseLandmarker.detectForVideo(video, now);
-          if (pr.landmarks.length > 0) {
-            setPoseDetected(true); const pl = pr.landmarks[0];
-            du.drawConnectors(pl, mp.PoseLandmarker.POSE_CONNECTIONS, { color: "#5C729B60", lineWidth: 2.5 });
-            du.drawLandmarks(pl.slice(0, 25), { color: "#60EFFF", fillColor: "#1060FF80", radius: 3 });
-          } else { setPoseDetected(false); }
-        } catch { /* transient */ }
-      }
-    }
-    if (now - lastUpdateRef.current > 500) {
-      setWpm(paceWpm(wordListRef.current.length, (now - startTimeRef.current) / 1000));
-      setMood(moodRef.current);
-      lastUpdateRef.current = now;
-    }
-    animRef.current = requestAnimationFrame(runDetection);
-  }, []);
-
   // ── Speech-to-text (backend) ─────────────────────────────────────────────
   const startSpeech = useCallback(() => {
     if (voiceListenerRef.current) return;  // never two listeners at once
@@ -632,42 +487,6 @@ function SessionContent() {
     setTimeout(resumeListening, 120);
   }, [resumeListening]);
 
-  // ── Live audio metering ──────────────────────────────────────────────────
-  const startAudioMeter = useCallback((stream: MediaStream) => {
-    try {
-      const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AC();
-      const source  = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.55;
-      source.connect(analyser);
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
-
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      let lastUi = 0;
-      const tick = () => {
-        analyser.getByteFrequencyData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i];
-        const avg = sum / data.length / 255;
-        audioLevelRef.current = audioLevelRef.current * 0.72 + avg * 0.28;
-        const now = performance.now();
-        if (now - lastUi > 80) { setAudioLevel(audioLevelRef.current); lastUi = now; }
-        audioMeterRafRef.current = requestAnimationFrame(tick);
-      };
-      tick();
-    } catch { /* audio metering is a nice-to-have, session still works without it */ }
-  }, []);
-
-  const stopAudioMeter = useCallback(() => {
-    if (audioMeterRafRef.current) cancelAnimationFrame(audioMeterRafRef.current);
-    audioCtxRef.current?.close().catch(() => {});
-    audioCtxRef.current = null; analyserRef.current = null;
-    audioLevelRef.current = 0; setAudioLevel(0);
-  }, []);
-
   // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
     setCamError(null);
@@ -684,7 +503,7 @@ function SessionContent() {
       const { width, height } = stream.getVideoTracks()[0]?.getSettings() ?? {};
       if (width && height) setCamAspect(`${width} / ${height}`);
       setCameraOn(true);
-      startAudioMeter(stream);
+      startMeter(stream);
 
       // Record the session (audio+video together) so it can be uploaded for
       // real backend analysis once the session ends.
@@ -707,7 +526,7 @@ function SessionContent() {
         : name === "NotReadableError" ? "Your camera or microphone is being used by another app. Close it and reload."
         : "Couldn't start your camera and microphone. You can still type your replies below.");
     }
-  }, [setCameraOn, startAudioMeter]);
+  }, [setCameraOn, startMeter]);
 
   const stopRecording = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve) => {
@@ -728,13 +547,13 @@ function SessionContent() {
     if (videoRef.current) videoRef.current.srcObject = null;
     if (trackVideoRef.current) trackVideoRef.current.srcObject = null;
     setCameraOn(false);
-    stopAudioMeter();
-  }, [setCameraOn, stopAudioMeter]);
+    stopMeter();
+  }, [setCameraOn, stopMeter]);
 
   // ── Session start / end ───────────────────────────────────────────────────
   const startSession = useCallback(async () => {
     wordListRef.current = []; fillerCntRef.current = 0;
-    lastUpdateRef.current = 0; lastPrevRef.current = 0; lastTsRef.current = 0;
+    lastPrevRef.current = 0;
     lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
     sttAudioSecRef.current = [];
     activeRef.current = true; startTimeRef.current = performance.now(); sessionStartedAtRef.current = Date.now();
@@ -762,7 +581,7 @@ function SessionContent() {
     backendSessionIdRef.current = backendSession?.id ?? null;
 
     timerRef.current = setInterval(() => incrementDuration(), 1000);
-    initMediaPipe().then(() => { if (activeRef.current) animRef.current = requestAnimationFrame(runDetection); });
+    startTracking();
     if (isTalkRef.current) {
       // Presenting: the user talks, the AI stays silent; the analysis afterwards uses the recording
       // and when each slide was shown (from the start of the recording)
@@ -819,7 +638,7 @@ function SessionContent() {
     window.speechSynthesis?.cancel();
     if (timerRef.current) clearInterval(timerRef.current);
     if (silenceCheckRef.current) clearInterval(silenceCheckRef.current);
-    cancelAnimationFrame(animRef.current);
+    stopTracking();
     stopSpeech();
 
     const recordedBlob = await stopRecording();
@@ -850,7 +669,7 @@ function SessionContent() {
     }
     router.push(`/results/${sessionId}`);
   }, [
-    stopSpeech, stopRecording, stopCamera, setRecording, router, duration,
+    stopSpeech, stopRecording, stopCamera, setRecording, router, duration, stopTracking,
   ]);
 
   // ── Lighting & contrast check: once a second while the camera runs (independent of
@@ -861,7 +680,7 @@ function SessionContent() {
       if (videoRef.current) setLighting(analyzeLighting(videoRef.current, faceNormRef.current));
     }, 1000);
     return () => clearInterval(timer);
-  }, [sessionStarted, isCameraOn]);
+  }, [sessionStarted, isCameraOn, faceNormRef]);
 
   // ── Silence detection ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -965,15 +784,15 @@ function SessionContent() {
       window.speechSynthesis?.cancel();
       if (timerRef.current) clearInterval(timerRef.current);
       if (silenceCheckRef.current) clearInterval(silenceCheckRef.current);
-      cancelAnimationFrame(animRef.current);
-      stopSpeech(); stopCamera(); disposeMediaPipe();
+      stopTracking();
+      stopSpeech(); stopCamera(); disposeTracking();
       // Leaving without clicking "End" — a MediaRecorder still attached to
       // (now-stopped) tracks won't emit further data, but stop it
       // explicitly so it isn't left in "recording" state indefinitely.
       const mr = mediaRecorderRef.current;
       if (mr && mr.state !== "inactive") { try { mr.stop(); } catch { /* already stopped */ } }
     };
-  }, [stopCamera, stopSpeech, disposeMediaPipe]);
+  }, [stopCamera, stopSpeech, stopTracking, disposeTracking]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   // The AI's turn before its voice starts (LLM reply + TTS loading) reads as "thinking"

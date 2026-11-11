@@ -31,9 +31,10 @@ _usage: ContextVar[dict | None] = ContextVar("llm_usage", default=None)
 
 @contextlib.contextmanager
 def track_llm_usage(tally: dict | None = None):
-    """Collect {calls, prompt_tokens, completion_tokens} for LLM calls made inside the block."""
+    """Collect {calls, prompt_tokens, completion_tokens, fallback_calls} for LLM calls made inside the
+    block. fallback_calls = answered by LLM_FALLBACK_MODEL because LLM_MODEL was overloaded."""
     tally = tally if tally is not None else {}
-    for k in ("calls", "prompt_tokens", "completion_tokens"):
+    for k in ("calls", "prompt_tokens", "completion_tokens", "fallback_calls"):
         tally.setdefault(k, 0)
     token = _usage.set(tally)
     try:
@@ -47,14 +48,47 @@ async def _count_usage(response: httpx.Response) -> None:
     if tally is None or not response.request.url.path.endswith("/chat/completions") or response.status_code != 200:
         return
     try:
-        usage = json.loads(await response.aread()).get("usage") or {}  # non-streaming calls only (none stream)
+        reply = json.loads(await response.aread())  # non-streaming calls only (none stream)
     except Exception:  # noqa: BLE001 — accounting must never break a call
         return
+    usage = reply.get("usage") or {}
+    model = response.headers.get(FALLBACK_HEADER) or settings.llm_model   # the model that answered
     tally["calls"] += 1
+    tally["fallback_calls"] += int(FALLBACK_HEADER in response.headers)
     tally["prompt_tokens"] += int(usage.get("prompt_tokens") or 0)
     tally["completion_tokens"] += int(usage.get("completion_tokens") or 0)
-    logger.info("llm usage: model=%s prompt=%s completion=%s", settings.llm_model,
+    logger.info("llm usage: model=%s prompt=%s completion=%s", model,
                 usage.get("prompt_tokens"), usage.get("completion_tokens"))
+
+
+FALLBACK_HEADER = "x-speechmate-fallback-model"
+
+
+class _FallbackModelTransport(httpx.AsyncBaseTransport):
+    """When the LLM provider answers 503 (model overloaded, as Gemini does at peak times), send the
+    same chat request once more to LLM_FALLBACK_MODEL. One place, so every LLM caller gets it."""
+
+    def __init__(self, inner: httpx.AsyncBaseTransport, fallback: str):
+        self.inner, self.fallback = inner, fallback
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        response = await self.inner.handle_async_request(request)
+        if response.status_code != 503 or not request.url.path.endswith("/chat/completions"):
+            return response
+        body = json.loads(request.content or b"{}")
+        if body.get("model") == self.fallback:
+            return response
+        logger.warning("LLM model %s overloaded (503); retrying with %s", body.get("model"), self.fallback)
+        await response.aclose()
+        body["model"] = self.fallback
+        headers = {k: v for k, v in request.headers.items() if k.lower() != "content-length"}
+        retry = httpx.Request(request.method, request.url, headers=headers, content=json.dumps(body).encode())
+        response = await self.inner.handle_async_request(retry)
+        response.headers[FALLBACK_HEADER] = self.fallback   # httpx reports the original request, so mark it here
+        return response
+
+    async def aclose(self) -> None:
+        await self.inner.aclose()
 
 
 def llm_provider() -> str | None:
@@ -77,12 +111,16 @@ def get_llm_client() -> AsyncOpenAI | None:
     if not settings.llm_base_url:
         return get_openai_client()
     if _llm_client is None:
+        transport = httpx.AsyncHTTPTransport()
+        if settings.llm_fallback_model:
+            transport = _FallbackModelTransport(transport, settings.llm_fallback_model)
         _llm_client = AsyncOpenAI(
             api_key=settings.llm_api_key or "not-needed",  # Ollama ignores it, the SDK requires one
             base_url=settings.llm_base_url,
             timeout=settings.llm_timeout_sec,
             max_retries=0,
-            http_client=httpx.AsyncClient(timeout=settings.llm_timeout_sec, event_hooks={"response": [_count_usage]}),
+            http_client=httpx.AsyncClient(timeout=settings.llm_timeout_sec, transport=transport,
+                                          event_hooks={"response": [_count_usage]}),
         )
     return _llm_client
 
