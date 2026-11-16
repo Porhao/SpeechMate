@@ -1,13 +1,15 @@
-"""Vision analysis of a live-session recording: eye contact, posture, facial emotion.
+"""Vision analysis of a live-session recording: gaze (eye contact + its timeline), body (posture,
+gestures, head steadiness) and facial emotion.
 
-- Eye contact: MediaPipe Face Mesh with refined iris landmarks — the iris
-  position within each eye classifies gaze as camera / left / right / down.
-- Posture: MediaPipe Pose — head tilt from the ear line, shoulder level, and
-  torso-midpoint movement across frames for stability.
+- Gaze: MediaPipe Face Mesh with refined iris landmarks, ~2 samples a second over the whole
+  video; the iris position within each eye classifies gaze as camera / left / right / down.
+- Body: one MediaPipe Pose pass over sampled frames — head tilt, shoulder level, torso
+  movement, seated-posture problems, hand movement and head steadiness.
 - Emotion: MediaPipe face detection crop + a pretrained ViT facial-expression
   classifier (trpakov/vit-face-expression, FER2013 7-class) on CPU.
 
-All blocking — the pipeline runs them via asyncio.to_thread.
+All blocking — the pipeline runs them via asyncio.to_thread. The models are shared, process-wide
+singletons and not thread-safe: the pipeline lets one analysis at a time use them.
 """
 
 import logging
@@ -15,8 +17,9 @@ import math
 import statistics
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 
+from app.services.live import rules
 from app.services.live._ml import load_once
 
 logger = logging.getLogger(__name__)
@@ -33,7 +36,7 @@ H_CENTER_LO, H_CENTER_HI = 0.35, 0.65
 V_DOWN_THRESHOLD = 0.62
 
 # Pose landmark indices
-NOSE, LEFT_EAR, RIGHT_EAR, LEFT_SHOULDER, RIGHT_SHOULDER = 0, 7, 8, 11, 12
+NOSE, LEFT_EAR, RIGHT_EAR, LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_WRIST, RIGHT_WRIST = 0, 7, 8, 11, 12, 15, 16
 # Seated-posture checks (calibration knobs: ratios, so the distance to the camera doesn't matter)
 VISIBLE = 0.5            # pose landmark visibility needed to count a shoulder as in view
 MIN_NECK_RATIO = 0.3     # (shoulder line y − ear line y) ÷ shoulder width: ~0.45–0.6 sitting upright; slumped or lying back sinks the head into the shoulders
@@ -70,7 +73,6 @@ class PostureResult:
     body_stability: float | None
     excessive_movement: bool
     tilt_angle: float
-    recommendations: list[str] = field(default_factory=list)
     in_frame_pct: float = 100.0          # % of frames with both shoulders in view
     upright_pct: float | None = None     # % of in-view frames sitting upright with the camera at eye level
     slouched_pct: float = 0.0            # % of in-view frames slumped / lying back
@@ -93,17 +95,23 @@ def as_dict(result) -> dict | None:
 
 # ── Frame sampling ──────────────────────────────────────────────────────────
 
-def sample_frames(video_path: str, max_frames: int = 60) -> list:
-    """Evenly sample up to `max_frames` RGB frames. Empty list if unreadable (e.g. audio-only)."""
+def _with_timeout(fn, *args, timeout: float, label: str) -> list:
+    """`fn(*args)` (a video read), or [] if it takes longer than `timeout`."""
     pool = ThreadPoolExecutor(max_workers=1)
-    future = pool.submit(_sample_frames_blocking, video_path, max_frames)
+    future = pool.submit(fn, *args)
     try:
-        return future.result(timeout=FRAME_READ_TIMEOUT_SEC)
+        return future.result(timeout=timeout)
     except FutureTimeoutError:
-        logger.warning("Timed out sampling frames from %s", video_path)
+        logger.warning("Timed out %s", label)
         return []
     finally:
         pool.shutdown(wait=False)  # don't wait on a native call that may never return
+
+
+def sample_frames(video_path: str, max_frames: int = 60) -> list:
+    """Evenly sample up to `max_frames` RGB frames. Empty list if unreadable (e.g. audio-only)."""
+    return _with_timeout(_sample_frames_blocking, video_path, max_frames, timeout=FRAME_READ_TIMEOUT_SEC,
+                         label=f"sampling frames from {video_path}")
 
 
 def _sample_frames_blocking(video_path: str, max_frames: int) -> list:
@@ -139,7 +147,7 @@ def _sample_frames_blocking(video_path: str, max_frames: int) -> list:
     return frames
 
 
-# ── Eye contact ─────────────────────────────────────────────────────────────
+# ── Gaze ────────────────────────────────────────────────────────────────────
 
 @load_once
 def _face_mesh():
@@ -168,51 +176,26 @@ def _gaze(lm) -> tuple[str, float]:
     return "camera", h
 
 
-def analyze_eye_contact(frames: list) -> EyeContactResult | None:
-    gazes, h_ratios = [], []
-    for frame in frames:
-        result = _face_mesh().process(frame)
-        if result.multi_face_landmarks:
-            g, h = _gaze(result.multi_face_landmarks[0].landmark)
-            gazes.append(g)
-            h_ratios.append(h)
-    if not gazes:
-        return None
-
-    look_away = sum(1 for g in gazes if g != "camera")
-    pct = round(look_away / len(gazes) * 100, 1)
-    return EyeContactResult(
-        eye_contact_score=round(100 - pct, 1),
-        gaze_consistency=round(max(0.0, 100 - statistics.pstdev(h_ratios) * 200), 1) if len(h_ratios) > 1 else 100.0,
-        look_away_count=look_away,
-        look_away_percentage=pct,
-        dominant_gaze=max(set(gazes), key=gazes.count),
-        frame_count=len(gazes),
-    )
+@dataclass
+class GazeSample:
+    t_sec: float   # on the audio's timeline
+    gaze: str      # camera | left | right | down
+    h: float       # horizontal iris position, 0-1
 
 
-# ── Gaze timeline (for Gaze Tunneling) ──────────────────────────────────────
-
-GAZE_FPS = 2.0                 # samples per second: fine enough for 5 s windows
+GAZE_FPS = 2.0                 # samples per second: fine enough for 5 s Gaze Tunneling windows
 GAZE_TIMEOUT_SEC = 180
 
 
-def gaze_timeline(video_path: str, duration_sec: float) -> list[tuple[float, bool]]:
-    """[(t_sec, looked_away)] at ~GAZE_FPS for every sampled frame with a face, on the same
-    timeline as the audio (the recorder pauses video and audio together). Streams the file:
-    one frame in memory at a time. Empty if unreadable or timed out."""
-    pool = ThreadPoolExecutor(max_workers=1)
-    future = pool.submit(_gaze_timeline_blocking, video_path, duration_sec)
-    try:
-        return future.result(timeout=GAZE_TIMEOUT_SEC)
-    except FutureTimeoutError:
-        logger.warning("Timed out reading the gaze timeline from %s", video_path)
-        return []
-    finally:
-        pool.shutdown(wait=False)
+def gaze_samples(video_path: str, duration_sec: float) -> list[GazeSample]:
+    """A gaze sample at ~GAZE_FPS for every sampled frame with a face, on the same timeline as the
+    audio (the recorder pauses video and audio together). Streams the file: one frame in memory at
+    a time. Empty if unreadable or timed out."""
+    return _with_timeout(_gaze_samples_blocking, video_path, duration_sec, timeout=GAZE_TIMEOUT_SEC,
+                         label=f"reading the gaze from {video_path}")
 
 
-def _gaze_timeline_blocking(video_path: str, duration_sec: float) -> list[tuple[float, bool]]:
+def _gaze_samples_blocking(video_path: str, duration_sec: float) -> list[GazeSample]:
     import cv2
 
     cap = cv2.VideoCapture(video_path)
@@ -221,7 +204,7 @@ def _gaze_timeline_blocking(video_path: str, duration_sec: float) -> list[tuple[
     fps = cap.get(cv2.CAP_PROP_FPS)
     fps = fps if 5 <= fps <= 120 else 30.0   # browser webm often reports 1000 or 0
     step = max(int(round(fps / GAZE_FPS)), 1)
-    samples, idx = [], 0                      # (frame index, looked_away)
+    samples, idx = [], 0                      # (frame index, gaze, h)
     while idx < int(duration_sec * 120) + 1000:  # cap for a stream that never signals EOF
         if idx % step:
             if not cap.grab():
@@ -232,13 +215,29 @@ def _gaze_timeline_blocking(video_path: str, duration_sec: float) -> list[tuple[
                 break
             result = _face_mesh().process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             if result.multi_face_landmarks:
-                samples.append((idx, _gaze(result.multi_face_landmarks[0].landmark)[0] != "camera"))
+                samples.append((idx, *_gaze(result.multi_face_landmarks[0].landmark)))
         idx += 1
     cap.release()
     if not samples or idx == 0:
         return []
     # Frame position → seconds, scaled to the audio's length (robust to a wrong reported fps)
-    return [(i / idx * duration_sec, away) for i, away in samples]
+    return [GazeSample(i / idx * duration_sec, g, h) for i, g, h in samples]
+
+
+def eye_contact(samples: list[GazeSample]) -> EyeContactResult | None:
+    if not samples:
+        return None
+    gazes = [s.gaze for s in samples]
+    look_away = sum(1 for g in gazes if g != "camera")
+    pct = round(look_away / len(gazes) * 100, 1)
+    return EyeContactResult(
+        eye_contact_score=round(100 - pct, 1),
+        gaze_consistency=round(max(0.0, 100 - statistics.pstdev(s.h for s in samples) * 200), 1) if len(samples) > 1 else 100.0,
+        look_away_count=look_away,
+        look_away_percentage=pct,
+        dominant_gaze=max(set(gazes), key=gazes.count),
+        frame_count=len(gazes),
+    )
 
 
 # ── Posture ─────────────────────────────────────────────────────────────────
@@ -267,25 +266,52 @@ def posture_issue(lm, aspect: float = 16 / 9) -> str | None:
     return None
 
 
-def analyze_posture(frames: list) -> PostureResult | None:
-    """Alignment (head, shoulders, steadiness) on the frames where you're in view, scaled by the share
-    of the session you sat upright, in view, with the camera at eye level: lying in bed, slumping, or
-    sitting so close that your shoulders are cut off can't score well. None when no body was seen."""
+@dataclass
+class GestureResult:
+    hands_visible_ratio: float     # share of frames with at least one hand in view
+    gesture_ratio: float           # share of frames where a visible hand moved noticeably
+    head_stability: float          # 0–100 (nose movement relative to the shoulders)
+    frame_count: int
+
+
+def analyze_body(frames: list) -> tuple[PostureResult | None, GestureResult | None]:
+    """One Pose pass. Posture: alignment (head, shoulders, steadiness) on the frames where you're in
+    view, scaled by the share of the session you sat upright, in view, with the camera at eye level —
+    lying in bed, slumping, or sitting so close your shoulders are cut off can't score well.
+    Gestures: hands visible and moving, and how still the head is relative to the shoulders."""
     tilts, shoulder_diffs, torso_x, torso_y, issues = [], [], [], [], []
+    visible, moving, heads, prev_wrists = 0, 0, [], None
     for frame in frames:
         result = _pose().process(frame)
         if not result.pose_landmarks:
+            prev_wrists = None
             continue
         lm = result.pose_landmarks.landmark
+        width = abs(lm[LEFT_SHOULDER].x - lm[RIGHT_SHOULDER].x) or 0.2
+        mid_x = (lm[LEFT_SHOULDER].x + lm[RIGHT_SHOULDER].x) / 2
+        mid_y = (lm[LEFT_SHOULDER].y + lm[RIGHT_SHOULDER].y) / 2
+        heads.append(((lm[NOSE].x - mid_x) / width, (lm[NOSE].y - mid_y) / width))
+        wrists = [(lm[i].x, lm[i].y) for i in (LEFT_WRIST, RIGHT_WRIST) if lm[i].visibility > VISIBLE and lm[i].y < 1.0]
+        if wrists:
+            visible += 1
+            if prev_wrists and max(math.dist(a, b) for a in wrists for b in prev_wrists) / width > 0.15:
+                moving += 1
+        prev_wrists = wrists or None
+
         issue = posture_issue(lm, frame.shape[1] / frame.shape[0])
         issues.append(issue)
         if issue == "out_of_frame":
             continue
         tilts.append(math.degrees(math.atan2(lm[RIGHT_EAR].y - lm[LEFT_EAR].y, lm[RIGHT_EAR].x - lm[LEFT_EAR].x)))
         shoulder_diffs.append(abs(lm[LEFT_SHOULDER].y - lm[RIGHT_SHOULDER].y))
-        torso_x.append((lm[LEFT_SHOULDER].x + lm[RIGHT_SHOULDER].x) / 2)
-        torso_y.append((lm[LEFT_SHOULDER].y + lm[RIGHT_SHOULDER].y) / 2)
-    return posture_from(issues, tilts, shoulder_diffs, torso_x, torso_y)
+        torso_x.append(mid_x)
+        torso_y.append(mid_y)
+    gestures = None
+    if len(heads) >= 3:
+        hx, hy = statistics.pstdev(h[0] for h in heads), statistics.pstdev(h[1] for h in heads)
+        gestures = GestureResult(hands_visible_ratio=round(visible / len(heads), 2), gesture_ratio=round(moving / len(heads), 2),
+                                 head_stability=rules.clamp(100 - (hx + hy) * 250), frame_count=len(heads))
+    return posture_from(issues, tilts, shoulder_diffs, torso_x, torso_y), gestures
 
 
 def posture_from(issues: list[str | None], tilts: list[float], shoulder_diffs: list[float],
@@ -297,12 +323,9 @@ def posture_from(issues: list[str | None], tilts: list[float], shoulder_diffs: l
     in_view = [i for i in issues if i != "out_of_frame"]
     in_frame = pct(len(in_view), len(issues))
     good = pct(in_view.count(None), len(issues))       # upright, in view, camera level: share of ALL frames
-    recs = []
-    if in_frame < 80:
-        recs.append("Sit back so your head and both shoulders are in view, like a video interview.")
     if not tilts:  # never in view: alignment can't be judged, and the score reflects that
         return PostureResult(posture_score=0.0, head_alignment=None, shoulder_alignment=None, body_stability=None,
-                             excessive_movement=False, tilt_angle=0.0, recommendations=recs,
+                             excessive_movement=False, tilt_angle=0.0,
                              in_frame_pct=in_frame, upright_pct=None)
     avg_tilt = statistics.mean(tilts)
     head = round(max(0.0, 100 - abs(avg_tilt) * 4), 1)
@@ -311,17 +334,6 @@ def posture_from(issues: list[str | None], tilts: list[float], shoulder_diffs: l
     stability = round(max(0.0, 100 - movement * 800), 1)
     slouched, camera_low = pct(in_view.count("slouched"), len(in_view)), pct(in_view.count("camera_low"), len(in_view))
 
-    if slouched >= 20:
-        recs.append("Sit up straight on a chair: you were slumped or leaning back for part of the session.")
-    if camera_low >= 20:
-        recs.append("Raise the camera to eye level (stack books under the laptop); filming from below looks like lounging.")
-    if head < 70:
-        recs.append("Keep your head upright and avoid excessive nodding.")
-    if shoulders < 70:
-        recs.append("Level your shoulders to project confidence.")
-    if stability < 60:
-        recs.append("Reduce body swaying to appear more composed.")
-
     return PostureResult(
         posture_score=round((head + shoulders + stability) / 3 * good / 100, 1),
         head_alignment=head,
@@ -329,7 +341,6 @@ def posture_from(issues: list[str | None], tilts: list[float], shoulder_diffs: l
         body_stability=stability,
         excessive_movement=stability < 50,
         tilt_angle=round(avg_tilt, 1),
-        recommendations=recs,
         in_frame_pct=in_frame,
         upright_pct=pct(in_view.count(None), len(in_view)),
         slouched_pct=slouched,

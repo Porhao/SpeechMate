@@ -19,8 +19,8 @@ from PIL import Image, ImageDraw
 from app.config import settings
 from app.database import Base, engine
 from app.main import app
-from app.services import pipeline, tasks
-from app.services.slide_processor import slide_processor
+from app.services import tasks
+from app.services import slide_processor
 from app.services.storage import storage_service
 from make_sample_deck import build as build_sample_deck
 from tests.conftest import sign_in
@@ -33,7 +33,7 @@ pytestmark = pytest.mark.skipif(
 async def _pillow_render(session_id: str, pptx_relative_path: str) -> list[Path]:
     slides_dir = storage_service.ensure_session_dirs(session_id)["slides"]
     paths = []
-    for i, text in enumerate(slide_processor.extract_slide_texts(pptx_relative_path), start=1):
+    for i, text in enumerate(slide_processor.slide_texts(pptx_relative_path), start=1):
         img = Image.new("RGB", (1920, 1080), "white")
         ImageDraw.Draw(img).multiline_text((100, 100), text, fill="black")
         path = slides_dir / f"slide_{i}.png"
@@ -61,7 +61,7 @@ def _tone_wav(pattern: list[tuple[float, bool]]) -> bytes:
 @pytest.fixture
 async def client(monkeypatch):
     if not (shutil.which(settings.libreoffice_bin) and shutil.which("pdftoppm")):
-        monkeypatch.setattr(pipeline.slide_processor, "convert_pptx_to_pngs", _pillow_render)
+        monkeypatch.setattr(slide_processor, "render_slides", _pillow_render)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)

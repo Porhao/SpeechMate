@@ -7,9 +7,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from app.config import settings
+from app.config import DEFAULT_SECRET_KEY, settings
 from app.routers import assistant, auth, conversation, health, impromptu, live, notifications, sessions
-from app.services import tasks
+from app.services import deck_pipeline, tasks
+from app.services.live import pipeline as live_pipeline
 
 # Configure logging
 logging.basicConfig(
@@ -22,9 +23,10 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.secret_key == "change-me-in-production":
+    if settings.secret_key == DEFAULT_SECRET_KEY:
         logging.getLogger(__name__).warning("SECRET_KEY is the default — set a real one in .env before deploying")
-    await tasks.fail_interrupted_jobs()
+    await deck_pipeline.recover_after_restart()
+    await live_pipeline.recover_after_restart()
     yield
     await tasks.wait_for_all(timeout=10)
 

@@ -2,16 +2,15 @@
 recording and run the multimodal analysis."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import and_, delete, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, require_cloud_consent
+from app.auth import get_current_user, get_owned, require_cloud_consent
 from app.database import get_db
-from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
+from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, NEVER_USED, LiveSession, results_link
 from app.models.notification import Notification
 from app.models.session import Session as Deck
 from app.models.user import User
@@ -22,16 +21,14 @@ from app.schemas.live import (
     LiveStartRequest,
     PracticePlan,
 )
-from app.services import practice_plans, tasks
-from app.services.learner import learner_brief
+from app.services import decks, documents, plans, tasks
+from app.services.learner import first_name, learner_brief
 from app.services.live.pipeline import run_live_analysis
-from app.limits import MB, rate_limit, read_limited
-from app.services.storage import storage_service
-from app.routers.sessions import deck_slides
+from app.limits import MB, rate_limit, read_limited, save_limited
+from app.services.storage import live_folder, storage_service
 
 router = APIRouter(tags=["live sessions"])
 
-LIVE_STORAGE_PREFIX = "live"
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".m4a", ".webm", ".ogg", ".oga", ".flac", ".aac", ".mp4", ".mov"}
 
 
@@ -61,21 +58,8 @@ def _to_response(s: LiveSession) -> LiveSessionResponse:
     )
 
 
-async def _own_session(db: AsyncSession, user: User, live_id: uuid.UUID) -> LiveSession:
-    s = (await db.execute(
-        select(LiveSession).where(LiveSession.id == live_id, LiveSession.user_id == user.id)
-    )).scalar_one_or_none()
-    if not s:
-        raise HTTPException(status_code=404, detail="Live session not found")
-    return s
-
-
 MAX_RESUME_BYTES = 5 * MB
 MAX_RECORDING_BYTES = 500 * MB  # ~25 min of 720p webm; recordings stream to disk, never into memory
-
-
-def _first_name(user: User) -> str | None:
-    return (user.full_name or "").split(" ")[0] or None
 
 
 @router.post("/interview/resume", dependencies=[Depends(rate_limit("resume", 10))])
@@ -87,30 +71,27 @@ async def read_resume(
     Nothing is stored here; the text is saved only with the interview session it's used in."""
     data = await read_limited(file, MAX_RESUME_BYTES, "The resume")
     try:
-        text = practice_plans.extract_resume_text(data, file.filename or "")
+        text = documents.extract_resume_text(data, file.filename or "")
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return {"text": text, "chars": len(text)}
+    return {"text": text}
 
 
 @router.post("/interview/plan", response_model=PracticePlan, dependencies=[Depends(rate_limit("plan", 6))])
 async def interview_plan(body: InterviewSetup, user: User = Depends(require_cloud_consent)):
     """Curate the mock-interview questions from the candidate's setup (and resume) for preview."""
-    return await practice_plans.build_interview_plan(body.model_dump(exclude_none=True), _first_name(user), learner_brief(user))
+    return await plans.build_interview_plan(body.model_dump(exclude_none=True), first_name(user), learner_brief(user))
 
 
-async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: str = "qa", use_script: bool = False) -> dict:
-    deck = await db.get(Deck, deck_id)
-    if not deck or (deck.user_id is not None and deck.user_id != user.id):
-        raise HTTPException(status_code=404, detail="Deck not found")
+async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: str, use_script: bool) -> dict:
+    deck = await get_owned(db, Deck, deck_id, user, "Deck")
     if not deck.insights:
         raise HTTPException(status_code=409, detail="This deck hasn't been analysed yet: wait for its insights first")
-    title = deck.original_filename.rsplit(".", 1)[0]
-    base = {"deck_id": str(deck.id), "deck_title": title, "deck_summary": deck.insights.get("summary", ""),
+    base = {"deck_id": str(deck.id), "deck_title": decks.title(deck), "deck_summary": deck.insights.get("summary", ""),
             "audience": deck.requirement_prompt}
     if mode == "talk":
         # What each slide is about, to check the talk against; with the script, what it planned too
-        slides = await deck_slides(db, deck)
+        slides = await decks.slides(db, deck)
         if use_script:
             if not deck.script:
                 raise HTTPException(status_code=409, detail="Write a script for this deck first")
@@ -119,12 +100,7 @@ async def _deck_context(db: AsyncSession, user: User, deck_id: uuid.UUID, mode: 
                 if p := plan.get(s["index"]):
                     s.update(script=p["text"], budget_sec=p["seconds"])
         return {**base, "kind": "talk", "slides": slides, **({"script": True} if use_script else {})}
-    # Built once (normally by the deck pipeline, right after the insights) and reused for every rehearsal
-    plan = deck.insights.get("qa_plan")
-    if not plan:
-        plan = await practice_plans.build_qa_plan(title, deck.insights, deck.requirement_prompt, learner_brief(user))
-        deck.insights = {**deck.insights, "qa_plan": plan}
-    return {**base, "kind": "qa", "plan": plan}
+    return {**base, "kind": "qa", "plan": await decks.qa_plan(deck, learner_brief(user))}
 
 
 @router.post("/live", response_model=LiveSessionResponse, status_code=201)
@@ -139,8 +115,8 @@ async def start_live_session(
             raise HTTPException(status_code=422, detail="Tell us about the interview first (position, background…)")
         setup = body.interview.model_dump(exclude_none=True)
         resume_text = setup.pop("resume_text", None)
-        plan = body.plan.model_dump() if body.plan else await practice_plans.build_interview_plan(
-            {**setup, **({"resume_text": resume_text} if resume_text else {})}, _first_name(user), learner_brief(user))
+        plan = body.plan.model_dump() if body.plan else await plans.build_interview_plan(
+            {**setup, **({"resume_text": resume_text} if resume_text else {})}, first_name(user), learner_brief(user))
         context = {"setup": setup, "resume_text": resume_text, "plan": plan}
     elif body.session_type == "Presentation":
         if not body.deck_id:
@@ -175,16 +151,8 @@ def _summary(s: LiveSession) -> LiveSessionResponse:
 @router.get("/live", response_model=list[LiveSessionResponse])
 async def list_live_sessions(deck_id: uuid.UUID | None = None, user: User = Depends(get_current_user),
                              db: AsyncSession = Depends(get_db)):
-    """The user's live sessions as summaries, most recent first; `deck_id` keeps one deck's attempts."""
-    # A row is created as soon as the practice page opens. One that was never ended (no duration,
-    # no recording) is not an attempt: it stays out of the lists and is removed after a day.
-    never_used = and_(LiveSession.status == "active", LiveSession.duration_sec == 0,
-                      LiveSession.recording_storage_path.is_(None))
-    await db.execute(delete(LiveSession).where(
-        LiveSession.user_id == user.id, never_used,
-        LiveSession.created_at < datetime.now(timezone.utc) - timedelta(days=1)))
-    await db.commit()
-    q = select(LiveSession).where(LiveSession.user_id == user.id, ~never_used)
+    """The user's attempts as summaries, most recent first; `deck_id` keeps one deck's attempts."""
+    q = select(LiveSession).where(LiveSession.user_id == user.id, ~NEVER_USED)
     if deck_id:
         q = q.where(LiveSession.context["deck_id"].as_string() == str(deck_id))
     result = await db.execute(q.order_by(LiveSession.created_at.desc()))
@@ -196,7 +164,7 @@ async def get_live_session(
     live_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Poll here after requesting analysis; `analysis` appears once status is `complete`."""
-    return _to_response(await _own_session(db, user, live_id))
+    return _to_response(await get_owned(db, LiveSession, live_id, user, "Live session"))
 
 
 @router.post("/live/{live_id}/end", response_model=LiveSessionResponse)
@@ -206,12 +174,12 @@ async def end_live_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    s = await _own_session(db, user, live_id)
+    s = await get_owned(db, LiveSession, live_id, user, "Live session")
     s.duration_sec = body.duration_sec
     if body.turns:
         s.turns = [t.model_dump() for t in body.turns]
     if body.client_metrics:
-        s.client_metrics = body.client_metrics
+        s.client_metrics = body.client_metrics.model_dump()
     await db.commit()
     return _to_response(s)
 
@@ -223,12 +191,13 @@ async def upload_recording(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    s = await _own_session(db, user, live_id)
+    s = await get_owned(db, LiveSession, live_id, user, "Live session")
     if s.status in LIVE_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="This session is being analysed")
     ext = audio_extension(file.filename)
-    s.recording_storage_path = await storage_service.save_upload_limited(
-        f"{LIVE_STORAGE_PREFIX}/{live_id}", f"recording{ext}", file, MAX_RECORDING_BYTES, "The recording"
+    path = storage_service.path(live_folder(live_id), f"recording{ext}")
+    await save_limited(file, path, MAX_RECORDING_BYTES, "The recording")
+    s.recording_storage_path = storage_service.relative(path
     )
     await db.commit()
     return _to_response(s)
@@ -239,7 +208,7 @@ async def analyze_live_session(
     live_id: uuid.UUID, user: User = Depends(require_cloud_consent), db: AsyncSession = Depends(get_db)
 ):
     """Start the multimodal analysis in the background; poll GET /live/{id}."""
-    s = await _own_session(db, user, live_id)
+    s = await get_owned(db, LiveSession, live_id, user, "Live session")
     if not s.recording_storage_path:
         raise HTTPException(status_code=409, detail="Upload the recording before analysing")
     if s.status in LIVE_IN_PROGRESS_STATUSES:
@@ -254,12 +223,12 @@ async def analyze_live_session(
 async def delete_live_session(
     live_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
-    s = await _own_session(db, user, live_id)
+    s = await get_owned(db, LiveSession, live_id, user, "Live session")
     if s.status in LIVE_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="Wait for the analysis to finish before deleting")
     await db.delete(s)
     # Its notifications ("results are ready", "analysis failed") would open a page that's gone
-    await db.execute(delete(Notification).where(Notification.user_id == user.id, Notification.link == f"/results/{live_id}"))
+    await db.execute(delete(Notification).where(Notification.user_id == user.id, Notification.link == results_link(live_id)))
     await db.commit()
-    storage_service.delete_session(f"{LIVE_STORAGE_PREFIX}/{live_id}")
+    storage_service.delete_folder(live_folder(live_id))
 

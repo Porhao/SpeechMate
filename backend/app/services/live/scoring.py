@@ -1,12 +1,13 @@
-"""Cross-modal scoring for live sessions: confidence and the overall communication
-score (recommendations are in coaching.py).
+"""Cross-modal scoring for live sessions: perceived confidence and the overall communication score.
 
-Any input can be None (its model wasn't available). Weighted combinations are
-renormalised over the inputs that exist, and recommendations only use metrics
-that were actually measured.
+Any input can be None (its model wasn't available). Weighted combinations are renormalised over the
+inputs that exist. Each metric's own 0-100 rule is in rules.py.
 """
 
 from dataclasses import dataclass
+
+from app.services.live import rules
+from app.services.live.rules import clamp
 
 
 def _weighted(parts: list[tuple[float | None, float]]) -> float | None:
@@ -16,17 +17,13 @@ def _weighted(parts: list[tuple[float | None, float]]) -> float | None:
     return sum(v * w for v, w in present) / sum(w for _, w in present)
 
 
-def _clamp(v: float) -> float:
-    return max(0.0, min(100.0, v))
-
-
 # ── Confidence ──────────────────────────────────────────────────────────────
 # "Confidence" can't be measured directly; what we can measure is how confident someone
 # *comes across*, from cues listeners are known to react to: steady pace, few hesitations,
 # repetitions and fillers, a quick start to answers, a relaxed face, an upright and steady
 # posture, and looking at the camera. Each cue gets a 0-100 score from a plain rule (below),
 # then a weighted average over the cues that were measured. The weights are a reasoned
-# starting point, not fitted: calibrate them against human ratings (see docs/confidence-model.md).
+# starting point, not fitted: calibrate them against human ratings (see backend/docs/confidence-model.md).
 
 CONFIDENCE_CUES = {
     # key: (label, channel, weight)
@@ -52,12 +49,7 @@ class ConfidenceResult:
     body_confidence: float | None     # posture, stability, eye contact
     label: str                        # High / Medium / Low
     coverage: float = 1.0             # share of the cue weight that was actually measured (0-1)
-    cues: list[dict] | None = None    # [{key, label, channel, weight, value, score}] for the breakdown
-
-
-def _pace_score(wpm: float) -> float:
-    """120-160 wpm sounds natural; rushing or dragging both read as nerves."""
-    return _clamp(100 - max(0.0, 120 - wpm, wpm - 160) * 1.5)
+    cues: list[dict] | None = None    # [{key, label, channel, weight, value, score, status}] for the breakdown
 
 
 def confidence_cue_scores(
@@ -80,27 +72,27 @@ def confidence_cue_scores(
     per_min = lambda n: n / talk_minutes if n is not None and talk_minutes and talk_minutes > 0.1 else None  # noqa: E731
     out: dict[str, tuple[float, float]] = {}
     if speaking_rate:
-        out["pace"] = (speaking_rate, _pace_score(speaking_rate))
+        out["pace"] = (speaking_rate, rules.pace_score(speaking_rate))
     if (r := per_min(pause_frequency)) is not None:
-        out["pauses"] = (r, _clamp(100 - max(0.0, r - 20) * 4))       # 0.25 s+ pauses: ~15-20 a minute is normal speech
+        out["pauses"] = (r, clamp(100 - max(0.0, r - 20) * 4))       # 0.25 s+ pauses: ~15-20 a minute is normal speech
     if (r := per_min(repetition_count)) is not None:
-        out["repetitions"] = (r, _clamp(100 - r * 15))               # "I I think": each one per minute costs 15
+        out["repetitions"] = (r, clamp(100 - r * 15))               # "I I think": each one per minute costs 15
     if (r := per_min(block_count)) is not None:
-        out["blocks"] = (r, _clamp(100 - r * 25))                    # 1.2-3 s silences mid-answer, stretched sounds
+        out["blocks"] = (r, clamp(100 - r * 25))                    # 1.2-3 s silences mid-answer, stretched sounds
     if fillers_per_minute is not None:
-        out["fillers"] = (fillers_per_minute, _clamp(100 - max(0.0, fillers_per_minute - 2) * 10))  # 1-2/min unnoticed
+        out["fillers"] = (fillers_per_minute, rules.filler_score(fillers_per_minute))
     if response_latency_sec is not None:
-        out["response"] = (response_latency_sec, _clamp(100 - max(0.0, response_latency_sec - 1.5) * 12))
+        out["response"] = (response_latency_sec, rules.latency_score(response_latency_sec))
     if emotion_confidence is not None:
-        out["expression"] = (emotion_confidence, _clamp(emotion_confidence))
+        out["expression"] = (emotion_confidence, clamp(emotion_confidence))
     if facial_tension is not None:
-        out["relaxed"] = (facial_tension, _clamp(100 - facial_tension))
+        out["relaxed"] = (facial_tension, clamp(100 - facial_tension))
     if posture_score is not None:
-        out["posture"] = (posture_score, _clamp(posture_score))
+        out["posture"] = (posture_score, clamp(posture_score))
     if body_stability is not None:
-        out["stability"] = (body_stability, _clamp(body_stability))
+        out["stability"] = (body_stability, clamp(body_stability))
     if eye_contact_score is not None:
-        out["eye_contact"] = (eye_contact_score, _clamp(eye_contact_score))
+        out["eye_contact"] = (eye_contact_score, clamp(eye_contact_score))
     return out
 
 
@@ -135,7 +127,7 @@ def estimate_confidence(**measured) -> ConfidenceResult | None:
         label="High" if score >= 75 else "Medium" if score >= 50 else "Low",
         coverage=round(coverage, 2),
         cues=[{"key": k, "label": CONFIDENCE_CUES[k][0], "channel": CONFIDENCE_CUES[k][1], "weight": CONFIDENCE_CUES[k][2],
-               "value": round(v, 2), "score": round(sc, 1)} for k, (v, sc) in scored.items()],
+               "value": round(v, 2), "score": round(sc, 1), "status": rules.status(sc)} for k, (v, sc) in scored.items()],
     )
 
 

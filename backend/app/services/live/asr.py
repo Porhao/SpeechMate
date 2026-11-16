@@ -11,12 +11,9 @@ from pathlib import Path
 
 from app.config import settings
 from app.services.ai import get_openai_client, with_retries
-from app.services.media import run_command
+from app.services.live.audio import to_flac
 
 logger = logging.getLogger(__name__)
-
-# OpenAI returns full language names in verbose_json
-_LANGUAGE_CODES = {"english": "en", "malay": "ms", "indonesian": "id", "chinese": "zh", "tamil": "ta"}
 
 # Whisper tends to "clean up" disfluencies. A prompt written with fillers
 # nudges it to transcribe them verbatim, which the filler metric depends on;
@@ -27,8 +24,6 @@ VERBATIM_PROMPT = "Umm, okay lah, so, uh, macam this week saya busy sikit, you k
 @dataclass
 class ASRResult:
     transcript: str
-    language: str
-    confidence: float
     engine: str
     word_timestamps: list[dict] = field(default_factory=list)  # [{word, start, end}]
 
@@ -84,14 +79,6 @@ def _seg(segment, key):
     return segment.get(key) if isinstance(segment, dict) else getattr(segment, key, None)
 
 
-async def to_flac(wav: Path) -> Path:
-    """Lossless FLAC copy for upload: about a third of the WAV size (measured 2.1 vs 6.0 MB for
-    3 min), so the 25 MB upload limit allows ~37 min of speech instead of ~13."""
-    out = wav.with_suffix(".flac")
-    await run_command([settings.ffmpeg_bin, "-y", "-hide_banner", "-loglevel", "error", "-i", str(wav), "-c:a", "flac", str(out)])
-    return out
-
-
 def stt_language() -> str | None:
     """Language to force on transcription (STT_LANGUAGE); None = auto-detect, which keeps Manglish as spoken."""
     return settings.stt_language if settings.stt_language not in ("", "auto") else None
@@ -118,15 +105,12 @@ async def _transcribe_openai(wav: Path, language: str | None = None) -> ASRResul
                 timestamp_granularities=["word", "segment"],
                 **({"language": language} if language else {}),
             )
-        detected = (getattr(resp, "language", None) or "english").lower()
         text, spans = keep_speech(resp.text, getattr(resp, "segments", None))
         words = [{"word": w.word.strip(), "start": w.start, "end": w.end} for w in (getattr(resp, "words", None) or [])]
         if getattr(resp, "segments", None):  # word timings of dropped segments go too
             words = [w for w in words if any(s - 0.05 <= w["start"] <= e + 0.05 for s, e in spans)]
         return ASRResult(
             transcript=text,
-            language=_LANGUAGE_CODES.get(detected.split(" (")[0], detected[:2]),   # "malay (macrolanguage)" → ms
-            confidence=1.0,
             engine=f"openai:{settings.transcription_model}",
             word_timestamps=words,
         )
@@ -137,7 +121,7 @@ async def _transcribe_openai(wav: Path, language: str | None = None) -> ASRResul
                 model=settings.transcription_model, file=f, prompt=VERBATIM_PROMPT
             )
         return ASRResult(
-            transcript=keep_speech(resp.text, None)[0], language="en", confidence=1.0,
+            transcript=keep_speech(resp.text, None)[0],
             engine=f"openai:{settings.transcription_model}",
         )
 

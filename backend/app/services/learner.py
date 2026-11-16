@@ -25,6 +25,10 @@ STYLE_GUIDE = {
 }
 
 
+def first_name(user: User) -> str | None:
+    return (user.full_name or "").split()[0] if (user.full_name or "").strip() else None
+
+
 def learner_brief(user: User | None) -> str:
     """'About the learner: …' for a system prompt, or '' when the profile is empty."""
     if user is None:

@@ -2,11 +2,12 @@
 
 import { CheckCircle2, Circle, Loader2, XCircle, RotateCcw } from "lucide-react";
 import type { DeckStatusResponse } from "@/types";
+import { PREP_STEPS } from "@/lib/deckPipeline";
 
-// Named steps map 1:1 to the deck preparation's status values (services/pipeline.py).
+// Named steps map 1:1 to the deck preparation's status values (backend/app/services/deck_pipeline.py).
 const STEPS = [
-  { status: "processing_slides", label: "Reading your slides", counted: true },
-  { status: "analyzing_content", label: "Understanding them: summary, key points, Q&A questions", counted: false },
+  { status: "processing_slides", label: PREP_STEPS.reading, counted: true },
+  { status: "analyzing_content", label: PREP_STEPS.understanding, counted: false },
 ] as const;
 
 export default function GenerationProgress({

@@ -3,7 +3,7 @@
 The time each slide gets is decided here (content-weighted), not by the LLM, so the plan always
 adds up to the requested length; the LLM writes each slide's part to that word budget, from the
 slide's own text and key point. Names and figures that aren't in the deck are sent back once
-(practice_plans.invented_terms). Without an LLM the script is the key point plus the slide's lines.
+(text.invented_terms). Without an LLM the script is the key point plus the slide's lines.
 
 Two styles: "full" (word for word, to practise reading then loosen) and "points" (an opening line,
 2-3 talking points and a transition). The learner brief (services/learner.py) sets the level.
@@ -14,9 +14,9 @@ from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
-from app.services.ai import with_retries
+from app.services.ai import llm_json
 from app.services.learner import with_brief
-from app.services.practice_plans import _llm_json, invented_terms
+from app.services.text import invented_terms
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +89,7 @@ async def write_script(slides: list[dict], minutes: float, style: str, audience:
                 "with an example or why it matters, still using only the slides' facts") if short else None
 
     try:
-        # Gemini sometimes answers "503 high demand" for a moment: try again before falling back
-        result = await with_retries(lambda: _llm_json(with_brief(SYSTEM, learner), payload, _Script, temperature=0.5, check=check, tries=3),
-                                    attempts=3, label="Script writer")
+        result = await llm_json(with_brief(SYSTEM, learner), payload, _Script, temperature=0.5, check=check, tries=3)
     except Exception as e:  # noqa: BLE001
         logger.error("Script writer failed: %s", e)
         result = None

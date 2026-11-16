@@ -3,12 +3,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import get_current_user, get_owned
 from app.database import get_db
 from app.models.notification import Notification
 from app.models.user import User
@@ -51,11 +51,7 @@ async def list_notifications(user: User = Depends(get_current_user), db: AsyncSe
 
 @router.post("/{notification_id}/read", response_model=NotificationOut)
 async def mark_read(notification_id: uuid.UUID, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    n = (await db.execute(
-        select(Notification).where(Notification.id == notification_id, Notification.user_id == user.id)
-    )).scalar_one_or_none()
-    if not n:
-        raise HTTPException(status_code=404, detail="Notification not found")
+    n = await get_owned(db, Notification, notification_id, user, "Notification")
     if n.read_at is None:
         n.read_at = datetime.now(timezone.utc)
         await db.commit()

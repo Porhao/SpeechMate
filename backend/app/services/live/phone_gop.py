@@ -28,7 +28,9 @@ import re
 import subprocess
 from dataclasses import dataclass
 
+from app.config import settings
 from app.services.live._ml import load_once
+from app.services.live.pronunciation import PHONE_GOP, PronunciationResult
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +106,7 @@ def tokenize_ipa(ipa: str, vocab: dict[str, int]) -> list[tuple[str, bool]] | No
 
 def _espeak(lines: list[str], voice: str) -> list[str] | None:
     try:
-        res = subprocess.run(["espeak-ng", "-q", "--ipa", "--sep=_", "-v", voice], input="\n".join(lines),
+        res = subprocess.run([settings.espeak_bin, "-q", "--ipa", "--sep=_", "-v", voice], input="\n".join(lines),
                              capture_output=True, text=True, timeout=60, check=True)
     except (OSError, subprocess.SubprocessError) as e:
         logger.warning("espeak-ng failed: %s", e)
@@ -298,5 +300,8 @@ def assess(wav_16k, word_timestamps: list[dict]) -> dict | None:
         malay += sum(1 for w in fit_en if fit_ms.get(w, 0) > fit_en[w] + MALAY_MARGIN)
     if not phones_by_word:
         return None
-    return summarise(clean, phones_by_word) | {"method": "phone-gop", "words_scored": len(phones_by_word),
-                                                "words_malay": malay, "words_skipped": len(words) - len(phones_by_word)}
+    r = summarise(clean, phones_by_word)
+    if r["score"] is None:
+        return None
+    logger.info("Phone GOP: %d words scored, %d Malay, %d skipped", len(phones_by_word), malay, len(words) - len(phones_by_word))
+    return PronunciationResult(method=PHONE_GOP, **r)

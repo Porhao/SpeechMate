@@ -10,11 +10,10 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.models.live_session import LiveSession
 from app.models.user import User
-from app.services.ai import get_llm_client
-from app.services.learner import learner_brief, with_brief
+from app.services.ai import get_llm_client, llm_text
+from app.services.learner import first_name, learner_brief, with_brief
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ Never invent their scores or sessions: use only the summary below, and say so if
 Malaysian English and mixing in Malay ("lah", "kan") are fine and never counted as errors.
 When pointing to a page, write its path exactly as listed so it becomes a link.
 
-The app (pages):
+The app (pages; the frontend's list is frontend/lib/modes.ts PRACTICE_PAGES):
 - /home: today's tasks (drills from your last reports, decks to present), recent sessions.
 - /conversation: chat with an AI partner about an everyday topic for 3-5 minutes.
 - /interview: a mock interview from your role, background and resume; feedback on every answer with a
@@ -40,6 +39,8 @@ The app (pages):
 - /presentations: upload slides (.pptx or .pdf); the AI reads them (summary, key point per slide). Then
   "Present it" (you move through your slides on camera; each slide's talk is checked against the slide) or
   "Rehearse the Q&A" (audience questions from your deck).
+- /impromptu: pick a theme, spin a random topic, research it for 5 minutes, then explain it in 1-2 minutes;
+  the result says how well you understood and explained it.
 - /script: write a talk script from a deck for a chosen number of minutes (full script or talking points),
   then "Practise this script".
 - /progress: all sessions, scores over time; each opens its report at /results/<id>.
@@ -71,7 +72,7 @@ def _session_line(s: LiveSession) -> str:
 async def _context(db: AsyncSession, user: User, page: str | None) -> str:
     rows = (await db.execute(select(LiveSession).where(LiveSession.user_id == user.id)
                              .order_by(LiveSession.created_at.desc()).limit(RECENT))).scalars().all()
-    lines = [f"The user's first name: {user.full_name.split()[0]}." if user.full_name else ""]
+    lines = [f"The user's first name: {name}." if (name := first_name(user)) else ""]
     lines.append("Their latest sessions (newest first):\n" + "\n".join(f"- {_session_line(s)}" for s in rows)
                  if rows else "They haven't done a session yet.")
     if page:
@@ -80,19 +81,10 @@ async def _context(db: AsyncSession, user: User, page: str | None) -> str:
 
 
 async def reply(db: AsyncSession, user: User, messages: list[dict], page: str | None) -> str:
-    client = get_llm_client()
-    if client is None:
+    if get_llm_client() is None:
         return ("I can't reach the AI right now, so I can only point the way: /methodology explains every score, "
                 "and /progress has all your reports.")
     system = with_brief(f"{GUIDE}\n{await _context(db, user, page)}", learner_brief(user))
     convo = [{"role": m["role"], "content": m["text"]} for m in messages[-MAX_TURNS:]]
-    try:
-        resp = await client.chat.completions.create(
-            model=settings.llm_model, messages=[{"role": "system", "content": system}, *convo],
-            temperature=0.5, max_tokens=400,
-        )
-        text = (resp.choices[0].message.content or "").strip()
-    except Exception as e:  # noqa: BLE001
-        logger.error("Mate's reply failed: %s", e)
-        text = ""
-    return text or "Sorry, I lost my train of thought there. Could you ask that again?"
+    return (await llm_text(system, convo, max_tokens=400, temperature=0.5)
+            or "Sorry, I lost my train of thought there. Could you ask that again?")

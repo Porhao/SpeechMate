@@ -10,7 +10,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ChevronRight, Loader2, MessagesSquare, PenLine, Presentation, RotateCcw } from "lucide-react";
-import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
+import { presentationService } from "@/services/presentation";
+import { DECK_IN_PROGRESS, deckTitle } from "@/lib/deckPipeline";
 import { authService } from "@/services/auth";
 import { liveService } from "@/services/live";
 import GenerationProgress from "@/components/presentation/GenerationProgress";
@@ -19,6 +20,9 @@ import SlideImage from "@/components/presentation/SlideImage";
 import { Card, Notice, statusColor } from "@/components/ui/kit";
 import type { DeckStatusResponse, LiveSession } from "@/types";
 import { formatDateTime, formatDuration } from "@/lib/format";
+import { sessionUrl } from "@/lib/modes";
+import { overallScore, statusOf } from "@/lib/scores";
+import { requireSignIn } from "@/hooks/useAuth";
 
 const POLL_MS = 3000;
 
@@ -54,11 +58,11 @@ export default function PresentationWorkspace() {
   const keyPoints = useMemo(() => new Map((deck?.insights?.slides ?? []).map((s) => [s.slide_index, s.key_point])), [deck]);
 
   const start = async (mode: "talk" | "qa") => {
-    if (!authService.isSignedIn()) { router.push(`/login?next=/presentations/${id}`); return; }
+    if (!requireSignIn(router)) return;
     setStarting(mode); setStartError(null);
     try {
       const s = await liveService.start({ session_type: "Presentation", deck_id: id, presentation_mode: mode });
-      router.push(`/session?mode=Presentation&live=${s.id}`);
+      router.push(sessionUrl("Presentation", { live: s.id }));
     } catch (e) {
       setStartError(e instanceof Error ? e.message : "Couldn't start the session");
       setStarting(null);
@@ -92,7 +96,7 @@ export default function PresentationWorkspace() {
         </Link>
         {/* min width: on a phone the action pills wrap below instead of squeezing the title away */}
         <div className="flex-1 min-w-[200px]">
-          <h1 className="font-display text-2xl sm:text-3xl truncate" style={{ color: "var(--ink)" }}>{deck.original_filename.replace(/\.(pptx|pdf)$/i, "")}</h1>
+          <h1 className="font-display text-2xl sm:text-3xl truncate" style={{ color: "var(--ink)" }}>{deckTitle(deck.original_filename)}</h1>
           <p className="text-sm" style={{ color: "var(--muted)" }}>
             {deck.slide_count ? `${deck.slide_count} slides` : "Presentation"}
             {deck.insights?.stats && ` · aim for about ${deck.insights.stats.estimated_minutes[0]}–${deck.insights.stats.estimated_minutes[1]} min`}
@@ -182,13 +186,13 @@ export default function PresentationWorkspace() {
             <Card title="Your attempts on this deck">
               <ul className="divide-y divide-[var(--line-2)]">
                 {attempts.map((s) => {
-                  const score = s.analysis?.communication_score.overall_score;
+                  const score = overallScore(s.analysis);
                   const talk = s.context?.kind === "talk";
                   return (
                     <li key={s.id}>
                       <Link href={`/results/${s.id}`} className="flex items-center gap-4 py-3 group">
                         <span className="w-10 text-center font-display text-xl tabular-nums"
-                          style={{ color: score != null ? statusColor(score >= 75 ? "good" : score >= 55 ? "ok" : "work") : "var(--faint)" }}>
+                          style={{ color: score != null ? statusColor(statusOf(score)) : "var(--faint)" }}>
                           {score != null ? Math.round(score) : "—"}
                         </span>
                         <span className="flex-1 min-w-0">

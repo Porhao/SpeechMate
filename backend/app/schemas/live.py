@@ -6,8 +6,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# The three practice functions. "Presentation" is the Q&A rehearsal on an uploaded deck.
-SESSION_TYPES = ("Conversation", "Interview", "Presentation")
+# The recorded practice functions ("Presentation" = talk or Q&A on an uploaded deck); the frontend's
+# SessionType (frontend/types/index.ts) lists the same three.
+SessionType = Literal["Conversation", "Interview", "Presentation"]
+MAX_RESUME_CHARS = 8000
 
 
 class InterviewSetup(BaseModel):
@@ -19,7 +21,7 @@ class InterviewSetup(BaseModel):
     interview_type: Literal["behavioural", "technical", "mixed"] = "mixed"
     background: str | None = Field(default=None, max_length=2000)
     job_description: str | None = Field(default=None, max_length=4000)
-    resume_text: str | None = Field(default=None, max_length=8000)
+    resume_text: str | None = Field(default=None, max_length=MAX_RESUME_CHARS)
 
 
 class PlanQuestion(BaseModel):
@@ -36,7 +38,7 @@ class PracticePlan(BaseModel):
 
 
 class LiveStartRequest(BaseModel):
-    session_type: Literal["Conversation", "Interview", "Presentation"]
+    session_type: SessionType
     topic: str | None = Field(default=None, max_length=200)
     # Interview: the setup, plus the plan the user previewed (built here if omitted)
     interview: InterviewSetup | None = None
@@ -55,11 +57,22 @@ class Turn(BaseModel):
     t_sec: float | None = None
 
 
+class SlideTime(BaseModel):
+    slide_index: int
+    t_sec: float  # on the recording's clock (clamped by live/talk.py)
+
+
+class ClientMetrics(BaseModel):
+    """What only the browser can measure (frontend/app/(app)/session/page.tsx sends it at the end)."""
+    response_latency_sec: list[float] = Field(default=[], max_length=500)  # end of the AI's turn → first sound
+    stt_audio_sec: list[float] = Field(default=[], max_length=500)          # each live turn sent to speech recognition
+    slide_times: list[SlideTime] = Field(default=[], max_length=2000)       # talk mode: when each slide came up
+
+
 class LiveEndRequest(BaseModel):
     duration_sec: int = Field(ge=0)
     turns: list[Turn] = Field(default=[], max_length=200)
-    # Browser-side measurements, e.g. {"gaze_tunneling": 0.42, "response_latency_sec": [1.2, 0.8]}
-    client_metrics: dict | None = None
+    client_metrics: ClientMetrics | None = None
 
 
 class LiveSessionResponse(BaseModel):
@@ -82,13 +95,12 @@ class ConversationMessage(BaseModel):
 
 
 class ConversationRequest(BaseModel):
-    messages: list[ConversationMessage]
-    mode: str = "Conversation"
+    messages: list[ConversationMessage] = Field(max_length=50)  # the partner reads the last 12
+    mode: SessionType = "Conversation"
     topic: str | None = None
     # A planned Interview / Presentation Q&A session: the partner follows its question plan
     live_id: uuid.UUID | None = None
 
 
 class TTSRequest(BaseModel):
-    text: str = Field(min_length=1)
-    voice: str | None = None
+    text: str = Field(min_length=1, max_length=4096)

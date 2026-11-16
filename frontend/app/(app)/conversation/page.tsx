@@ -6,9 +6,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Coffee, Globe2, GraduationCap, MessageCircle, Shuffle, Sparkles, Users } from "lucide-react";
-import { authService } from "@/services/auth";
 import ClayArt from "@/components/three/ClayArt";
 import { Button, Card, Field, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
+import { sessionUrl } from "@/lib/modes";
+import { requireSignIn } from "@/hooks/useAuth";
 
 const SCENARIOS = [
   { icon: MessageCircle, title: "Your week", topic: "Catching up: what happened in your week and what you're looking forward to" },
@@ -34,8 +35,8 @@ export default function ConversationPage() {
   const chosen = custom.trim() || topic;
   const start = () => {
     // Sessions are only recorded and analysed when signed in: ask before, not after, the talk
-    if (!authService.isSignedIn()) { router.push("/login?next=/conversation"); return; }
-    router.push(`/session?mode=Conversation&topic=${encodeURIComponent(chosen)}`);
+    if (!requireSignIn(router)) return;
+    router.push(sessionUrl("Conversation", { topic: chosen }));
   };
 
   return (

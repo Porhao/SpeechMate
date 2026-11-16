@@ -1,57 +1,45 @@
-"""Local file storage service.
-
-Abstracts file I/O so we can swap to S3/Supabase Storage later
-without changing callers.
-"""
+"""Local file storage: one folder per deck (its upload and slide images) and per live session
+(its recording and analysis work files), under STORAGE_BASE_PATH. Rows store paths relative to it."""
 
 import shutil
+import uuid
 from pathlib import Path
 
 from app.config import settings
 
 
+def deck_folder(deck_id: uuid.UUID | str) -> str:
+    return str(deck_id)
+
+
+def live_folder(live_id: uuid.UUID | str) -> str:
+    return f"live/{live_id}"
+
+
 class StorageService:
-    """Manages file storage for decks (upload, slide PNGs) and live-session recordings."""
+    def __init__(self):
+        self.base_path = Path(settings.storage_base_path).resolve()
 
-    def __init__(self, base_path: str | None = None):
-        self.base_path = Path(base_path or settings.storage_base_path).resolve()
+    def path(self, folder: str, filename: str = "") -> Path:
+        """Absolute path of a file (or, without `filename`, the folder) in `folder`."""
+        return self.base_path / folder / filename if filename else self.base_path / folder
 
-    def _session_dir(self, session_id: str) -> Path:
-        return self.base_path / session_id
-
-    def ensure_session_dirs(self, session_id: str) -> dict[str, Path]:
-        """Create the per-session directory structure and return paths."""
-        session_dir = self._session_dir(session_id)
-        dirs = {
-            "root": session_dir,
-            "slides": session_dir / "slides",
-        }
+    def ensure_session_dirs(self, folder: str) -> dict[str, Path]:
+        """Create a deck folder and its slides/ subfolder."""
+        dirs = {"root": self.path(folder), "slides": self.path(folder, "slides")}
         for d in dirs.values():
             d.mkdir(parents=True, exist_ok=True)
         return dirs
 
-    async def save_upload_limited(self, session_id: str, filename: str, file, max_bytes: int, what: str) -> str:
-        """Stream an UploadFile to storage with a size cap (413 above it); returns the relative path."""
-        from app.limits import save_limited
-
-        file_path = self._session_dir(session_id) / filename
-        await save_limited(file, file_path, max_bytes, what)
-        return self.relative(file_path)
-
     def relative(self, path: Path) -> str:
-        """Convert an absolute path under the storage root to a storage-relative path."""
         return path.relative_to(self.base_path).as_posix()
 
     def get_absolute_path(self, relative_path: str) -> Path:
-        """Convert a storage-relative path to an absolute path."""
         return self.base_path / relative_path
 
-    def delete_session(self, session_id: str) -> None:
-        """Remove all stored files for a session."""
-        session_dir = self._session_dir(session_id)
-        if session_dir.exists():
-            shutil.rmtree(session_dir)
+    def delete_folder(self, folder: str) -> None:
+        if (d := self.path(folder)).exists():
+            shutil.rmtree(d)
 
 
-# Module-level singleton
 storage_service = StorageService()

@@ -14,6 +14,8 @@ import TaskList from "@/components/home/TaskList";
 import { presentationService } from "@/services/presentation";
 import type { DeckListItem, LiveSession } from "@/types";
 import { formatDay } from "@/lib/format";
+import { sessionLabel } from "@/lib/modes";
+import { overallScore } from "@/lib/scores";
 
 const FUNCTIONS = [
   {
@@ -46,12 +48,8 @@ const FUNCTIONS = [
   },
 ] as const;
 
-const TYPE_LABEL: Record<string, string> = { Conversation: "Conversation", Interview: "Mock interview", Presentation: "Presentation Q&A", Pronunciation: "Pronunciation" };
 
-function score(s: LiveSession) {
-  const v = s.analysis?.communication_score.overall_score;
-  return v != null ? Math.round(v) : null;
-}
+const score = (s: LiveSession) => overallScore(s.analysis);
 
 export default function HomePage() {
   const { user } = useUserStore();
@@ -142,7 +140,7 @@ export default function HomePage() {
                 <li key={s.id}>
                   <Link href={`/results/${s.id}`} className="flex items-center gap-3 py-2.5">
                     <span className="w-9 font-display text-lg tabular-nums" style={{ color: score(s) != null ? "var(--ink)" : "var(--faint)" }}>{score(s) ?? "—"}</span>
-                    <span className="flex-1 text-sm truncate" style={{ color: "var(--ink-2)" }}>{s.context?.kind === "talk" ? "Presentation" : TYPE_LABEL[s.session_type] ?? s.session_type}</span>
+                    <span className="flex-1 text-sm truncate" style={{ color: "var(--ink-2)" }}>{sessionLabel(s)}</span>
                     <span className="text-xs" style={{ color: "var(--muted)" }}>{formatDay(s.created_at)}</span>
                   </Link>
                 </li>

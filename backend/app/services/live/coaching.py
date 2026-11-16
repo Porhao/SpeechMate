@@ -11,14 +11,14 @@ goal and session type) — but only from these measured candidates, so it can't 
 an issue that wasn't observed. Otherwise the ranked rule-based list is used as-is.
 """
 
-import json
 import logging
 from dataclasses import asdict, dataclass, field
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
-from app.config import settings
-from app.services.ai import get_llm_client, parse_json_object
+from app.services.ai import llm_json
+from app.services.live import rules
+from app.services.live.speech import BLOCK_MIN_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, x))
 
 
-def _trend(name: str, now: float | None, before: float | None, lower_is_better: bool, unit: str = "") -> str:
+def _trend(now: float | None, before: float | None, lower_is_better: bool, unit: str = "") -> str:
     if now is None or before is None:
         return ""
     better = now < before if lower_is_better else now > before
@@ -102,25 +102,26 @@ def build_candidates(
     # ── Pace ──
     if fluency and fluency.get("speaking_rate"):
         wpm = fluency["speaking_rate"]
-        trend = _trend("pace", wpm, prev_speech.get("speaking_rate"), lower_is_better=wpm > 160, unit=" wpm")
-        if wpm > 165:
+        lo, hi = rules.PACE_WPM
+        trend = _trend(wpm, prev_speech.get("speaking_rate"), lower_is_better=wpm > hi, unit=" wpm")
+        if wpm > hi + 5:  # a little past the range before it's worth a drill
             out.append(Recommendation(
                 "pace", "Slow down your delivery",
-                f"You spoke at {wpm:.0f} words per minute; 120–160 is easy to follow.{trend}",
+                f"You spoke at {wpm:.0f} words per minute; {lo}–{hi} is easy to follow.{trend}",
                 "At this speed listeners miss key points and you have no room to breathe or emphasise.",
                 "Take a 6-sentence paragraph you know. Read it aloud marking a slash after every sentence and "
                 "pause one full breath at each slash. Record it twice: the second take should feel slow to you.",
                 f"Under {max(150, int(wpm - 15))} wpm next session (now {wpm:.0f}).",
-                _clamp01((wpm - 160) / 50), practice, 10))
-        elif wpm < 110:
+                _clamp01((wpm - hi) / 50), practice, 10))
+        elif wpm < lo - 10:
             out.append(Recommendation(
                 "pace", "Bring more energy to your pace",
-                f"You spoke at {wpm:.0f} words per minute; 120–160 sounds natural.{trend}",
+                f"You spoke at {wpm:.0f} words per minute; {lo}–{hi} sounds natural.{trend}",
                 "A slow pace can sound hesitant and makes it harder for listeners to stay engaged.",
                 "Pick a topic you know well and explain it in 60 seconds, then explain it again in 45 seconds "
                 "without dropping any point.",
                 f"Above {min(125, int(wpm + 15))} wpm next session (now {wpm:.0f}).",
-                _clamp01((110 - wpm) / 40), practice, 10))
+                _clamp01((lo - 10 - wpm) / 40), practice, 10))
 
     # ── Long pauses / blocks ──
     blocks = [e for e in (stutter or {}).get("detected_events", []) if e.get("type") == "Block"]
@@ -129,19 +130,19 @@ def build_candidates(
         longest = max((b.get("end_time") or 0) - (b.get("start_time") or 0) for b in blocks)
         out.append(Recommendation(
             "pauses", "Bridge long silences",
-            f"{len(blocks)} mid-sentence silence(s) of 1.2 s or more (at {times}); the longest was {longest:.1f} s.",
+            f"{len(blocks)} mid-sentence silence(s) of {BLOCK_MIN_SECONDS:g} s or more (at {times}); the longest was {longest:.1f} s.",
             "Short pauses add emphasis, but long ones mid-sentence read as losing your thread.",
             "Prepare three bridge phrases (\"The key point is…\", \"Let me put it another way…\", "
             "\"Coming back to…\"). Answer 5 practice questions and use a bridge whenever you feel a blank.",
-            f"At most {max(0, len(blocks) - 1)} silence(s) over 1.2 s next session (now {len(blocks)}).",
+            f"At most {max(0, len(blocks) - 1)} silence(s) over {BLOCK_MIN_SECONDS:g} s next session (now {len(blocks)}).",
             _clamp01(len(blocks) / 5 + longest / 8), practice, 10))
 
     # ── Fillers ──
     if fillers and fillers.get("total_fillers"):
         fpm = fillers.get("fillers_per_minute") or 0
-        if fpm >= 3:
+        if fpm >= rules.FILLERS_OK_PER_MIN + 1:
             top = ", ".join(f"“{w}” ×{n}" for w, n in list((fillers.get("filler_breakdown") or {}).items())[:3])
-            trend = _trend("fillers", fpm, prev_speech.get("filler_per_minute"), lower_is_better=True, unit="/min")
+            trend = _trend(fpm, prev_speech.get("filler_per_minute"), lower_is_better=True, unit="/min")
             out.append(Recommendation(
                 "fillers", "Swap filler words for a silent pause",
                 f"{fillers['total_fillers']} filler words ({fpm:.1f} per minute): {top}.{trend}",
@@ -149,7 +150,7 @@ def build_candidates(
                 f"Answer 3 questions for 60 seconds each. Every time you feel \"{fillers.get('top_filler', 'um')}\" "
                 "coming, close your mouth and breathe instead. Replay and tally — aim to beat your count each round.",
                 f"Under {max(1.0, round(fpm * 0.6, 1))} fillers per minute next session (now {fpm:.1f}).",
-                _clamp01((fpm - 2) / 8), practice, 10))
+                _clamp01((fpm - rules.FILLERS_OK_PER_MIN) / 8), practice, 10))
 
     # ── Repetitions ──
     reps = [e for e in (stutter or {}).get("detected_events", []) if e.get("type") == "Repetition"]
@@ -192,7 +193,7 @@ def build_candidates(
     # ── Eye contact ──
     if eye and eye.get("eye_contact_score") is not None:
         score = eye["eye_contact_score"]
-        if score < 70:
+        if score < rules.EYE_CONTACT_OK:
             away = eye.get("look_away_percentage", 100 - score)
             direction = eye.get("dominant_gaze")
             reason = {
@@ -200,7 +201,7 @@ def build_candidates(
                 "left": "mostly to the left, off-camera",
                 "right": "mostly to the right, off-camera",
             }.get(direction, "away from the camera")
-            trend = _trend("eye", score, prev_vision.get("eye_contact_score"), lower_is_better=False)
+            trend = _trend(score, prev_vision.get("eye_contact_score"), lower_is_better=False)
             out.append(Recommendation(
                 "eye_contact", "Hold eye contact with the lens",
                 f"You looked away {away:.0f}% of the time, {reason}.{trend}",
@@ -211,23 +212,23 @@ def build_candidates(
                 _clamp01((75 - score) / 50), "Presentation", 10))
 
     # ── Posture ──
-    if posture and posture.get("posture_score") is not None and posture["posture_score"] < 75:
+    if posture and posture.get("posture_score") is not None and posture["posture_score"] < rules.POSTURE_OK:
         issues = []  # older sessions lack the framing keys; a never-in-view one has None alignments
 
         def v(key: str, default: float) -> float:
             return default if posture.get(key) is None else posture[key]
 
-        if v("in_frame_pct", 100) < 80:
+        if v("in_frame_pct", 100) < rules.IN_FRAME_MIN_PCT:
             issues.append(f"shoulders out of view {100 - posture['in_frame_pct']:.0f}% of the time")
-        if v("slouched_pct", 0) >= 20:
+        if v("slouched_pct", 0) >= rules.POSTURE_ISSUE_PCT:
             issues.append(f"slumped or leaning back {posture['slouched_pct']:.0f}% of the time")
-        if v("camera_low_pct", 0) >= 20:
+        if v("camera_low_pct", 0) >= rules.POSTURE_ISSUE_PCT:
             issues.append(f"camera below eye level {posture['camera_low_pct']:.0f}% of the time")
-        if v("head_alignment", 100) < 70:
+        if v("head_alignment", 100) < rules.ALIGNMENT_MIN:
             issues.append(f"head tilted about {abs(v('tilt_angle', 0)):.0f}°")
-        if v("shoulder_alignment", 100) < 70:
+        if v("shoulder_alignment", 100) < rules.ALIGNMENT_MIN:
             issues.append("uneven shoulders")
-        if v("body_stability", 100) < 60:
+        if v("body_stability", 100) < rules.STABILITY_MIN:
             issues.append("frequent swaying")
         if issues:
             out.append(Recommendation(
@@ -241,7 +242,7 @@ def build_candidates(
                 _clamp01((80 - posture["posture_score"]) / 40), "Presentation", 5))
 
     # ── Facial tension ──
-    if emotion and emotion.get("facial_tension", 0) >= 30:
+    if emotion and emotion.get("facial_tension", 0) >= rules.TENSION_OK:
         out.append(Recommendation(
             "expression", "Relax your expression",
             f"Your face looked tense for much of the session (tension {emotion['facial_tension']:.0f}/100; "
@@ -253,28 +254,29 @@ def build_candidates(
             _clamp01((emotion["facial_tension"] - 20) / 50), practice, 5))
 
     # ── Monotone voice ──
-    if prosody and prosody.get("pitch_variation_st") is not None and prosody["pitch_variation_st"] < 2.0:
+    lo_st, hi_st = rules.PITCH_ST
+    if prosody and prosody.get("pitch_variation_st") is not None and prosody["pitch_variation_st"] < lo_st:
         st = prosody["pitch_variation_st"]
         out.append(Recommendation(
             "vocal_variety", "Add more melody to your voice",
-            f"Your pitch moved by only {st:.1f} semitones on average; 2–7 sounds lively.",
+            f"Your pitch moved by only {st:.1f} semitones on average; {lo_st:g}–{hi_st:g} sounds lively.",
             "A flat voice makes even good content sound uninterested, and listeners stop paying attention.",
             "Read a short news paragraph three times: once flat, once exaggerated like a storyteller, then "
             "in between. Lift your pitch on the key word of every sentence and drop it at the full stop.",
-            f"Vocal variety above {max(2.0, round(st + 0.7, 1))} semitones next session (now {st:.1f}).",
+            f"Vocal variety above {max(lo_st, round(st + 0.7, 1))} semitones next session (now {st:.1f}).",
             _clamp01((2.2 - st) / 1.5), practice, 5))
-    if prosody and prosody.get("loudness_dbfs") is not None and prosody["loudness_dbfs"] < -35:
+    if prosody and prosody.get("loudness_dbfs") is not None and prosody["loudness_dbfs"] < rules.QUIET_DBFS:
         out.append(Recommendation(
             "volume", "Speak up",
             f"Your voice averaged {prosody['loudness_dbfs']:.0f} dBFS, which is quiet for a microphone recording.",
             "A quiet voice is hard to follow and can come across as unsure.",
             "Sit upright, breathe from your belly, and speak as if to someone at the back of a small room. "
             "Check that the mic level bar stays in the middle while you talk.",
-            "Louder than −35 dBFS next session.",
-            _clamp01((-35 - prosody["loudness_dbfs"]) / 12), practice, 5))
+            f"Louder than −{-rules.QUIET_DBFS} dBFS next session.",
+            _clamp01((rules.QUIET_DBFS - prosody["loudness_dbfs"]) / 12), practice, 5))
 
     # ── Hedging ──
-    if language_use and language_use.get("hedges_per_100_words", 0) >= 2:
+    if language_use and language_use.get("hedges_per_100_words", 0) >= rules.HEDGES_OK_PER_100 + 1:
         h = language_use["hedges_per_100_words"]
         top = ", ".join(f"“{w}” ×{n}" for w, n in (language_use.get("top_hedges") or {}).items())
         out.append(Recommendation(
@@ -284,7 +286,7 @@ def build_candidates(
             "Record a 1-minute answer, then write it down and delete every hedge. Say the cleaned-up version "
             "aloud twice: it should sound firmer, not ruder.",
             f"Under {max(1.0, round(h * 0.6, 1))} hedges per 100 words next session (now {h:.1f}).",
-            _clamp01((h - 1) / 5), practice, 5))
+            _clamp01((h - rules.HEDGES_OK_PER_100) / 5), practice, 5))
 
     # ── Slow to respond ──
     if response_latency_sec is not None and response_latency_sec > 3:
@@ -336,8 +338,7 @@ Return JSON only: {"summary": "...", "focus": [{"area", "title", "evidence", "wh
 
 
 async def _llm_plan(candidates: list[Recommendation], context: dict) -> tuple[dict, list[Recommendation]] | None:
-    client = get_llm_client()
-    if client is None or not candidates:
+    if not candidates:
         return None
     allowed = {c.area for c in candidates}
     payload = {
@@ -347,33 +348,19 @@ async def _llm_plan(candidates: list[Recommendation], context: dict) -> tuple[di
             for c in candidates[:6]
         ],
     }
-    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
-    for _ in range(2):
-        resp = await client.chat.completions.create(
-            model=settings.llm_model, messages=messages, response_format={"type": "json_object"}, temperature=0.3
-        )
-        content = resp.choices[0].message.content or ""
-        try:
-            plan = _LLMPlan.model_validate(parse_json_object(content))
-            unknown = [i.area for i in plan.focus if i.area not in allowed]
-            if unknown:
-                raise ValueError(f"areas not in the candidates: {unknown}; use only {sorted(allowed)}")
-            by_area = {c.area: c for c in candidates}
-            items = [
-                Recommendation(
-                    i.area, i.title, i.evidence, i.why, i.drill, i.target,
-                    by_area[i.area].severity, by_area[i.area].practice_type, by_area[i.area].daily_minutes,
-                )
-                for i in plan.focus
-            ]
-            return {"summary": plan.summary}, items
-        except (ValueError, ValidationError) as e:
-            logger.warning("LLM coaching plan invalid, re-prompting: %s", e)
-            messages += [
-                {"role": "assistant", "content": content},
-                {"role": "user", "content": f"That was invalid: {e}. Return corrected JSON only."},
-            ]
-    return None
+
+    def check(plan: _LLMPlan) -> str | None:
+        unknown = [i.area for i in plan.focus if i.area not in allowed]
+        return f"Areas not in the candidates: {unknown}; use only {sorted(allowed)}" if unknown else None
+
+    plan = await llm_json(SYSTEM, payload, _LLMPlan, temperature=0.3, check=check)
+    if plan is None or check(plan):
+        return None
+    by_area = {c.area: c for c in candidates}
+    items = [Recommendation(i.area, i.title, i.evidence, i.why, i.drill, i.target,
+                            by_area[i.area].severity, by_area[i.area].practice_type, by_area[i.area].daily_minutes)
+             for i in plan.focus]
+    return {"summary": plan.summary}, items
 
 
 def _rule_summary(strengths: list[str], top: list[Recommendation]) -> str:

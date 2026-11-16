@@ -77,11 +77,11 @@ export function VoiceBeam({ stream, listening, thinking, color, children }: {
 // ── Volume meter — how loud the user is, live, against a comfortable band ──────
 // ponytail: thresholds on the browser's average spectrum level (0–1), set by ear on a laptop mic;
 // calibrate per mic, or map to the analysis' loudness metric if the two need to agree.
-const VOL_FULL = 0.4, VOL_QUIET = 0.03, VOL_LOUD = 0.3;
-export function VolumeMeter({ level, muted, speaking }: { level: number; muted: boolean; speaking: boolean }) {
+const VOL_FULL = 0.4, VOL_SILENT = 0.01, VOL_QUIET = 0.03, VOL_LOUD = 0.3;
+export function VolumeMeter({ level, muted }: { level: number; muted: boolean }) {
   const [label, color] =
     muted ? ["Muted", "var(--muted)"] :
-    !speaking ? ["Waiting for you", "var(--muted)"] :
+    level < VOL_SILENT ? ["Waiting for you", "var(--muted)"] :
     level < VOL_QUIET ? ["Too quiet", "var(--warn)"] :
     level > VOL_LOUD ? ["Very loud", "var(--warn)"] : ["Good", "var(--ok)"];
   const pct = (v: number) => `${Math.min(100, (v / VOL_FULL) * 100)}%`;

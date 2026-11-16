@@ -2,10 +2,10 @@
 type When = string | Date;
 const show = (when: When, opts: Intl.DateTimeFormatOptions) => new Date(when).toLocaleString("en-MY", opts);
 
+/** "1:05" (whole seconds, never negative) */
 export function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  const t = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 }
 
 /** "12 Nov" */

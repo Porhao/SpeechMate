@@ -6,19 +6,17 @@ import {
   Mic, MicOff, PhoneOff, Send, Volume2, VolumeX, Shuffle,
   Activity, Loader2, Video, VideoOff, Briefcase, Presentation, ListChecks, Keyboard,
 } from "lucide-react";
-import { useSessionStore } from "@/store/useSessionStore";
-import { useFeedbackStore } from "@/store/useFeedbackStore";
 import { cn, inkOf } from "@/lib/utils";
 import { liveService, conversationService } from "@/services/live";
-import { presentationService } from "@/services/presentation";
-import { ApiError } from "@/services/api";
+import { api, ApiError } from "@/services/api";
 import { VoiceTurnListener } from "@/lib/voiceTurns";
 import SlideImage from "@/components/presentation/SlideImage";
 import { analyzeLighting, type LightingReport } from "@/lib/lighting";
 import type { SessionType, LiveSession } from "@/types";
 import { formatDuration } from "@/lib/format";
+import { isSessionType, MODES } from "@/lib/modes";
 import {
-  BACKCHANNEL_TEXTS, CHECKIN_MESSAGES, FILLER_WORDS, MODE_ACKS, MODE_PROMPTS, MODE_TITLES, MOOD_STATES, RANDOM_TOPICS,
+  BACKCHANNEL_TEXTS, CHECKIN_MESSAGES, MODE_ACKS, MODE_PROMPTS, MOOD_STATES, RANDOM_TOPICS,
   paceWpm, type MoodLabel,
 } from "./script";
 import { POSTURE_TIPS, useAudioMeter, useFaceTracking } from "./hooks";
@@ -33,15 +31,15 @@ function SessionContent() {
   const router       = useRouter();
   // A session prepared beforehand (interview setup / deck Q&A) arrives as ?live=<id>&mode=…
   const liveParam    = searchParams.get("live");
-  const mode         = (["Conversation", "Interview", "Presentation"].includes(searchParams.get("mode") ?? "")
-    ? searchParams.get("mode") : "Conversation") as SessionType;
+  const modeParam    = searchParams.get("mode");
+  const mode: SessionType = isSessionType(modeParam) ? modeParam : "Conversation";
 
-  const {
-    isRecording, isCameraOn, duration, setRecording, setCameraOn, incrementDuration, resetDuration,
-  } = useSessionStore();
-  const {
-    transcript, appendTranscript, reset,
-  } = useFeedbackStore();
+  // Off until the camera really starts, so a permission error shows in its place
+  const [isRecording, setRecording] = useState(false);
+  const [isCameraOn, setCameraOn] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [transcript, setTranscript] = useState("");  // the user's words so far, shown live
+  const appendTranscript = useCallback((text: string) => setTranscript((t) => (t ? `${t} ${text}` : text)), []);
 
   // ── State ─────────────────────────────────────────────────────────────────
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -84,8 +82,8 @@ function SessionContent() {
   const replyWhenQuietRef = useRef<() => void>(() => {});
   // Why the camera/mic couldn't start (permission denied, no device, in use elsewhere)
   const [camError,       setCamError]       = useState<string | null>(null);
+  const [startError,     setStartError]     = useState<string | null>(null);  // the session couldn't be created
   const [wpm,            setWpm]            = useState(0);
-  const [, setFillerCount]    = useState(0);
   const [voiceEnabled,   setVoiceEnabled]   = useState(true);
   const [currentTopic,   setCurrentTopic]   = useState(searchParams.get("topic") || RANDOM_TOPICS[0]);
   // A drill from the results page ("Practise this now"): the one skill to focus on, kept on screen
@@ -125,15 +123,13 @@ function SessionContent() {
   const aiSpeakingRef       = useRef(false);
   const voiceEnabledRef     = useRef(true);
   const isRecordingRef      = useRef(false);
-  const modeRef             = useRef(mode);
+  const modeRef             = useRef(mode);  // from the URL: fixed for the page's life
   // Response time: from the end of the AI's turn to the first sound of the user's answer
   const turnOpenedAtRef     = useRef<number | null>(null);
   const latenciesRef        = useRef<number[]>([]);
   const sessionStartedAtRef = useRef(0);
   const wordListRef         = useRef<string[]>([]);
-  const fillerCntRef        = useRef(0);
   const startTimeRef        = useRef(0);
-  const lastPrevRef         = useRef(0);
   const lastSpeechTimeRef   = useRef(0);
   const checkinAskedRef     = useRef(false);
   const silenceCheckRef     = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -173,7 +169,6 @@ function SessionContent() {
   useEffect(() => { aiTypingRef.current      = aiTyping; },       [aiTyping]);
   useEffect(() => { voiceEnabledRef.current  = voiceEnabled; },   [voiceEnabled]);
   useEffect(() => { isRecordingRef.current   = isRecording; },    [isRecording]);
-  useEffect(() => { modeRef.current          = mode; },           [mode]);
   useEffect(() => { messagesRef.current      = messages; },       [messages]);
   useEffect(() => { currentTopicRef.current  = currentTopic; },   [currentTopic]);
 
@@ -211,10 +206,14 @@ function SessionContent() {
   }, []);
 
   // ── TTS (Kokoro in the browser, else the backend, else the browser's built-in voice) ─────
-  const speakText = useCallback((text: string, onEnd?: () => void) => {
-    const token = ++speakTokenRef.current;
+  const silenceAI = useCallback(() => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
     window.speechSynthesis?.cancel();
+  }, []);
+
+  const speakText = useCallback((text: string, onEnd?: () => void) => {
+    const token = ++speakTokenRef.current;
+    silenceAI();
 
     aiSpeakingRef.current = true;  // blocks listening, replies and check-ins from now on
     detachRecognizer();
@@ -275,7 +274,7 @@ function SessionContent() {
       ended = true;
       if (!playing) finish();
     })();
-  }, [detachRecognizer, resumeListening]);
+  }, [detachRecognizer, resumeListening, silenceAI]);
 
   // ── Auto-reply after user speech (real OpenAI chat) ─────────────────────
   const triggerAIReply = useCallback(async (spokenText: string) => {
@@ -311,14 +310,14 @@ function SessionContent() {
       speakText(reply);
     } catch {
       // Fallback: preset prompts when API key is missing or network fails
-      const prompts = MODE_PROMPTS[modeRef.current] ?? MODE_PROMPTS.Conversation;
+      const prompts = MODE_PROMPTS[modeRef.current];
       const idx = promptIndexRef.current;
       setTimeout(() => {
         if (gen !== replyGenRef.current) return;
         setAiTyping(false); aiTypingRef.current = false;
         let reply: string;
         if (idx < prompts.length) {
-          const acks = MODE_ACKS[modeRef.current] ?? [];
+          const acks = MODE_ACKS[modeRef.current];
           const ack  = acks[Math.floor(Math.random() * acks.length)] ?? "";
           reply = ack + prompts[idx];
           promptIndexRef.current = idx + 1;
@@ -402,10 +401,6 @@ function SessionContent() {
       appendTranscript(text);
       const words = text.trim().split(/\s+/).filter(Boolean);
       wordListRef.current.push(...words);
-      // Gaze Tunneling is computed on the server from the recording's word timings
-      const fillerHits = words.filter((w: string) => FILLER_WORDS.has(w.toLowerCase().replace(/[^a-z']/g, ""))).length;
-      fillerCntRef.current += fillerHits;
-      setFillerCount(fillerCntRef.current);
       pendingUserSpeechRef.current += (pendingUserSpeechRef.current ? " " : "") + text.trim();
       if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
       const replyWhenQuiet = () => {
@@ -468,7 +463,6 @@ function SessionContent() {
 
   useEffect(() => { startSpeechRef.current = startSpeech; }, [startSpeech]);
 
-  const stopSpeech = detachRecognizer;
 
   // "I'm done, reply now": answer as soon as the last words are transcribed, without the usual wait
   const replyNow = useCallback(() => {
@@ -481,11 +475,10 @@ function SessionContent() {
 
   const interruptAI = useCallback(() => {
     speakTokenRef.current++;  // cancels a voice still loading, and the old utterance's callbacks
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
-    window.speechSynthesis?.cancel();
+    silenceAI();
     setVoicePending(false); setAiSpeaking(false); aiSpeakingRef.current = false;
     setTimeout(resumeListening, 120);
-  }, [resumeListening]);
+  }, [resumeListening, silenceAI]);
 
   // ── Camera ────────────────────────────────────────────────────────────────
   const startCamera = useCallback(async () => {
@@ -552,24 +545,34 @@ function SessionContent() {
 
   // ── Session start / end ───────────────────────────────────────────────────
   const startSession = useCallback(async () => {
-    wordListRef.current = []; fillerCntRef.current = 0;
-    lastPrevRef.current = 0;
+    // The backend session comes first: without it nothing would be recorded or analysed, so a
+    // failure (signed out, no consent, server down) stops here instead of after the whole talk
+    let backendSession = prepared;
+    if (!backendSession) {
+      setStartError(null);
+      try {
+        backendSession = await liveService.start({ session_type: mode, topic: mode === "Conversation" ? currentTopicRef.current : undefined });
+      } catch (e) {
+        setStartError(e instanceof ApiError && e.status === 403
+          ? "Agree to cloud processing (the box that just opened) to start the session."
+          : "Couldn't start the session. Check your connection and try again.");
+        return;
+      }
+    }
+    wordListRef.current = [];
     lastSpeechTimeRef.current = Date.now(); checkinAskedRef.current = false;
     sttAudioSecRef.current = [];
     activeRef.current = true; startTimeRef.current = performance.now(); sessionStartedAtRef.current = Date.now();
     turnOpenedAtRef.current = null; latenciesRef.current = [];
     pendingUserSpeechRef.current = "";
 
-    setSessionStarted(true); setRecording(true); setFillerCount(0); setWpm(0);
-    resetDuration(); reset();
+    setSessionStarted(true); setRecording(true); setWpm(0);
+    setDuration(0); setTranscript("");
 
     // A backend live session (for recording + analysis) needs sign-in. Interview and
     // Presentation Q&A sessions were prepared on their setup page (with a question plan).
-    const [backendSession, health] = await Promise.all([
-      (prepared ? Promise.resolve(prepared)
-        : liveService.start({ session_type: mode, topic: mode === "Conversation" ? currentTopicRef.current : undefined })
-      ).catch(() => null),
-      presentationService.health().catch(() => null),
+    const [health] = await Promise.all([
+      api.health().catch(() => null),
       startCamera(),
     ]);
     if (voiceEnabledRef.current) conversationService.preloadVoice();
@@ -578,9 +581,9 @@ function SessionContent() {
     const stt = health ? Boolean(health.providers?.openai) : true;
     sttFailsRef.current = 0; setSttNotice("");
     sttAvailableRef.current = stt; setSttAvailable(stt);
-    backendSessionIdRef.current = backendSession?.id ?? null;
+    backendSessionIdRef.current = backendSession.id;
 
-    timerRef.current = setInterval(() => incrementDuration(), 1000);
+    timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
     startTracking();
     if (isTalkRef.current) {
       // Presenting: the user talks, the AI stays silent; the analysis afterwards uses the recording
@@ -594,10 +597,10 @@ function SessionContent() {
     // The opening line: the plan's intro (interview / Q&A) or a greeting from the partner;
     // scripted when no LLM is available
     setAiTyping(true); aiTypingRef.current = true;
-    let firstMsg = (MODE_PROMPTS[mode] ?? MODE_PROMPTS.Conversation)[0];
+    let firstMsg = MODE_PROMPTS[mode][0];
     try {
       const r = await conversationService.partnerReply(
-        [], mode, mode === "Conversation" ? currentTopicRef.current : undefined, backendSession?.id);
+        [], mode, mode === "Conversation" ? currentTopicRef.current : undefined, backendSession.id);
       firstMsg = r.reply;
       if (r.progress && r.total_questions) setPlanProgress({ asked: r.progress.asked, total: r.total_questions });
     } catch { promptIndexRef.current = 1; }
@@ -631,24 +634,20 @@ function SessionContent() {
     setVoicePending(false);
     if (autoReplyTimerRef.current) clearTimeout(autoReplyTimerRef.current);
     pendingUserSpeechRef.current = "";
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; audioRef.current = null; }
+    silenceAI();
     if (backchannelAudioRef.current) { backchannelAudioRef.current.pause(); backchannelAudioRef.current = null; }
     if (backchannelTimerRef.current) clearInterval(backchannelTimerRef.current);
     backchannelUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
-    window.speechSynthesis?.cancel();
     if (timerRef.current) clearInterval(timerRef.current);
     if (silenceCheckRef.current) clearInterval(silenceCheckRef.current);
     stopTracking();
-    stopSpeech();
+    detachRecognizer();
 
     const recordedBlob = await stopRecording();
     stopCamera(); setRecording(false);
 
     const sessionId = backendSessionIdRef.current;
-    if (!sessionId) {
-      router.push("/login");
-      return;
-    }
+    if (!sessionId) return;  // ended before it started
     try {
       const turns = messagesRef.current.map((m) => ({
         role: m.role === "ai" ? "assistant" as const : "user" as const,
@@ -669,7 +668,7 @@ function SessionContent() {
     }
     router.push(`/results/${sessionId}`);
   }, [
-    stopSpeech, stopRecording, stopCamera, setRecording, router, duration, stopTracking,
+    detachRecognizer, stopRecording, stopCamera, router, duration, stopTracking, silenceAI,
   ]);
 
   // ── Lighting & contrast check: once a second while the camera runs (independent of
@@ -702,8 +701,10 @@ function SessionContent() {
   // ── Toggles ───────────────────────────────────────────────────────────────
   const toggleMic = () => {
     if (!sessionStarted) return;
-    if (isRecording) { streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false)); stopSpeech(); }
-    else { streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = true)); startSpeech(); }
+    streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !isRecording));
+    // Presenting has no AI turns: muting only silences the mic, and the recording (which the slide
+    // timings are measured against) keeps running
+    if (!isTalkRef.current) { if (isRecording) detachRecognizer(); else startSpeech(); }
     setRecording(!isRecording);
   };
 
@@ -749,7 +750,6 @@ function SessionContent() {
     setInput("");
     const words = text.split(/\s+/).filter(Boolean);
     wordListRef.current.push(...words);
-    fillerCntRef.current += words.filter((w) => FILLER_WORDS.has(w.toLowerCase())).length;
     appendTranscript(text);
     triggerAIReplyRef.current(text);
   }, [input, sessionStarted, aiTyping, appendTranscript]);
@@ -781,29 +781,24 @@ function SessionContent() {
   useEffect(() => {
     return () => {
       activeRef.current = false;
-      window.speechSynthesis?.cancel();
+      silenceAI();
       if (timerRef.current) clearInterval(timerRef.current);
       if (silenceCheckRef.current) clearInterval(silenceCheckRef.current);
       stopTracking();
-      stopSpeech(); stopCamera(); disposeTracking();
+      detachRecognizer(); stopCamera(); disposeTracking();
       // Leaving without clicking "End" — a MediaRecorder still attached to
       // (now-stopped) tracks won't emit further data, but stop it
       // explicitly so it isn't left in "recording" state indefinitely.
       const mr = mediaRecorderRef.current;
       if (mr && mr.state !== "inactive") { try { mr.stop(); } catch { /* already stopped */ } }
     };
-  }, [stopCamera, stopSpeech, stopTracking, disposeTracking]);
+  }, [stopCamera, detachRecognizer, stopTracking, disposeTracking, silenceAI]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
   // The AI's turn before its voice starts (LLM reply + TTS loading) reads as "thinking"
   const thinking = aiTyping || voicePending;
-  const fmt = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  const MODE_COLORS: Record<string, string> = {
-    Conversation: "#D6245F", Interview: "#1A3A3A", Presentation: "#6B4FC4",
-  };
-  const mc = MODE_COLORS[mode] ?? "#D6245F";
+  const mc = MODES[mode].color;
   const mcInk = inkOf(mc);  // the mode colour as readable text in either theme
 
   const orbState: OrbState =
@@ -836,7 +831,7 @@ function SessionContent() {
   }, [messages, mode, setup, deckTitle, currentTopic]);
 
   // ── Whose turn is it? One plain answer for the turn banner ─────────────────
-  const partner = mode === "Interview" ? "Alex" : mode === "Presentation" ? "The moderator" : "Your partner";
+  const partner = MODES[mode].partner;
   const userSpeaking = interimText === "Hearing you…";
   const transcribing = interimText === "Transcribing…";
   type Turn = { tone: "you" | "ai" | "wait" | "off"; icon: typeof Mic; title: string; hint: string };
@@ -914,7 +909,7 @@ function SessionContent() {
     <div className="h-full flex flex-col justify-center max-w-md mx-auto py-4">
       <p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--muted)" }}>How this works</p>
       <h2 className="font-display text-3xl mt-1" style={{ color: "var(--ink)" }}>
-        {isTalk ? "Present your deck" : mode === "Interview" ? "Your interview with Alex" : mode === "Presentation" ? "Your Q&A rehearsal" : "Just talk"}
+        {isTalk ? "Present your deck" : mode === "Interview" ? `Your interview with ${partner}` : mode === "Presentation" ? "Your Q&A rehearsal" : "Just talk"}
       </h2>
       <ol className="mt-5 space-y-3.5">
         {(isTalk ? [
@@ -1008,6 +1003,40 @@ function SessionContent() {
   // retune if those grow.
   const CAM_FIT = "lg:h-[calc(100dvh-470px)] lg:min-h-[160px] lg:flex-shrink-0 lg:grid lg:place-items-center lg:[container-type:size] lg:[&>*]:w-[min(100cqw,calc(100cqh*16/9))]";
   const CARDS_FIT = "grid lg:grid-cols-2 gap-3 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:content-start";
+  // The live transcript and the reply box, shared by the interview and conversation layouts
+  const composer = (
+    <>
+      {(transcript || interimText) && sessionStarted && (
+        <LiveTranscript transcript={transcript} newest={newestPhrase} status={interimText} color={mc} />
+      )}
+      <div className="flex-shrink-0 flex gap-2">
+        <VoiceBeam stream={streamRef.current} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc}>
+          <input type="text" value={input} aria-label="Type your reply"
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+            disabled={!sessionStarted || thinking || aiSpeaking}
+            placeholder={
+              !sessionStarted ? `Start the ${mode === "Interview" ? "interview" : "session"} first…` :
+              aiSpeaking ? `${partner} is speaking — listen…` :
+              thinking ? `${partner} is replying…` :
+              !sttAvailable ? "Speech recognition unavailable — type your reply…" :
+              speechActive ? "Speaking captured — or type here…" :
+              "Speak aloud, or type your reply…"
+            }
+            className="w-full px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)] border border-[var(--line)] focus:border-[var(--line-strong)]"
+            style={{ background: "var(--surface-2)" }}
+          />
+        </VoiceBeam>
+        <button onClick={sendMessage} aria-label="Send"
+          disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
+          className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
+          style={{ background: mc }}>
+          <Send className="w-4 h-4" />
+        </button>
+      </div>
+    </>
+  );
+
   const cameraStage = (
     <div className="clay relative w-full flex-shrink-0 overflow-hidden rounded-xl bg-black"
       style={{ aspectRatio: "16 / 9", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1018,16 +1047,16 @@ function SessionContent() {
       {!isCameraOn && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/35">
           <VideoOff className="w-8 h-8" />
-          <span className="text-xs text-center max-w-sm px-4" role={camError ? "alert" : undefined}
-            style={camError ? { color: "#fbbf24" } : undefined}>
-            {camError ?? (sessionStarted ? "Camera is off" : "Your camera appears here when the session starts")}
+          <span className="text-xs text-center max-w-sm px-4" role={startError || camError ? "alert" : undefined}
+            style={startError || camError ? { color: "#fbbf24" } : undefined}>
+            {startError ?? camError ?? (sessionStarted ? "Camera is off" : "Your camera appears here when the session starts")}
           </span>
         </div>
       )}
 
       {sessionStarted && (
         <span className="absolute top-3 left-3 flex items-center gap-1.5 text-[11px] font-semibold text-white px-2 py-1" style={chip}>
-          <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> REC {fmt(duration)}
+          <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> REC {formatDuration(duration)}
         </span>
       )}
       <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-1" style={{ ...chip, color: stateColor }}>
@@ -1171,12 +1200,12 @@ function SessionContent() {
       <div className="flex items-center justify-between pb-4 flex-shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <span className="clay text-sm font-semibold px-4 py-1.5 rounded-full text-white" style={{ background: mc }}>
-            {isTalk ? "Presentation" : MODE_TITLES[mode]}
+            {isTalk ? "Presentation" : MODES[mode].title}
           </span>
           {sessionStarted && (
             <span className="flex items-center gap-2 font-mono text-sm font-semibold text-[var(--ink)]" aria-label="Time elapsed">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              {fmt(duration)}
+              {formatDuration(duration)}
               <HeaderPulse level={audioLevel} active={isRecording} color={mc} />
             </span>
           )}
@@ -1260,7 +1289,7 @@ function SessionContent() {
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
                 <div className="flex items-center gap-2">
                   <Briefcase className="w-3.5 h-3.5 text-white/60" />
-                  <p className="text-white text-xs font-semibold">Alex · Interviewer</p>
+                  <p className="text-white text-xs font-semibold">{partner} · Interviewer</p>
                 </div>
                 {aiSpeaking && (
                   <span className="flex items-center gap-1 text-[10px] font-semibold text-[#A4D4C5]">
@@ -1293,7 +1322,7 @@ function SessionContent() {
                 <p className="text-xs text-[var(--muted)]">Loading your interview setup…</p>
               )}
               <p className="text-[11px] text-[var(--muted)] mt-3 leading-relaxed">
-                Answer as you would in the real interview. Alex asks one question at a time and may ask a
+                Answer as you would in the real interview. {partner} asks one question at a time and may ask a
                 follow-up if an answer is short. Feedback on every answer comes after you end.
               </p>
             </div>
@@ -1304,7 +1333,7 @@ function SessionContent() {
               {!sessionStarted ? startGuide : messages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center px-4 gap-3">
                   <Loader2 className="w-6 h-6 animate-spin" style={{ color: mcInk }} />
-                  <p className="text-sm" style={{ color: "var(--muted)" }}>Alex is getting the first question ready…</p>
+                  <p className="text-sm" style={{ color: "var(--muted)" }}>{partner} is getting the first question ready…</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1345,39 +1374,7 @@ function SessionContent() {
               )}
             </div>
 
-            {/* Live transcript */}
-            {(transcript || interimText) && sessionStarted && (
-              <LiveTranscript transcript={transcript} newest={newestPhrase} status={interimText} color={mc} />
-            )}
-
-            {/* Input */}
-            <div className="flex-shrink-0 flex gap-2">
-              <VoiceBeam stream={streamRef.current} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc}>
-              <input type="text" value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                disabled={!sessionStarted || thinking || aiSpeaking}
-                placeholder={
-                  !sessionStarted   ? "Start the interview first…" :
-                  aiSpeaking        ? "Alex is speaking — listen carefully…" :
-                  thinking          ? "Alex is formulating a question…" :
-                  !sttAvailable     ? "Speech recognition unavailable — type your answer…" :
-                  speechActive      ? "Speaking captured — or type here…" :
-                  "Speak your answer aloud, or type it here…"
-                }
-                className="w-full px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
-                style={{ background: "var(--surface-2)", border: "1px solid var(--line)" }}
-                onFocus={(e) => (e.target.style.borderColor = "rgba(96,165,250,0.5)")}
-                onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
-              />
-              </VoiceBeam>
-              <button onClick={sendMessage}
-                disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
-                className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
-                style={{ background: "#1A3A3A" }}>
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
+            {composer}
           </div>
         </div>
 
@@ -1541,42 +1538,7 @@ function SessionContent() {
                 )}
               </div>
 
-              {/* Live transcript */}
-              {(transcript || interimText) && sessionStarted && (
-                <LiveTranscript transcript={transcript} newest={newestPhrase} status={interimText} color={mc} />
-              )}
-
-              {/* Input */}
-              <div className="flex-shrink-0 flex gap-3">
-                <VoiceBeam stream={streamRef.current} listening={speechActive && sessionStarted && !aiSpeaking && !thinking} thinking={sessionStarted && thinking} color={mc}>
-                <input type="text" value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                  disabled={!sessionStarted || thinking || aiSpeaking}
-                  placeholder={
-                    !sessionStarted ? "Start the session first…" :
-                    aiSpeaking ? "Listening to your partner…" :
-                    thinking   ? "Your partner is replying…" :
-                    !sttAvailable ? "Speech recognition unavailable — type your response…" :
-                    speechActive ? "Speaking captured — or type here…" :
-                    "Speak aloud, or type your response…"
-                  }
-                  className="w-full px-4 py-3 rounded-xl text-sm text-[var(--ink)] outline-none transition-all disabled:opacity-40 placeholder:text-[var(--faint)]"
-                  style={{
-                    background: "var(--surface-2)",
-                    border: "1px solid var(--line)",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = `${mc}50`)}
-                  onBlur={(e) => (e.target.style.borderColor = "var(--line)")}
-                />
-                </VoiceBeam>
-                <button onClick={sendMessage}
-                  disabled={!sessionStarted || !input.trim() || thinking || aiSpeaking}
-                  className="w-11 h-11 flex items-center justify-center rounded-xl text-white transition-all disabled:opacity-30 flex-shrink-0 press-effect"
-                  style={{ background: mc }}>
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
+              {composer}
           </>
         </div>
         </div>
@@ -1587,7 +1549,7 @@ function SessionContent() {
         <span className="flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" />
           Analysed after you end: voice, language, body language, confidence{mode === "Conversation" ? "" : " and the content of every answer"}
         </span>
-        {sessionStarted && <VolumeMeter level={audioLevel} muted={!isRecording} speaking={userSpeaking} />}
+        {sessionStarted && <VolumeMeter level={audioLevel} muted={!isRecording} />}
         {wpm > 0 && <span>Pace so far: <b className="text-[var(--ink)]">{wpm} wpm</b> (120–160 is comfortable)</span>}
       </div>
     </div>

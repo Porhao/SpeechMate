@@ -11,26 +11,22 @@ are an unreadable deck or a broken LibreOffice/pdftoppm install.
 import logging
 import uuid
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_factory
-from app.models.session import Session
+from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
 from app.models.slide import Slide
 from app.models.user import User
-from app.services import practice_plans
+from app.services import decks
 from app.services.deck_insights import analyse_deck
 from app.services.learner import learner_brief
-from app.services.media import MediaError
 from app.services.notifications import notify
-from app.services.slide_processor import SlideProcessorError, slide_processor
-from app.services.storage import storage_service
+from app.services import slide_processor
+from app.services.tasks import fail_job
+from app.services.storage import deck_folder, storage_service
 
 logger = logging.getLogger(__name__)
-
-
-class PipelineError(Exception):
-    """A hard failure with a user-facing message."""
 
 
 async def _set_status(db: AsyncSession, session: Session, status: str, **fields) -> None:
@@ -46,18 +42,13 @@ def _add_warning(session: Session, message: str) -> None:
     session.warnings = [*(session.warnings or []), message]
 
 
-async def run_ideal_presentation_pipeline(session_id: uuid.UUID) -> None:
-    """Prepare a deck for practice: render the slides, then understand them (insights + Q&A plan).
-    The user presents it themselves; there's no example narration or video any more (2026-10-07),
-    so the script / narration / video stages below no longer run."""
+async def prepare_deck(session_id: uuid.UUID) -> None:
+    """Prepare a deck for practice: render the slides, then understand them (insights + Q&A plan)."""
     async with async_session_factory() as db:
-        session = (
-            await db.execute(select(Session).where(Session.id == session_id))
-        ).scalar_one_or_none()
+        session = await db.get(Session, session_id)
         if session is None:
-            logger.error("Pipeline started for unknown session %s", session_id)
+            logger.error("Deck preparation started for unknown deck %s", session_id)
             return
-
         try:
             slides = await _stage_process_slides(db, session)
             await _stage_analyze_content(db, session, slides)
@@ -65,25 +56,22 @@ async def run_ideal_presentation_pipeline(session_id: uuid.UUID) -> None:
             notify(db, session.user_id, "deck_ready", "Your deck is ready to present",
                    f"“{session.original_filename}”: read the summary, then present it.", f"/presentations/{session.id}")
             await db.commit()
-        except (PipelineError, SlideProcessorError, MediaError) as e:
-            logger.error("Pipeline failed for session %s: %s", session_id, e)
-            await db.rollback()
-            await db.refresh(session)
-            await _set_status(db, session, "failed", error_detail=str(e))
-            notify(db, session.user_id, "deck_failed", "Deck preparation failed",
-                   f"“{session.original_filename}”: {e}", f"/presentations/{session.id}")
-            await db.commit()
-        except Exception as e:  # noqa: BLE001
-            logger.exception("Unexpected pipeline error for session %s", session_id)
-            await db.rollback()
-            await db.refresh(session)
-            await _set_status(db, session, "failed", error_detail=f"Internal error: {e}")
-            notify(db, session.user_id, "deck_failed", "Deck preparation failed",
-                   f"“{session.original_filename}” hit an internal error: try Retry.", f"/presentations/{session.id}")
-            await db.commit()
+        except Exception as e:  # noqa: BLE001 — every failure ends as a failed deck the user can retry
+            await fail_job(db, session, e, kind="deck_failed", title="Deck preparation failed",
+                           link=f"/presentations/{session.id}", about=f"“{session.original_filename}”: ")
 
 
-# ── Stage 1: Slide Processing ────────────────────────────────────────────────
+async def recover_after_restart() -> None:
+    """On startup, mark decks a restart interrupted as failed, so the user can retry them."""
+    async with async_session_factory() as db:
+        result = await db.execute(update(Session).where(Session.status.in_(SESSION_IN_PROGRESS_STATUSES))
+                                  .values(status="failed", error_detail="Interrupted by a server restart: press Retry."))
+        await db.commit()
+    if result.rowcount:
+        logger.warning("Marked %d interrupted deck(s) as failed", result.rowcount)
+
+
+# ── Slides ────────────────────────────────────────────────
 async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slide]:
     await _set_status(
         db, session, "processing_slides",
@@ -93,8 +81,8 @@ async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slid
     await db.execute(delete(Slide).where(Slide.session_id == session.id))
     await db.commit()
 
-    png_paths = await slide_processor.convert_pptx_to_pngs(str(session.id), session.pptx_storage_path)
-    texts = slide_processor.extract_slide_texts(session.pptx_storage_path)
+    png_paths = await slide_processor.render_slides(deck_folder(session.id), session.pptx_storage_path)
+    texts = slide_processor.slide_texts(session.pptx_storage_path)
     if texts and len(texts) != len(png_paths):
         logger.warning(
             "Slide text count (%d) != rendered pages (%d); text context may be misaligned",
@@ -116,7 +104,7 @@ async def _stage_process_slides(db: AsyncSession, session: Session) -> list[Slid
     return slides
 
 
-# ── Stage 1b: Content analysis (deck insights) ──────────────────────────────
+# ── Content analysis (deck insights) ─────────────────────────────────────────
 async def _stage_analyze_content(db: AsyncSession, session: Session, slides: list[Slide]) -> None:
     await _set_status(db, session, "analyzing_content")
     insights, warning = await analyse_deck([s.slide_text or "" for s in slides], session.requirement_prompt)
@@ -128,10 +116,8 @@ async def _stage_analyze_content(db: AsyncSession, session: Session, slides: lis
     # "Start Q&A" opens instantly instead of waiting for it
     if insights:
         try:
-            title = session.original_filename.rsplit(".", 1)[0]
             owner = await db.get(User, session.user_id) if session.user_id else None
-            plan = await practice_plans.build_qa_plan(title, insights, session.requirement_prompt, learner_brief(owner))
-            session.insights = {**insights, "qa_plan": plan}  # a new dict, so the JSON column is saved
+            await decks.qa_plan(session, learner_brief(owner))
             await db.commit()
         except Exception:  # noqa: BLE001 — the Q&A start builds it on demand instead
             logger.exception("Pre-building the Q&A plan failed for %s", session.id)

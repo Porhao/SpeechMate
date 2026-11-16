@@ -1,4 +1,6 @@
 import { API_BASE_URL } from "@/constants";
+import { useUserStore } from "@/store/useUserStore";
+import type { BackendHealth } from "@/types";
 
 const CONSENT_REQUIRED = "cloud_consent_required";
 export const CONSENT_EVENT = "speechmate:consent-required";
@@ -9,31 +11,33 @@ export class ApiError extends Error {
   }
 }
 
+// ── Who is signed in: the access token (and the saved user, store/useUserStore.ts) ──
+const TOKEN_KEY = "access_token";
+export const session = {
+  token: () => (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null),
+  start: (accessToken: string) => localStorage.setItem(TOKEN_KEY, accessToken),
+  /** Forget the token and the saved user (signing out, or the session expired). */
+  end: () => { localStorage.removeItem(TOKEN_KEY); useUserStore.getState().logout(); },
+};
+
 function authHeader(): Record<string, string> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = session.token();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 // Access tokens are short-lived (30 min): on a 401, get a new one once and retry the request.
-// The refresh token is an httpOnly cookie the browser sends to /auth/* (page scripts can't
-// read it). A refresh token left in localStorage by an older version is used once, then deleted.
+// The refresh token is an httpOnly cookie the browser sends to /auth/* (page scripts can't read it).
 async function refreshTokens(): Promise<boolean> {
-  const legacy = localStorage.getItem("refresh_token");
-  const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
-    ...(legacy ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refresh_token: legacy }) } : {}),
-  }).catch(() => null);
-  localStorage.removeItem("refresh_token");
+  const res = await fetch(`${API_BASE_URL}/auth/refresh`, { method: "POST", credentials: "include" }).catch(() => null);
   if (!res?.ok) return false;
-  localStorage.setItem("access_token", (await res.json()).access_token);
+  session.start((await res.json()).access_token);
   return true;
 }
 
-/** The session is over (refresh token expired or gone): drop the stale token and go to sign-in. */
+/** The session is over (refresh token expired or gone): forget it and go to sign-in. */
 function signedOut(): never {
-  localStorage.removeItem("access_token");
-  window.location.href = "/login";
+  session.end();
+  window.location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
   throw new ApiError(401, "Your session has expired. Please sign in again.");
 }
 
@@ -65,7 +69,6 @@ async function request<T>(path: string, options: RequestInit = {}, retried = fal
   return res.json() as Promise<T>;
 }
 
-/** The error for a failed response (its parsed JSON body). */
 function apiError(status: number, body: { detail?: unknown } | null): ApiError {
   const detail = typeof body?.detail === "string" ? body.detail : JSON.stringify(body?.detail ?? "");
   // The server refuses cloud processing until the user agrees: show the consent dialog (ConsentGate)
@@ -101,13 +104,31 @@ function uploadWithProgress<T>(path: string, form: FormData, onProgress: (fracti
   });
 }
 
+/** Filename for a recorded Blob — the backend picks the decoder from the extension. */
+export function blobFilename(blob: Blob, base: string): string {
+  const type = blob.type.toLowerCase();
+  const ext = type.includes("mp4") ? "mp4"
+    : type.includes("ogg") ? "ogg"
+    : type.includes("wav") ? "wav"
+    : type.includes("mpeg") ? "mp3"
+    : "webm";
+  return `${base}.${ext}`;
+}
+
 export const api = {
+  /** What the server can do (speech recognition, LLM…). /health sits at the server root, outside /api. */
+  health: async (): Promise<BackendHealth> => {
+    const res = await fetch(`${API_BASE_URL.replace(/\/api\/?$/, "")}/health`);
+    if (!res.ok) throw new ApiError(res.status, "Health check failed");
+    return res.json();
+  },
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "DELETE", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
   upload: <T>(path: string, form: FormData, onProgress?: (fraction: number) => void) =>
     onProgress ? uploadWithProgress<T>(path, form, onProgress) : request<T>(path, { method: "POST", body: form }),
   /** Raw fetch to the API (for binary responses such as TTS audio). */

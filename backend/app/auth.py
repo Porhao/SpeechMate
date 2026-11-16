@@ -78,17 +78,20 @@ async def get_current_user(
     return await user_from_token(credentials.credentials, "access", db)
 
 
+async def get_owned(db: AsyncSession, model, row_id, user: User, what: str):
+    """The caller's row of `model`; anyone else's gets 404, as if it didn't exist."""
+    row = (await db.execute(select(model).where(model.id == row_id, model.user_id == user.id))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{what} not found")
+    return row
+
+
 # ── Cloud-processing consent (PDPA) ─────────────────────────────────────────
 CONSENT_REQUIRED = "cloud_consent_required"   # 403 detail the frontend answers with the consent screen
 
 
-def check_cloud_consent(user: User | None) -> None:
-    """403 when a signed-in user hasn't agreed to cloud processing yet (settings.require_cloud_consent)."""
-    if user is not None and settings.require_cloud_consent and user.cloud_consent_at is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CONSENT_REQUIRED)
-
-
 async def require_cloud_consent(user: User = Depends(get_current_user)) -> User:
-    """Dependency for routes that start cloud processing: signed in and consented."""
-    check_cloud_consent(user)
+    """Dependency for routes that start cloud processing: signed in and agreed to it (settings.require_cloud_consent)."""
+    if settings.require_cloud_consent and user.cloud_consent_at is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CONSENT_REQUIRED)
     return user

@@ -1,7 +1,7 @@
-"""In-process background job runner (v1 replacement for Celery/arq).
+"""In-process background job runner (v1 replacement for Celery/arq), and how a job fails.
 
-Keeps strong references to running tasks (asyncio only holds weak ones)
-and caps how many pipelines run at the same time.
+Keeps strong references to running tasks (asyncio only holds weak ones) and caps how many
+pipelines run at the same time. Each pipeline marks its own rows interrupted by a restart.
 """
 
 import asyncio
@@ -9,12 +9,10 @@ import logging
 from collections.abc import Coroutine
 from typing import Any
 
-from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import async_session_factory
-from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
-from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
+from app.services.notifications import notify
 
 logger = logging.getLogger(__name__)
 
@@ -51,20 +49,24 @@ async def wait_for_all(timeout: float | None = None) -> None:
         await asyncio.wait(set(_running), timeout=timeout)
 
 
-async def fail_interrupted_jobs() -> None:
-    """On startup, mark jobs orphaned by a previous restart as failed so they can be retried."""
-    message = "Interrupted by a server restart — use the retry endpoint to run it again."
-    async with async_session_factory() as db:
-        s = await db.execute(
-            update(Session)
-            .where(Session.status.in_(SESSION_IN_PROGRESS_STATUSES))
-            .values(status="failed", error_detail=message)
-        )
-        live = await db.execute(
-            update(LiveSession)
-            .where(LiveSession.status.in_(LIVE_IN_PROGRESS_STATUSES))
-            .values(status="failed", error_detail="Interrupted by a server restart — request the analysis again.")
-        )
-        await db.commit()
-        if s.rowcount or live.rowcount:
-            logger.warning("Marked %d deck(s) and %d live analysis job(s) as interrupted", s.rowcount, live.rowcount)
+class JobError(Exception):
+    """A failure the user can act on: its message is shown to them as is."""
+
+
+INTERNAL_ERROR = "Something went wrong on our side. Please try again."
+
+
+async def fail_job(db: AsyncSession, row, error: Exception, *, kind: str, title: str, link: str, about: str = "") -> None:
+    """Mark a background job's row (deck or live session) failed and tell its owner. A JobError's
+    message is shown; anything else is logged in full and shown as INTERNAL_ERROR."""
+    if isinstance(error, JobError):
+        logger.warning("%s %s failed: %s", type(row).__name__, row.id, error)
+        message = str(error)
+    else:
+        logger.error("%s %s crashed", type(row).__name__, row.id, exc_info=error)
+        message = INTERNAL_ERROR
+    await db.rollback()
+    await db.refresh(row)
+    row.status, row.error_detail = "failed", message
+    notify(db, row.user_id, kind, title, f"{about}{message}", link)
+    await db.commit()

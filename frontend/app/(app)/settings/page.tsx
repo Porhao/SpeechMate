@@ -2,7 +2,8 @@
 
 // Settings: only what actually works. Appearance, the account, signing out; privacy has its own page.
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
+import { useHydrated } from "@/hooks/useHydrated";
 import { Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +13,7 @@ import { Row } from "@/components/privacy/PrivacyControls";
 
 export default function SettingsPage() {
   const user = useUserStore((s) => s.user);
-  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const hydrated = useHydrated();
   const { logout } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
 

@@ -13,15 +13,14 @@ import { useParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, Loader2, Play, RotateCcw } from "lucide-react";
 import { liveService } from "@/services/live";
 import { Button, Card, Dots, LinkButton, Notice, ScoreBar, StatusBadge, statusColor } from "@/components/ui/kit";
-import type { ContentFeedback, FullAnalysisResult, LiveSession, Pillar, SlideFeedback } from "@/types";
+import type { ContentFeedback, LiveSession, Pillar, SlideFeedback, MetricStatus } from "@/types";
 import { formatDateTime, formatDuration } from "@/lib/format";
 import SlideImage from "@/components/presentation/SlideImage";
 import { mascot } from "@/lib/mascot";
+import { MODES, sessionSubtitle, sessionUrl } from "@/lib/modes";
+import { overallScore, statusOf } from "@/lib/scores";
 
 const POLL_MS = 3000;
-const TITLES: Record<string, string> = {
-  Conversation: "Daily conversation", Interview: "Mock interview", Presentation: "Presentation Q&A", Pronunciation: "Pronunciation",
-};
 const STAGES = [
   "Transcribing what you said",
   "Measuring voice: pace, fluency, pronunciation, pitch, volume",
@@ -49,13 +48,7 @@ const DRILLS: Record<string, [topic: string, goal: string]> = {
 };
 function drillHref(area: string | undefined): string | null {
   const d = area ? DRILLS[area] : undefined;
-  return d ? `/session?mode=Conversation&topic=${encodeURIComponent(d[0])}&focus=${encodeURIComponent(d[1])}` : null;
-}
-
-function overallOf(a: FullAnalysisResult): number | null {
-  if (a.communication_score.overall_score != null) return Math.round(a.communication_score.overall_score);
-  const scores = PILLAR_ORDER.map((k) => a.pillars?.[k]?.score).filter((v): v is number => v != null);
-  return scores.length ? Math.round(scores.reduce((x, y) => x + y, 0) / scores.length) : null;
+  return d ? sessionUrl("Conversation", { topic: d[0], focus: d[1] }) : null;
 }
 
 function practiceAgainHref(s: LiveSession) {
@@ -111,7 +104,7 @@ function PillarDetail({ pillar }: { pillar: Pillar }) {
 }
 
 // ── Confidence: which cues it was worked out from ─────────────────────────────
-type Cue = { key: string; label: string; channel: string; weight: number; value: number; score: number };
+type Cue = { key: string; label: string; channel: string; weight: number; value: number; score: number; status?: MetricStatus };
 const CUE_VALUE: Record<string, (v: number) => string> = {
   pace: (v) => `${Math.round(v)} words/min`, pauses: (v) => `${v.toFixed(0)} a minute`,
   repetitions: (v) => `${v.toFixed(1)} a minute`, blocks: (v) => `${v.toFixed(1)} a minute`,
@@ -138,7 +131,7 @@ function ConfidenceBreakdown({ conf }: { conf: { confidence_score: number; label
             </p>
             <p className="text-xs sm:text-right sm:order-last tabular-nums" style={{ color: "var(--muted)" }}>{CUE_VALUE[c.key]?.(c.value) ?? c.value}</p>
             <div className="col-span-2 sm:col-span-1">
-              <ScoreBar score={c.score} status={c.score >= 75 ? "good" : c.score >= 50 ? "ok" : "work"} />
+              <ScoreBar score={c.score} status={c.status ?? statusOf(c.score)} />
             </div>
           </div>
         ))}
@@ -351,12 +344,9 @@ export default function ResultsPage() {
   }
 
   const a = session.analysis;
-  const title = session.context?.kind === "talk" ? "Presentation" : TITLES[session.session_type] ?? session.session_type;
-  const subtitle = session.session_type === "Interview" && session.context?.setup
-    ? `${session.context.setup.position}${session.context.setup.company ? ` · ${session.context.setup.company}` : ""}`
-    : session.session_type === "Presentation" ? session.context?.deck_title
-    : session.context?.topic;
-  const overall = a ? overallOf(a) : null;
+  const title = session.context?.kind === "talk" ? "Presentation" : MODES[session.session_type]?.title ?? session.session_type;
+  const subtitle = sessionSubtitle(session);
+  const overall = overallScore(a);
   const pillars = a?.pillars ? PILLAR_ORDER.map((k) => a.pillars![k]) : [];
   const opened = pillars.find((p) => p.key === openPillar);
   const stage = Math.min(STAGES.length - 1, Math.floor(elapsed / 12));

@@ -19,6 +19,7 @@ from app.auth import (
 from app.config import settings
 from app.database import get_db
 from app.limits import client_ip, limiter
+from app.services.storage import deck_folder, live_folder, storage_service
 from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
 from app.models.notification import Notification
 from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session as Deck
@@ -27,7 +28,6 @@ from app.schemas.auth import (
     ConsentRequest,
     DeleteAccountRequest,
     LoginRequest,
-    RefreshRequest,
     RegisterRequest,
     TokenResponse,
     UpdateProfileRequest,
@@ -35,6 +35,10 @@ from app.schemas.auth import (
 )
 
 router = APIRouter(tags=["auth"])
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite=settings.cookie_samesite, secure=settings.cookie_secure)
 
 
 def _to_response(user: User) -> UserResponse:
@@ -90,12 +94,9 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
 
 
 @router.post("/auth/refresh", response_model=TokenResponse)
-async def refresh(
-    request: Request, response: Response, body: RefreshRequest | None = None, db: AsyncSession = Depends(get_db),
-):
-    """New access token from the refresh cookie (rotated on every use). A refresh token in the body
-    is still accepted, so browsers signed in before the cookie existed move over without a sign-in."""
-    token = request.cookies.get(REFRESH_COOKIE) or (body.refresh_token if body else None)
+async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """New access token from the refresh cookie (rotated on every use)."""
+    token = request.cookies.get(REFRESH_COOKIE)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not signed in")
     user = await user_from_token(token, "refresh", db)
@@ -106,7 +107,7 @@ async def refresh(
 @router.post("/auth/logout")
 async def logout(response: Response):
     """Clears the refresh cookie; the client drops its access token."""
-    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite=settings.cookie_samesite, secure=settings.cookie_secure)
+    _clear_refresh_cookie(response)
     return {"message": "Logged out"}
 
 
@@ -169,16 +170,13 @@ async def delete_my_account(body: DeleteAccountRequest, response: Response,
                             user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Delete the account and everything belonging to it, files included (PDPA erasure).
     The password is asked again so a stolen access token alone can't erase an account."""
-    from app.routers.live import LIVE_STORAGE_PREFIX
-    from app.services.storage import storage_service
-
     if not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=403, detail="Wrong password")
     lives = (await db.execute(select(LiveSession).where(LiveSession.user_id == user.id))).scalars().all()
     decks = (await db.execute(select(Deck).where(Deck.user_id == user.id))).scalars().all()
     if any(s.status in LIVE_IN_PROGRESS_STATUSES for s in lives) or any(d.status in SESSION_IN_PROGRESS_STATUSES for d in decks):
         raise HTTPException(status_code=409, detail="Wait for running analyses to finish, then try again")
-    folders = [f"{LIVE_STORAGE_PREFIX}/{s.id}" for s in lives] + [str(d.id) for d in decks]
+    folders = [live_folder(s.id) for s in lives] + [deck_folder(d.id) for d in decks]
     for deck in decks:
         await db.delete(deck)                       # its slides go with it
     for model in (Notification, LiveSession):
@@ -186,5 +184,5 @@ async def delete_my_account(body: DeleteAccountRequest, response: Response,
     await db.delete(user)
     await db.commit()
     for folder in folders:
-        storage_service.delete_session(folder)
-    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH, httponly=True, samesite=settings.cookie_samesite, secure=settings.cookie_secure)
+        storage_service.delete_folder(folder)
+    _clear_refresh_cookie(response)

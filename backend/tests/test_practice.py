@@ -9,8 +9,8 @@ import pytest
 
 from app.database import Base, engine
 from app.main import app
-from app.services import practice_plans
-from app.services.live import coaching, extra_metrics
+from app.services import documents, feedback, partner, plans, text
+from app.services.live import coaching, extra_metrics, rules
 
 
 @pytest.fixture
@@ -39,12 +39,12 @@ def _docx(text: str) -> bytes:
 # ── Resume ──────────────────────────────────────────────────────────────────
 
 def test_resume_text_from_docx_and_txt():
-    assert practice_plans.extract_resume_text(_docx("Aisyah Rahman\nPython, SQL"), "cv.docx") == "Aisyah Rahman\nPython, SQL"
-    assert practice_plans.extract_resume_text(b"  Intern  at   Maybank \n\n", "cv.txt") == "Intern at Maybank"
+    assert documents.extract_resume_text(_docx("Aisyah Rahman\nPython, SQL"), "cv.docx") == "Aisyah Rahman\nPython, SQL"
+    assert documents.extract_resume_text(b"  Intern  at   Maybank \n\n", "cv.txt") == "Intern at Maybank"
     with pytest.raises(ValueError):
-        practice_plans.extract_resume_text(b"x", "cv.png")
+        documents.extract_resume_text(b"x", "cv.png")
     with pytest.raises(ValueError):
-        practice_plans.extract_resume_text(b"   ", "cv.txt")
+        documents.extract_resume_text(b"   ", "cv.txt")
 
 
 async def test_resume_and_plan_endpoints(client):
@@ -90,24 +90,24 @@ async def test_partner_follows_the_interview_plan_without_an_llm(client):
 
 def test_partner_answers_the_candidates_questions():
     ctx = {"plan": {"questions": [{"question": "Tell me about yourself."}, {"question": "Do you have any questions for us?"}]}}
-    practice_plans.next_step(ctx, None)
+    partner.next_step(ctx, None)
     # A clarifying question mid-interview: answered, the plan doesn't move, the question is put back
-    step = practice_plans.next_step(ctx, "Sorry, do you mean my studies or my work?")
+    step = partner.next_step(ctx, "Sorry, do you mean my studies or my work?")
     assert step == {"action": "answer", "question": "Tell me about yourself."} and ctx["progress"]["asked"] == 1
     long = " ".join(["I studied computing and built a booking app for my club last year"] * 3)
-    assert practice_plans.next_step(ctx, long)["action"] == "ask"
+    assert partner.next_step(ctx, long)["action"] == "ask"
     # "Any questions for us?" → their question is answered (not "thank you", not "give an example")
-    assert practice_plans.next_step(ctx, "What does a typical day look like for the team?") == {"action": "answer", "question": None}
-    assert practice_plans.next_step(ctx, "No, that's all. Thank you.")["action"] == "close"
-    assert not practice_plans.asks_question("What did I do? I organised the whole event.")
-    assert practice_plans.asks_question("how big is the team")
+    assert partner.next_step(ctx, "What does a typical day look like for the team?") == {"action": "answer", "question": None}
+    assert partner.next_step(ctx, "No, that's all. Thank you.")["action"] == "close"
+    assert not partner.asks_question("What did I do? I organised the whole event.")
+    assert partner.asks_question("how big is the team")
 
 
 def test_qa_plan_from_deck_insights_fallback():
     insights = {"summary": "Time management for students", "main_message": "Plan your week",
                 "likely_questions": ["How do I start?", "What if I fall behind?"],
                 "slides": [{"slide_index": 1, "key_point": "Intro"}, {"slide_index": 2, "key_point": "Use a weekly planner"}]}
-    plan = practice_plans._fallback_qa_plan("Time Management", insights)
+    plan = plans._fallback_qa_plan("Time Management", insights)
     qs = [q["question"] for q in plan["questions"]]
     assert qs[:2] == ["How do I start?", "What if I fall behind?"]
     assert any("weekly planner" in q for q in qs)
@@ -117,7 +117,7 @@ def test_qa_plan_from_deck_insights_fallback():
 # ── Content feedback ────────────────────────────────────────────────────────
 
 def test_pair_turns_joins_split_answers():
-    pairs = practice_plans.pair_turns([
+    pairs = feedback.pair_turns([
         {"role": "assistant", "text": "Q1"}, {"role": "user", "text": "part one"}, {"role": "user", "text": "part two"},
         {"role": "assistant", "text": "Q2"}, {"role": "assistant", "text": "Q3"}, {"role": "user", "text": "a3"},
     ])
@@ -127,13 +127,13 @@ def test_pair_turns_joins_split_answers():
 async def test_rule_based_content_feedback():
     turns = [{"role": "assistant", "text": "Tell me about a challenge you faced."},
              {"role": "user", "text": "When I was at my internship I led a team and as a result we reduced costs by 20%."}]
-    fb = await practice_plans.content_feedback("Interview", {"plan": {"questions": []}}, turns)
+    fb = await feedback.content_feedback("Interview", {"plan": {"questions": []}}, turns)
     a = fb["answers"][0]
     assert fb["source"] == "rules" and a["structure"] >= 4 and a["specificity"] >= 3
-    conv = await practice_plans.content_feedback("Conversation", None, [{"role": "assistant", "text": "Hi!"},
+    conv = await feedback.content_feedback("Conversation", None, [{"role": "assistant", "text": "Hi!"},
                                                                        {"role": "user", "text": "Fine."}])
     assert conv["kind"] == "conversation" and any("Ask a question back" in t for t in conv["tips"])
-    assert await practice_plans.content_feedback("Interview", None, []) is None
+    assert await feedback.content_feedback("Interview", None, []) is None
 
 
 # ── Extra metrics and pillars ───────────────────────────────────────────────
@@ -145,10 +145,11 @@ def test_language_use_metrics():
     assert extra_metrics.analyze_language_use("too short") is None
 
 
-def test_metric_scores():
-    assert extra_metrics.pace_score(140) == 100 and extra_metrics.pace_score(171) < 75 and extra_metrics.pace_score(200) == 0
-    assert extra_metrics.pitch_score(1.0) < 75 <= extra_metrics.pitch_score(3.0)
-    assert extra_metrics.latency_score(1.0) == 100 and extra_metrics.latency_score(6.5) == 40
+def test_metric_scores_reward_the_comfortable_range():
+    assert rules.pace_score(140) == 100 > rules.pace_score(171) > rules.pace_score(200) == 0
+    assert rules.pace_score(100) < 75 and rules.pace_score(100) == rules.pace_score(180)   # dragging = rushing
+    assert rules.pitch_score(1.0) < 75 <= rules.pitch_score(3.0)
+    assert rules.latency_score(1.0) == 100 > rules.latency_score(3.0) > rules.latency_score(6.5)
 
 
 def test_pillars_group_measured_metrics_only():
@@ -201,27 +202,26 @@ def test_slide_key_term_coverage_tracks_missed_terms():
 
 
 def test_intro_is_greeting_plus_planned_first_question():
-    intro = practice_plans._compose_intro(
-        "Hi [Candidate], welcome to our interview today. I'm Alex from Maybank. Let's start with a warm opener: tell me about yourself. Ready?",
-        "Can you share a project where you used statistics?", "Aisyah")
-    assert intro == "Hi Aisyah, welcome to our interview today. I'm Alex from Maybank. Can you share a project where you used statistics?"
-    assert practice_plans._compose_intro("...Welcome, everyone.", "First?", None) == "Welcome, everyone. First?"
+    intro = plans._compose_intro(
+        "Thank you, [Presenter], for the talk. Let's open the floor: first question. Ready?", "Can you share an example?")
+    assert intro == "Thank you, for the talk. Can you share an example?"
+    assert plans._compose_intro("...Welcome, everyone.", "First?") == "Welcome, everyone. First?"
 
 
 def test_invented_terms_flags_new_names_and_numbers_only():
     said = "During my internship I built dashboards in Power BI and we finished two weeks early."
-    assert practice_plans.invented_terms("During my internship I built dashboards in Power BI.", said) == []
-    assert practice_plans.invented_terms("I used Tableau and cut costs by 30%.", said) == ["Tableau", "30%"]
+    assert text.invented_terms("During my internship I built dashboards in Power BI.", said) == []
+    assert text.invented_terms("I used Tableau and cut costs by 30%.", said) == ["Tableau", "30%"]
 
 
 def test_question_labels_are_removed():
-    assert practice_plans._clean_question("Can you share an example? (Role-Specific Problem Solving)") == "Can you share an example?"
-    assert practice_plans._clean_question("Do you have any questions for us? (Mixed)") == "Do you have any questions for us?"
-    assert practice_plans._clean_question("Why do you use R (not Python) at work?") == "Why do you use R (not Python) at work?"
+    assert plans._clean_question("Can you share an example? (Role-Specific Problem Solving)") == "Can you share an example?"
+    assert plans._clean_question("Do you have any questions for us? (Mixed)") == "Do you have any questions for us?"
+    assert plans._clean_question("Why do you use R (not Python) at work?") == "Why do you use R (not Python) at work?"
 
 
 async def test_impromptu_judges_understanding(client, monkeypatch):
-    from app.routers import impromptu
+    from app.services import ai
 
     h = await _sign_in(client, "impromptu@example.com")
     short = await client.post("/api/impromptu/evaluate", headers=h,
@@ -232,11 +232,12 @@ async def test_impromptu_judges_understanding(client, monkeypatch):
         assert payload["topic"] == "Why the sky is blue"
         return model_cls(accuracy=5, depth=4, coverage=3, relevance=5, structure=2, summary="Clear start on scattering.",
                          understood=["sunlight scatters"], missed=["why sunsets are red"], mistakes=[], outline=["Light", "Air"])
-    monkeypatch.setattr(impromptu, "_llm_json", judge)
-    monkeypatch.setattr(impromptu, "get_llm_client", lambda: object())
+    monkeypatch.setattr("app.services.impromptu.llm_json", judge)
+    monkeypatch.setattr(ai, "get_llm_client", lambda: object())
     talk = "Sunlight is made of many colours and the air scatters blue light the most so we see blue " * 3
     r = await client.post("/api/impromptu/evaluate", headers=h,
                           json={"topic": "Why the sky is blue", "transcript": talk, "duration_sec": 60})
     body = r.json()
     assert r.status_code == 200 and body["judged"] and body["words"] == 54 and body["wpm"] == 54
     assert body["understanding"] == 81.2      # (5 + 4 + 3 + 5 - 4) / 16 = 13/16; structure isn't counted
+    assert body["verdict"] == "Strong understanding"

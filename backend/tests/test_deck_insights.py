@@ -10,7 +10,7 @@ import pytest
 from app.config import settings
 from app.database import Base, engine
 from app.main import app
-from app.services import deck_insights, tasks
+from app.services import ai, deck_insights, tasks
 from make_sample_deck import build as build_sample_deck
 from tests.conftest import sign_in
 
@@ -62,7 +62,7 @@ def _llm_reply(slide_numbers):
 
 
 async def test_llm_insights_reject_nonexistent_slides_and_fill_key_points(monkeypatch):
-    monkeypatch.setattr(deck_insights, "get_llm_client", lambda: _FakeLLM([_llm_reply([2, 9]), _llm_reply([2, 3, 4])]))
+    monkeypatch.setattr(ai, "get_llm_client", lambda: _FakeLLM([_llm_reply([2, 9]), _llm_reply([2, 3, 4])]))
     out, warning = await deck_insights.analyse_deck(TEXTS, "First-year students")
     assert warning is None and out["source"] == "llm"
     assert out["main_message"].startswith("Plan the night before")

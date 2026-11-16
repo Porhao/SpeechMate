@@ -7,13 +7,14 @@ import {
   Upload, FileText, RotateCcw, Loader2, ChevronRight,
   AlertTriangle, CheckCircle2, XCircle, ArrowRight, LayoutGrid, List as ListIcon,
 } from "lucide-react";
-import { presentationService, DECK_IN_PROGRESS } from "@/services/presentation";
+import { presentationService } from "@/services/presentation";
+import { api } from "@/services/api";
 import { liveService } from "@/services/live";
-import type { BackendHealth, DeckListItem, DeckStatusResponse, LiveSession } from "@/types";
+import type { BackendHealth, DeckListItem, DeckStatus, DeckStatusResponse, LiveSession } from "@/types";
 import { formatDate } from "@/lib/format";
 import { tint, inkOf } from "@/lib/utils";
 import { mascot } from "@/lib/mascot";
-import { STAGES, deckProgress, type DeckProgress } from "@/lib/deckPipeline";
+import { DECK_IN_PROGRESS, DECK_STATUS_LABEL, PREP_STEPS, STAGES, SUPPORTED_DECK, deckProgress, type DeckProgress } from "@/lib/deckPipeline";
 import { useExit } from "@/hooks/useExit";
 import { PageHeader } from "@/components/ui/kit";
 import { SearchBar, Highlight, matches } from "@/components/ui/SearchBar";
@@ -29,9 +30,9 @@ function prepSteps(d: DeckStatusResponse | null): HoopStep[] {
   const reading = !d || d.status === "queued" || d.status === "processing_slides";
   const done = d?.status === "complete" || d?.status === "failed";
   return [
-    { label: d?.status === "queued" ? "Waiting in the queue" : "Reading your slides", state: reading ? "active" : "done",
+    { label: d?.status === "queued" ? "Waiting in the queue" : PREP_STEPS.reading, state: reading ? "active" : "done",
       count: d?.slide_count ? `${d.slides_rendered}/${d.slide_count}` : undefined },
-    { label: "Understanding them: summary, key points, Q&A", state: done ? "done" : reading ? "todo" : "active" },
+    { label: PREP_STEPS.understanding, state: done ? "done" : reading ? "todo" : "active" },
   ];
 }
 
@@ -44,15 +45,8 @@ function netFill(phase: UploadPhase, progress: number | null, d: DeckStatusRespo
   return 0.4 + 0.4 * (d.slide_count ? d.slides_rendered / d.slide_count : 0);
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  queued: "Queued",
-  processing_slides: "Reading slides",
-  analyzing_content: "Understanding them",
-  complete: "Ready",
-  failed: "Failed",
-};
 
-function StatusPill({ status }: { status: string }) {
+function StatusPill({ status }: { status: DeckStatus }) {
   const color = status === "complete" ? "#2F7A4F" : status === "failed" ? "#C2342C" : "#1A3A3A";
   const Icon = status === "complete" ? CheckCircle2 : status === "failed" ? XCircle : Loader2;
   return (
@@ -61,7 +55,7 @@ function StatusPill({ status }: { status: string }) {
       style={{ background: `${tint(color, "14")}`, color, border: `1px solid ${tint(color, "28")}` }}
     >
       <Icon className={`w-3 h-3 ${DECK_IN_PROGRESS.has(status) ? "animate-spin" : ""}`} />
-      {STATUS_LABEL[status] ?? status}
+      {DECK_STATUS_LABEL[status] ?? status}
     </span>
   );
 }
@@ -80,14 +74,14 @@ function BoardCard({ p, query, leaving, onDelete }: { p: DeckProgress; query: st
             {p.lastAt ? `Last practised ${formatDate(p.lastAt)}` : `Uploaded ${formatDate(p.deck.created_at)}`}
           </p>
           <span className="relative z-10">
-            <DeleteButton disabled={DECK_IN_PROGRESS.has(p.deck.status)} onDelete={onDelete} light={stage.fg === "#FFFFFF"} label="Delete presentation" />
+            <DeleteButton disabled={DECK_IN_PROGRESS.has(p.deck.status)} onDelete={onDelete} light={stage.onDark} label="Delete presentation" />
           </span>
         </div>
         <Link href={`/presentations/${p.deck.session_id}`} className="block font-semibold leading-snug mt-1 break-words outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-[var(--accent-ink)]">
           <Highlight text={p.deck.original_filename} query={query} />
         </Link>
         <p className="text-xs mt-1 opacity-80">
-          {p.deck.slide_count ? `${p.deck.slide_count} slides` : STATUS_LABEL[p.deck.status] ?? p.deck.status}
+          {p.deck.slide_count ? `${p.deck.slide_count} slides` : DECK_STATUS_LABEL[p.deck.status] ?? p.deck.status}
           {p.talks ? ` · presented ${p.talks}×` : ""}{p.rehearsals ? ` · Q&A ${p.rehearsals}×` : ""}
         </p>
         <div className="mt-3 flex items-center gap-3">
@@ -143,7 +137,7 @@ export default function PresentationsPage() {
       .then(setDecks)
       .catch((e: Error) => setLoadError(e.message));
     liveService.history().then(setSessions).catch(() => null);  // for each deck's stage
-    presentationService.health().then(setHealth).catch(() => null);
+    api.health().then(setHealth).catch(() => null);
   }, []);
 
   // Keep the list fresh while any deck is still being prepared.
@@ -155,7 +149,7 @@ export default function PresentationsPage() {
 
   const pickPptx = (file: File | undefined) => {
     if (!file || submitting) return;
-    if (!/\.(pptx|pdf)$/i.test(file.name)) {
+    if (!SUPPORTED_DECK.test(file.name)) {
       setSubmitError("Please choose a PowerPoint (.pptx) or PDF file.");
       mascot("error", "That one isn't a .pptx or .pdf.");
       return;

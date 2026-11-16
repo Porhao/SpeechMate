@@ -15,6 +15,7 @@ from collections import Counter
 
 from pydantic import BaseModel, Field
 
+from app.services.ai import llm_json
 from app.services.learner import with_brief
 
 STOPWORDS = set("""
@@ -80,8 +81,7 @@ class _TalkReport(BaseModel):
 def split_by_slide(words: list[dict], slide_times: list[dict] | None, duration_sec: float) -> dict[int, dict]:
     """{slide_index: {"seconds", "said"}}: the time each slide was on screen (summed over visits)
     and the words whose start fell inside those spans."""
-    marks = sorted((m for m in slide_times or [] if isinstance(m, dict) and "slide_index" in m and "t_sec" in m),
-                   key=lambda m: m["t_sec"])
+    marks = sorted(slide_times or [], key=lambda m: m["t_sec"])
     if not marks:
         return {}
     spans = [(int(m["slide_index"]), max(0.0, float(m["t_sec"])),
@@ -136,8 +136,6 @@ def _rule_summary(rows: list[dict]) -> str:
 async def talk_feedback(context: dict, words: list[dict], slide_times: list[dict] | None, duration_sec: float,
                         learner: str = "") -> dict | None:
     """Per-slide alignment of the talk with the deck (`kind: "slides"`), or None without slides or timings."""
-    from app.services.practice_plans import _llm_json  # validated, re-prompted JSON from the local LLM
-
     slides = context.get("slides") or []
     parts = split_by_slide(words, slide_times, duration_sec)
     if not slides or not parts:
@@ -150,7 +148,7 @@ async def talk_feedback(context: dict, words: list[dict], slide_times: list[dict
             {"slide_index": r["slide_index"], "title": r["title"], "key_point": r["key_point"],
              "slide_text": next((s.get("text", "") for s in slides if s["index"] == r["slide_index"]), "")[:600],
              "presenter_said": r["said"]} for r in spoken]}
-        report = await _llm_json(with_brief(TALK_SYSTEM, learner), payload, _TalkReport, temperature=0.3)
+        report = await llm_json(with_brief(TALK_SYSTEM, learner), payload, _TalkReport, temperature=0.3)
     if report:
         by_idx = {j.slide_index: j for j in report.slides}
         for r in rows:

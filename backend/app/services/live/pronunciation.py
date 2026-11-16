@@ -4,8 +4,8 @@ Word-level confidence is the mean CTC frame confidence over a proportional
 time span per word (audio split evenly across the transcript's words), not a
 true forced alignment (Montreal Forced Aligner is a much heavier dependency).
 It's real inference on the real audio, with coarser word boundaries than
-full forced alignment would give. The Malaysian-English accent allowance is
-applied afterwards (language.adjust_pronunciation_for_accent).
+full forced alignment would give. It's the fallback for phone_gop.py; both
+return a PronunciationResult.
 """
 
 import logging
@@ -20,16 +20,24 @@ MODEL_NAME = "facebook/wav2vec2-base-960h"
 CORRECT_THRESHOLD = 75
 
 
+PHONE_GOP, CTC_WORD = "phone-gop", "ctc-word"   # which scorer produced a result
+
+
 @dataclass
 class PronunciationResult:
     score: float                                   # 0–100
-    word_scores: list[dict] = field(default_factory=list)  # [{word, score, is_correct}]
+    word_scores: list[dict] = field(default_factory=list)  # [{word, score, is_correct}]; "correct" is each scorer's own bar
     incorrect_words: list[str] = field(default_factory=list)
-    mispronunciation_count: int = 0
-    # "phone-gop" (phone_gop.py: accent-fair, per phoneme) or "ctc-word" (this module's fallback)
-    method: str = "ctc-word"
+    method: str = CTC_WORD   # PHONE_GOP (phone_gop.py: accent-fair, per phoneme) or CTC_WORD (this module)
     regional: list[dict] = field(default_factory=list)          # Malaysian English variation: accepted
     intelligibility: list[dict] = field(default_factory=list)   # deviations that cost clarity
+
+    def accent_fair_score(self, malaysian_english: bool) -> float:
+        """The score to report. The phone-level scorer accepts Malaysian English variation itself; the
+        word-level one under-scores it (trained on US/UK speech), so it gets a +5% allowance."""
+        if self.method == PHONE_GOP or not malaysian_english:
+            return self.score
+        return round(min(100.0, self.score * 1.05), 1)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -77,5 +85,4 @@ def assess(wav_16k: Path, transcript: str) -> PronunciationResult | None:
         score=round(sum(ws["score"] for ws in word_scores) / len(word_scores), 1),
         word_scores=word_scores,
         incorrect_words=incorrect,
-        mispronunciation_count=len(incorrect),
     )

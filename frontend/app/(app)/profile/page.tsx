@@ -3,7 +3,8 @@
 // Profile: who you are and what you're practising for. The AI coach reads these
 // fields, so they're saved to the backend; the stats on the left are real.
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
+import { useHydrated } from "@/hooks/useHydrated";
 import { Check, Loader2 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { useMyStats } from "@/hooks/useMyStats";
@@ -59,8 +60,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 export default function ProfilePage() {
   const user = useUserStore((s) => s.user);
-  // The signed-in user comes from localStorage, which the server render can't see
-  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const hydrated = useHydrated();
 
   if (!hydrated) return null;
   if (!user) {
@@ -77,16 +77,16 @@ export default function ProfilePage() {
 }
 
 function ProfileForm({ user }: { user: User }) {
-  const { profile, setUser, setProfile } = useUserStore();
+  const setUser = useUserStore((s) => s.setUser);
   const { stats } = useMyStats();
 
-  const [name,       setName]       = useState(user?.full_name ?? "");
-  const [goal,       setGoal]       = useState(user?.communication_goal ?? profile?.communication_goal ?? "");
-  const [skill,      setSkill]      = useState<SkillLevel>((user?.skill_level ?? profile?.skill_level ?? "Beginner") as SkillLevel);
-  const [challenges, setChallenges] = useState<string[]>(user?.challenges ?? profile?.challenges ?? []);
-  const [study,      setStudy]      = useState<StudyLevel | "">(user?.study_level ?? "");
-  const [field,      setField]      = useState(user?.field_of_study ?? "");
-  const [style,      setStyle]      = useState<FeedbackStyle>(user?.feedback_style ?? "balanced");
+  const [name,       setName]       = useState(user.full_name ?? "");
+  const [goal,       setGoal]       = useState(user.communication_goal ?? "");
+  const [skill,      setSkill]      = useState<SkillLevel>((user.skill_level ?? "Beginner") as SkillLevel);
+  const [challenges, setChallenges] = useState<string[]>(user.challenges ?? []);
+  const [study,      setStudy]      = useState<StudyLevel | "">(user.study_level ?? "");
+  const [field,      setField]      = useState(user.field_of_study ?? "");
+  const [style,      setStyle]      = useState<FeedbackStyle>(user.feedback_style ?? "balanced");
   const [saving,     setSaving]     = useState(false);
   const [saved,      setSaved]      = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
@@ -105,7 +105,6 @@ function ProfileForm({ user }: { user: User }) {
       });
       mascot("success", "Profile saved. I'll pitch things at your level.");
       setUser(updated);
-      if (profile) setProfile({ ...profile, communication_goal: goal, skill_level: skill, challenges });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {

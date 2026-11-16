@@ -50,14 +50,24 @@ MALAY_WORDS: set[str] = {
     "mengenai", "terhadap", "oleh", "seperti",
 }
 
-# Discourse particles that signal Manglish *style*: a single "lah" flags it
-# even in an otherwise all-English sentence.
-MANGLISH_PARTICLES = {
-    "lah", "mah", "weh", "kan", "lor", "leh", "la", "wei",
-    "one", "what", "also", "already", "got", "no need",
-}
-
 _TOKEN_RE = re.compile(r"[a-zA-Z']+")
+
+# Discourse particles that signal Manglish *style*: a single "lah" flags it even in an otherwise
+# all-English sentence. The second set are ordinary English words, particles only when they close
+# a clause ("I eat already.", "So nice one!"), not in "What do you think?".
+MANGLISH_PARTICLES = {"lah", "mah", "weh", "kan", "lor", "leh", "la", "wei"}
+CLAUSE_END_PARTICLES = {"one", "what", "also", "already", "got"}
+
+
+def manglish_particles(transcript: str) -> list[str]:
+    found = set()
+    for clause in re.split(r"[.,!?;]+", transcript.lower()):
+        tokens = _TOKEN_RE.findall(clause)
+        found |= {t for t in tokens if t in MANGLISH_PARTICLES}
+        if len(tokens) >= 2 and tokens[-1] in CLAUSE_END_PARTICLES:
+            found.add(tokens[-1])
+    return sorted(found)
+
 
 
 def estimate_language_ratio(text: str) -> tuple[float, float]:
@@ -91,7 +101,7 @@ class LanguageDetection:
 def detect_language_and_accent(transcript: str) -> LanguageDetection:
     words = [w.strip(".,!?\"'") for w in transcript.lower().split()]
     bm_found = sorted({w for w in words if w in MALAY_WORDS})
-    manglish_found = sorted({w for w in words if w in MANGLISH_PARTICLES})
+    manglish_found = manglish_particles(transcript)
 
     en_ratio, bm_ratio = estimate_language_ratio(transcript)
     if bm_ratio > 0.7:
@@ -110,12 +120,3 @@ def detect_language_and_accent(transcript: str) -> LanguageDetection:
         detected_bm_words=bm_found,
         accent_type=accent,
     )
-
-
-def adjust_pronunciation_for_accent(score: float, detection: LanguageDetection) -> float:
-    """Malaysian-English phonology (th → d/t, final-consonant reduction, vowel
-    shifts) is regional variation, not error: pronunciation models trained on
-    US/UK English under-score it, so apply a +5% allowance."""
-    if detection.accent_type == "Malaysian English":
-        return round(min(100.0, score * 1.05), 1)
-    return score

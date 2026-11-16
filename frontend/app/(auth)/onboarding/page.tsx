@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { authService } from "@/services/auth";
+import { Notice } from "@/components/ui/kit";
 import { tint, inkOf } from "@/lib/utils";
 
 // ── Step data ─────────────────────────────────────────────────────────────────
@@ -95,7 +96,9 @@ function StepDot({ step, current }: { step: number; current: number; total: numb
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setUser, setProfile } = useUserStore();
+  const setUser = useUserStore((s) => s.setUser);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [step,        setStep]        = useState(1);
   const [goal,        setGoal]        = useState("");
@@ -114,19 +117,16 @@ export default function OnboardingPage() {
     (step === 3 && challenges.length > 0) ||
     (step === 4 && practiceType !== "");
 
-  const handleFinish = () => {
-    // Saved on the server when signed in (the coaching plan uses the goal), and locally either way
-    if (authService.isSignedIn()) {
-      authService.updateProfile({ communication_goal: goal, skill_level: skill, challenges }).then(setUser).catch(() => null);
+  const handleFinish = async () => {
+    // The coaching plan uses the goal, so it's saved before moving on (onboarding follows sign-up)
+    setSaving(true); setSaveError(null);
+    try {
+      setUser(await authService.updateProfile({ communication_goal: goal, skill_level: skill, challenges }));
+    } catch {
+      setSaving(false);
+      setSaveError("Couldn't save your answers. Check your connection and press Finish again.");
+      return;
     }
-    setProfile({
-      id: "local",
-      user_id: "local",
-      age_group: "",
-      communication_goal: goal,
-      skill_level: skill as "Beginner" | "Intermediate" | "Advanced",
-      challenges,
-    });
     router.push(practiceType === "Interview" ? "/interview" : practiceType === "Presentation" ? "/presentations" : "/home");
   };
 
@@ -264,7 +264,7 @@ export default function OnboardingPage() {
             <div className="mb-6">
               <p className="text-xs font-semibold text-[var(--accent-ink)] uppercase tracking-widest mb-1">Step 4 of 4</p>
               <h1 className="font-display text-2xl text-[var(--ink)]">Preferred practice style?</h1>
-              <p className="text-sm text-[var(--muted)] mt-1">Don&apos;t worry — you can use all three anytime.</p>
+              <p className="text-sm text-[var(--muted)] mt-1">Don&apos;t worry — you can use any of them anytime.</p>
             </div>
             <div className="space-y-2">
               {PRACTICE_TYPES.map(({ value, label, icon: Icon, color, desc }) => {
@@ -319,14 +319,15 @@ export default function OnboardingPage() {
             </button>
           ) : (
             <button
-              disabled={!canNext}
+              disabled={!canNext || saving}
               onClick={handleFinish}
               className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[#0A0A0A] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all"
             >
-              <CheckCircle2 className="w-4 h-4" /> Start practising
+              <CheckCircle2 className="w-4 h-4" /> {saving ? "Saving…" : "Start practising"}
             </button>
           )}
         </div>
+        {saveError && <div className="mt-4"><Notice tone="bad">{saveError}</Notice></div>}
       </div>
 
       {/* ── Skip link ──────────────────────────────────────────────────── */}

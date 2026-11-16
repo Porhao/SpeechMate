@@ -6,10 +6,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FlaskConical, Gamepad2, GraduationCap, Loader2, Mic, Search, Sparkles, Square } from "lucide-react";
-import { authService } from "@/services/auth";
 import { conversationService, impromptuService, type ImpromptuResult } from "@/services/live";
 import { ApiError } from "@/services/api";
 import { Button, Card, Dots, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
+import { formatDuration } from "@/lib/format";
+import { requireSignIn } from "@/hooks/useAuth";
 
 const THEMES = [
   { name: "Games", icon: Gamepad2, topics: [
@@ -41,7 +42,6 @@ const THEMES = [
 const RESEARCH_SEC = 5 * 60, TALK_SEC = 2 * 60, MIN_TALK_SEC = 60;
 type Phase = "choose" | "research" | "speak" | "judging" | "result";
 
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, Math.floor(s % 60))).padStart(2, "0")}`;
 
 export default function ImpromptuPage() {
   const router = useRouter();
@@ -60,7 +60,7 @@ export default function ImpromptuPage() {
   const recRef = useRef<MediaRecorder | null>(null);
   const talkStartRef = useRef(0);
   const spinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [lastTalk, setLastTalk] = useState<{ blob: Blob; ext: string; seconds: number } | null>(null);  // for "Try again"
+  const [lastTalk, setLastTalk] = useState<{ blob: Blob; seconds: number } | null>(null);  // for "Try again"
 
   const topics = THEMES[theme].topics;
   const left = Math.max(0, (endsAt - now) / 1000);
@@ -100,7 +100,7 @@ export default function ImpromptuPage() {
   };
 
   const startResearch = async () => {
-    if (!authService.isSignedIn()) { router.push("/login?next=/impromptu"); return; }
+    if (!requireSignIn(router)) return;
     setError(null);
     try {
       // Ask for the mic now, so the talk can start on its own when the research time is up
@@ -113,17 +113,17 @@ export default function ImpromptuPage() {
     setNow(Date.now()); setEndsAt(Date.now() + RESEARCH_SEC * 1000); setPhase("research");
   };
 
-  const judge = async (blob: Blob, ext: string, seconds: number) => {
+  const judge = async (blob: Blob, seconds: number) => {
     setPhase("judging"); setError(null);
     try {
-      const text = transcript || await conversationService.transcribe(blob, topic!, `talk.${ext}`);
+      const text = transcript || await conversationService.transcribe(blob, topic!);
       setTranscript(text);
       setResult(await impromptuService.evaluate(topic!, text, seconds));
       setPhase("result");
     } catch (e) {
       setError(e instanceof ApiError && e.status === 503 ? "The AI judge isn't available right now. Please try again later."
         : "Couldn't judge your talk. Check your connection and try again.");
-      setLastTalk({ blob, ext, seconds });
+      setLastTalk({ blob, seconds });
       setPhase("result");
     }
   };
@@ -137,7 +137,7 @@ export default function ImpromptuPage() {
       stream.getTracks().forEach((t) => t.stop()); streamRef.current = null;  // mic off as soon as you finish
       const type = rec.mimeType || "audio/webm";
       const seconds = Math.min(TALK_SEC, (Date.now() - talkStartRef.current) / 1000);
-      void judge(new Blob(chunks, { type }), type.includes("mp4") ? "mp4" : type.includes("ogg") ? "ogg" : "webm", seconds);
+      void judge(new Blob(chunks, { type }), seconds);
     };
     rec.start();
     recRef.current = rec;
@@ -214,9 +214,9 @@ export default function ImpromptuPage() {
         <Card>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div role="timer" aria-live="off">
-              <p className="text-5xl font-semibold tabular-nums" style={{ color: talking && left < 15 ? "var(--bad)" : "var(--ink)" }}>{mmss(left)}</p>
+              <p className="text-5xl font-semibold tabular-nums" style={{ color: talking && left < 15 ? "var(--bad)" : "var(--ink)" }}>{formatDuration(left)}</p>
               <p className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-                {talking ? (talked < MIN_TALK_SEC ? `Keep going: at least ${mmss(MIN_TALK_SEC - talked)} more` : "You can finish any time")
+                {talking ? (talked < MIN_TALK_SEC ? `Keep going: at least ${formatDuration(MIN_TALK_SEC - talked)} more` : "You can finish any time")
                          : "Your talk starts automatically when the time is up"}
               </p>
             </div>
@@ -262,8 +262,6 @@ export default function ImpromptuPage() {
   );
 
   const r = result;
-  const verdict = r?.understanding == null ? null
-    : r.understanding >= 75 ? "Strong understanding" : r.understanding >= 50 ? "Partial understanding" : "Needs more research";
   const list = (title: string, items?: string[]) => items && items.length > 0 && (
     <Card title={title}>
       <ul className="space-y-1.5 list-disc pl-5 text-sm" style={{ color: "var(--ink-2)" }}>
@@ -278,7 +276,7 @@ export default function ImpromptuPage() {
         <Notice tone="bad">
           {error}{" "}
           {lastTalk && (
-            <button className="font-semibold underline" onClick={() => void judge(lastTalk.blob, lastTalk.ext, lastTalk.seconds)}>
+            <button className="font-semibold underline" onClick={() => void judge(lastTalk.blob, lastTalk.seconds)}>
               Try again
             </button>
           )}
@@ -288,36 +286,38 @@ export default function ImpromptuPage() {
         <>
           <Card>
             <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-              {r.understanding != null ? (
+              {r.judged ? (
                 <div className="text-center sm:pr-6 sm:border-r" style={{ borderColor: "var(--line)" }}>
                   <p className="text-5xl font-semibold tabular-nums" style={{ color: "var(--ink)" }}>{Math.round(r.understanding)}</p>
-                  <p className="text-xs font-semibold mt-1" style={{ color: "var(--accent-ink)" }}>{verdict}</p>
+                  <p className="text-xs font-semibold mt-1" style={{ color: "var(--accent-ink)" }}>{r.verdict}</p>
                 </div>
               ) : null}
               <div className="flex-1 space-y-3">
                 <p className="text-sm leading-relaxed" style={{ color: "var(--ink-2)" }}>{r.summary}</p>
                 {r.judged && (
                   <div className="flex flex-wrap gap-x-5 gap-y-2">
-                    <Dots label="Accuracy" value={r.accuracy!} /><Dots label="Depth" value={r.depth!} />
-                    <Dots label="Coverage" value={r.coverage!} /><Dots label="On topic" value={r.relevance!} />
-                    <Dots label="Structure" value={r.structure!} />
+                    <Dots label="Accuracy" value={r.accuracy} /><Dots label="Depth" value={r.depth} />
+                    <Dots label="Coverage" value={r.coverage} /><Dots label="On topic" value={r.relevance} />
+                    <Dots label="Structure" value={r.structure} />
                   </div>
                 )}
               </div>
             </div>
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
-              {([["Talk time", mmss(r.duration_sec)], ["Words", r.words], ["Pace", `${r.wpm} wpm`], ["Filler words", r.fillers]] as const).map(([k, v]) => (
+              {([["Talk time", formatDuration(r.duration_sec)], ["Words", r.words], ["Pace", `${r.wpm} wpm`], ["Filler words", r.fillers]] as const).map(([k, v]) => (
                 <div key={k}><dt className="text-xs" style={{ color: "var(--muted)" }}>{k}</dt>
                   <dd className="text-lg font-semibold" style={{ color: "var(--ink)" }}>{v}</dd></div>
               ))}
             </dl>
           </Card>
-          <div className="grid sm:grid-cols-2 gap-5">
-            {list("What you clearly understood", r.understood)}
-            {list("Worth adding next time", r.missed)}
-            {list("Facts to double-check", r.mistakes)}
-            {list("A strong 2-minute talk would cover", r.outline)}
-          </div>
+          {r.judged && (
+            <div className="grid sm:grid-cols-2 gap-5">
+              {list("What you clearly understood", r.understood)}
+              {list("Worth adding next time", r.missed)}
+              {list("Facts to double-check", r.mistakes)}
+              {list("A strong 2-minute talk would cover", r.outline)}
+            </div>
+          )}
           {transcript && (
             <details className="text-sm" style={{ color: "var(--ink-2)" }}>
               <summary className="cursor-pointer font-semibold" style={{ color: "var(--ink)" }}>What we heard</summary>

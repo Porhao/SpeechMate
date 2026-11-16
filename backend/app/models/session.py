@@ -3,16 +3,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, Uuid
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, JSONType
 
-# JSONB on Postgres, plain JSON elsewhere (e.g. SQLite in tests)
-JSONType = JSON().with_variant(JSONB(), "postgresql")
-
-# Statuses that mean the deck is still being prepared (services/pipeline.py)
+# Statuses that mean the deck is still being prepared (services/deck_pipeline.py)
 SESSION_IN_PROGRESS_STATUSES = ("queued", "processing_slides", "analyzing_content")
 
 

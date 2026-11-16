@@ -1,29 +1,9 @@
-import { API_BASE_URL } from "@/constants";
-import { api, ApiError } from "./api";
-import type { BackendHealth, DeckListItem, DeckScript, DeckStatusResponse, ScriptStyle } from "@/types";
+import { api } from "./api";
+import type { DeckListItem, DeckScript, DeckStatusResponse, ScriptStyle } from "@/types";
 
 // Client for presentation decks (/sessions): upload, preparation status, slide images.
-// All routes live under API_BASE_URL (…/api) except /health, which sits at the server root.
-
-/** Filename for a recorded Blob — the backend picks the decoder from the extension. */
-export function blobFilename(blob: Blob, base: string): string {
-  const type = blob.type.toLowerCase();
-  const ext = type.includes("mp4") ? "mp4"
-    : type.includes("ogg") ? "ogg"
-    : type.includes("wav") ? "wav"
-    : type.includes("mpeg") ? "mp3"
-    : "webm";
-  return `${base}.${ext}`;
-}
 
 export const presentationService = {
-  health: async (): Promise<BackendHealth> => {
-    const root = API_BASE_URL.replace(/\/api\/?$/, "");
-    const res = await fetch(`${root}/health`);
-    if (!res.ok) throw new ApiError(res.status, "Health check failed");
-    return res.json();
-  },
-
   create: (pptx: File, requirementPrompt?: string, onProgress?: (fraction: number) => void) => {
     const form = new FormData();
     form.append("pptx", pptx);
@@ -43,4 +23,3 @@ export const presentationService = {
   slideImage: (id: string, n: number) => api.blob(`/sessions/${id}/slides/${n}/image`),
 };
 
-export const DECK_IN_PROGRESS: ReadonlySet<string> = new Set(["queued", "processing_slides", "analyzing_content"]);

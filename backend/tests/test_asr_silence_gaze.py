@@ -104,7 +104,7 @@ def test_gaze_tunneling_finds_a_real_link_and_ignores_chance():
 def test_session_usage_bills_each_turn_at_least_10_seconds():
     u = session_usage({"calls": 3, "prompt_tokens": 900, "completion_tokens": 120, "fallback_calls": 1},
                       {"calls": 2, "prompt_tokens": 2000, "completion_tokens": 400},
-                      {"stt_audio_sec": [4.0, 12.0, 0, "x"]}, 150.0)
+                      {"stt_audio_sec": [4.0, 12.0, 0]}, 150.0)
     assert u["stt"]["turn_requests"] == 2 and u["stt"]["billed_sec"] == 10 + 12 + 150
     assert u["stt"]["usd"] == round(172 / 3600 * 0.111, 5)
     assert u["llm"]["calls"] == 5 and u["llm"]["prompt_tokens"] == 2900 and u["llm"]["completion_tokens"] == 520
@@ -120,7 +120,7 @@ async def test_quiet_recording_is_not_read_as_silence(tmp_path):
     import struct
     import wave
 
-    from app.services.media import detect_silences
+    from app.services.live.audio import detect_silences
 
     rate, amp = 16000, int(32767 * 10 ** (-44 / 20))   # peak at -44 dBFS
     frames = [0] * rate + [int(amp * math.sin(2 * math.pi * 220 * i / rate)) for i in range(3 * rate)] + [0] * rate

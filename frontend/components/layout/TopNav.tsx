@@ -14,6 +14,7 @@ import { useUserStore } from "@/store/useUserStore";
 import { ThemeToggleButton } from "@/components/theme/ThemeToggle";
 import NotificationBell from "@/components/layout/NotificationBell";
 import { useIdle } from "@/hooks/useIdle";
+import { PRACTICE_PAGES } from "@/lib/modes";
 
 // The logo: the 3D clay mic from the home page, turning slowly (an icon until it loads)
 const ClayScene = dynamic(() => import("@/components/three/ClayScene"), {
@@ -21,13 +22,10 @@ const ClayScene = dynamic(() => import("@/components/three/ClayScene"), {
   loading: () => <Mic2 className="w-4 h-4 m-auto" style={{ color: "var(--pink)" }} />,
 });
 
-// The three practice functions, the script writer and your progress
+// Home, the practice functions, the script writer and your progress
 const LINKS: { href: string; label: string; also?: string[] }[] = [
   { href: "/home", label: "Home" },
-  { href: "/conversation", label: "Conversation" },
-  { href: "/interview", label: "Interview" },
-  { href: "/presentations", label: "Presentation" },
-  { href: "/impromptu", label: "Impromptu" },
+  ...PRACTICE_PAGES,
   { href: "/script", label: "Script" },
   { href: "/progress", label: "Progress", also: ["/results"] },
 ];

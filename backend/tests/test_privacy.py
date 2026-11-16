@@ -10,7 +10,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.main import app
 from app.services import tasks
-from app.services.storage import storage_service
+from app.services.storage import live_folder, storage_service
 from tests.test_e2e import _tone_wav
 
 
@@ -63,7 +63,7 @@ async def test_recording_deleted_after_analysis_unless_kept(client):
 
     s = await analysed()
     assert s["status"] == "complete" and not s["has_recording"]
-    assert not storage_service.get_absolute_path(f"live/{s['id']}").exists()
+    assert not storage_service.path(live_folder(s["id"])).exists()
 
     r = await client.put("/api/users/profile", headers=h, json={"keep_recordings": True})
     assert r.json()["keep_recordings"] is True
@@ -87,7 +87,7 @@ async def test_export_and_delete_account(client):
     assert [s["id"] for s in data["practice_sessions"]] == [lid]
     assert "recording_storage_path" not in data["practice_sessions"][0]
 
-    folder = storage_service.get_absolute_path(f"live/{lid}")
+    folder = storage_service.path(live_folder(lid))
     assert folder.exists()
     assert (await client.request("DELETE", "/api/users/me", headers=h, json={"password": "wrong"})).status_code == 403
     assert (await client.request("DELETE", "/api/users/me", headers=h, json={"password": "correct-horse"})).status_code == 204

@@ -1,5 +1,4 @@
-import { api, ApiError } from "./api";
-import { blobFilename } from "./presentation";
+import { api, ApiError, blobFilename } from "./api";
 import type { InterviewSetup, LiveSession, PracticePlan, SessionType, Turn } from "@/types";
 
 // The AI partner's voice: Kokoro-82M running in the browser (kokoro-js), so it needs no server.
@@ -71,9 +70,9 @@ export const conversationService = {
 
   /** Transcribe one spoken turn on the backend (cloud Whisper). 503 = not available. */
   /** `context` (the AI's last line, the role or deck…) helps the model hear topic words right. */
-  transcribe: async (audio: Blob, context?: string, filename = "turn.wav"): Promise<string> => {
+  transcribe: async (audio: Blob, context?: string): Promise<string> => {
     const form = new FormData();
-    form.append("file", audio, filename);
+    form.append("file", audio, blobFilename(audio, "turn"));
     if (context) form.append("context", context.slice(-1000));
     // Retry a dropped request, a rate limit or a provider hiccup; 503 (no STT configured) and other 4xx are final
     for (let attempt = 0; ; attempt++) {
@@ -113,7 +112,7 @@ export const conversationService = {
 
   /** Speech for the partner's reply: Kokoro in the browser once it has loaded, until then (or if it
    *  fails) the backend's /tts/speak; the caller falls back to the browser's built-in voice after that. */
-  speak: async (text: string, voice = "nova"): Promise<Blob> => {
+  speak: async (text: string): Promise<Blob> => {
     loadKokoro();
     if (kokoro) {
       try {
@@ -125,7 +124,7 @@ export const conversationService = {
     const res = await api.fetch("/tts/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, voice }),
+      body: JSON.stringify({ text }),
     });
     if (!res.ok) throw new Error(`TTS ${res.status}`);
     return res.blob();
@@ -133,11 +132,13 @@ export const conversationService = {
 };
 
 // Impromptu speaking: judge a 1-2 minute talk on a random topic (transcribe it first)
-export type ImpromptuResult = {
-  words: number; duration_sec: number; wpm: number; fillers: number; judged: boolean; summary: string;
-  understanding?: number; accuracy?: number; depth?: number; coverage?: number; relevance?: number; structure?: number;
-  understood?: string[]; missed?: string[]; mistakes?: string[]; outline?: string[];
-};
+// backend/app/services/impromptu.py judge(): a talk too short to judge has only the measured numbers
+type ImpromptuMeasured = { words: number; duration_sec: number; wpm: number; fillers: number; summary: string };
+export type ImpromptuResult = (ImpromptuMeasured & { judged: false }) | (ImpromptuMeasured & {
+  judged: true; understanding: number; verdict: string;
+  accuracy: number; depth: number; coverage: number; relevance: number; structure: number;
+  understood: string[]; missed: string[]; mistakes: string[]; outline: string[];
+});
 export const impromptuService = {
   evaluate: (topic: string, transcript: string, duration_sec: number) =>
     api.post<ImpromptuResult>("/impromptu/evaluate", { topic, transcript, duration_sec }),

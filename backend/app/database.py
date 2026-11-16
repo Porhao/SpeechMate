@@ -1,5 +1,7 @@
 """Async SQLAlchemy engine and session factory."""
 
+from sqlalchemy import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -19,8 +21,11 @@ async_session_factory = async_sessionmaker(
 
 
 class Base(DeclarativeBase):
-    """Base class for all ORM models."""
     pass
+
+
+# JSONB on Postgres, plain JSON elsewhere (e.g. SQLite in tests)
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 async def get_db() -> AsyncSession:
@@ -32,5 +37,3 @@ async def get_db() -> AsyncSession:
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()

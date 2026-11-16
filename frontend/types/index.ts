@@ -31,14 +31,6 @@ export interface UserProfileUpdate {
 export type StudyLevel = "Secondary" | "Pre-university" | "Undergraduate" | "Postgraduate" | "Working professional";
 export type FeedbackStyle = "encouraging" | "balanced" | "direct";
 
-export interface UserProfile {
-  id: string;
-  user_id: string;
-  age_group: string;
-  communication_goal: string;
-  skill_level: "Beginner" | "Intermediate" | "Advanced";
-  challenges: string[];
-}
 
 // The three practice functions. "Presentation" = Q&A rehearsal on an uploaded deck.
 export type SessionType = "Conversation" | "Interview" | "Presentation";
@@ -158,7 +150,6 @@ export type ContentFeedback =
 
 export interface AuthTokens {
   access_token: string;
-  refresh_token?: string | null;  // now an httpOnly cookie; absent from new responses
   token_type: string;
 }
 

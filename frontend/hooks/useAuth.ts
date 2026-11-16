@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { authService } from "@/services/auth";
 import { useUserStore } from "@/store/useUserStore";
 import type { LoginPayload, RegisterPayload } from "@/services/auth";
@@ -10,20 +11,11 @@ export function useAuth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { setUser, setProfile, logout: storeLogout } = useUserStore();
+  const setUser = useUserStore((s) => s.setUser);
 
   const signIn = async (data: LoginPayload) => {
     await authService.login(data);
-    const user = await authService.me();
-    setUser(user);
-    setProfile({
-      id: user.id,
-      user_id: user.id,
-      age_group: user.age_group ?? "",
-      communication_goal: user.communication_goal ?? "",
-      skill_level: (user.skill_level as "Beginner" | "Intermediate" | "Advanced") ?? "Beginner",
-      challenges: user.challenges,
-    });
+    setUser(await authService.me());
   };
 
   const login = async (data: LoginPayload) => {
@@ -58,9 +50,15 @@ export function useAuth() {
 
   const logout = async () => {
     await authService.logout();
-    storeLogout();
     router.push("/");
   };
 
   return { login, register, logout, loading, error };
+}
+
+/** For actions that need an account: true when signed in, else off to sign-in (coming back to `next`). */
+export function requireSignIn(router: ReturnType<typeof useRouter>, next = location.pathname + location.search): boolean {
+  if (authService.isSignedIn()) return true;
+  router.push(`/login?next=${encodeURIComponent(next)}`);
+  return false;
 }

@@ -6,6 +6,9 @@ from pydantic_settings import BaseSettings
 from pydantic import Field
 
 
+DEFAULT_SECRET_KEY = "change-me-in-production"
+
+
 class Settings(BaseSettings):
     """Application settings, populated from environment variables or .env file."""
 
@@ -29,7 +32,7 @@ class Settings(BaseSettings):
     max_concurrent_jobs: int = 2
 
     # Auth (JWT). Generate a real secret with: python -c "import secrets; print(secrets.token_hex(32))"
-    secret_key: str = "change-me-in-production"
+    secret_key: str = DEFAULT_SECRET_KEY
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7

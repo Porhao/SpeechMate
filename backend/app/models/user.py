@@ -6,8 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
-from app.models.session import JSONType
+from app.database import Base, JSONType
 
 
 class User(Base):

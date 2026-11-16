@@ -9,7 +9,9 @@ import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from app.services.live import rules
 from app.services.live._ml import available
+from app.services.text import count_words
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +37,6 @@ class FluencyResult:
     pause_source: str           # word_timestamps | audio
 
 
-def _count_words(text: str) -> int:
-    return len(re.findall(r"\b\w+\b", text))
-
-
 def grade(score: float) -> str:
     if score >= 80:
         return "Excellent"
@@ -60,7 +58,7 @@ def analyze_fluency(
     silences: list[tuple[float, float]],
 ) -> FluencyResult:
     """`silences` = ffmpeg silencedetect output (≥0.25 s), used when timestamps are too sparse."""
-    word_count = _count_words(transcript)
+    word_count = count_words(transcript)
 
     ts = word_timestamps
     if ts and len(ts) >= max(2, word_count * 0.5):
@@ -79,9 +77,7 @@ def analyze_fluency(
     articulation_rate = round(word_count / max(speech_time / 60, 0.01), 1)
     pause_frequency = len(pauses)
 
-    # Penalise pace away from ~135 WPM and frequent pauses
-    pace_score = 100 - abs(speaking_rate - 135) * 0.5
-    raw = max(0.0, min(100.0, pace_score - min(pause_frequency * 2, 30)))
+    raw = max(0.0, rules.pace_score(speaking_rate) - min(pause_frequency * 2, 30))
 
     return FluencyResult(
         fluency_score=round(raw, 1),
@@ -107,7 +103,6 @@ MARKERS = {
     "like", "you know", "i mean", "actually", "basically", "literally", "well", "right",
     "okay so", "so yeah", "macam", "sebenarnya",
 }
-ALL_FILLERS = HESITATIONS | MARKERS
 
 
 def count_fillers(transcript: str) -> dict[str, int]:

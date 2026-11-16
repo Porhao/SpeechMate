@@ -9,34 +9,24 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, require_cloud_consent
+from app.auth import get_current_user, get_owned, require_cloud_consent
 from app.database import get_db
-from app.limits import MB, rate_limit
+from app.limits import MB, rate_limit, save_limited
 from app.models.session import SESSION_IN_PROGRESS_STATUSES, Session
 from app.models.slide import Slide
 from app.models.user import User
 from app.schemas.session import ScriptRequest, SessionCreateResponse, SessionListItem, SessionStatusResponse
-from app.services import tasks
+from app.services import decks, tasks
 from app.services.learner import learner_brief
-from app.services.pipeline import run_ideal_presentation_pipeline
+from app.services.deck_pipeline import prepare_deck
 from app.services.script_writer import write_script
-from app.services.storage import storage_service
+from app.services.storage import deck_folder, storage_service
 
 MAX_DECK_BYTES = 100 * MB         # image-heavy PowerPoints get big
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
-
-
-async def get_session_or_404(db: AsyncSession, session_id: uuid.UUID, user: User) -> Session:
-    """The caller's deck; anyone else's gets 404, as if it didn't exist."""
-    session = (await db.execute(
-        select(Session).where(Session.id == session_id, Session.user_id == user.id)
-    )).scalar_one_or_none()
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
 
 
 @router.post("", response_model=SessionCreateResponse, status_code=201)
@@ -52,7 +42,9 @@ async def create_session(
         raise HTTPException(status_code=400, detail="The deck must be a PowerPoint (.pptx) or PDF (.pdf) file")
 
     session_id = uuid.uuid4()
-    pptx_path = await storage_service.save_upload_limited(str(session_id), f"original{deck_ext}", pptx, MAX_DECK_BYTES, "The deck")
+    upload = storage_service.path(deck_folder(session_id), f"original{deck_ext}")
+    await save_limited(pptx, upload, MAX_DECK_BYTES, "The deck")
+    pptx_path = storage_service.relative(upload)
     db.add(Session(
         id=session_id,
         original_filename=pptx.filename,
@@ -63,7 +55,7 @@ async def create_session(
     ))
     await db.commit()  # must be committed before the background job reads it
 
-    tasks.spawn(run_ideal_presentation_pipeline(session_id), name=f"deck-{session_id}")
+    tasks.spawn(prepare_deck(session_id), name=f"deck-{session_id}")
     logger.info("Session %s created for '%s'", session_id, pptx.filename)
     return SessionCreateResponse(session_id=session_id, status="queued")
 
@@ -82,7 +74,7 @@ async def list_sessions(user: User = Depends(get_current_user), db: AsyncSession
 @router.get("/{session_id}", response_model=SessionStatusResponse)
 async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """Poll a deck's preparation status, with how many slides are rendered so far."""
-    session = await get_session_or_404(db, session_id, user)
+    session = await get_owned(db, Session, session_id, user, "Session")
     rendered = await db.scalar(select(func.count()).select_from(Slide).where(Slide.session_id == session_id))
     return SessionStatusResponse(
         session_id=session.id,
@@ -99,24 +91,14 @@ async def get_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db),
     )
 
 
-async def deck_slides(db: AsyncSession, deck: Session) -> list[dict]:
-    """Each slide's title, text and key point (from the insights), in order."""
-    insights = deck.insights or {}
-    points = {p.get("slide_index"): p.get("key_point") for p in insights.get("slides") or []}
-    titles = {p.get("slide_index"): p.get("title") for p in (insights.get("stats") or {}).get("per_slide") or []}
-    rows = (await db.execute(select(Slide).where(Slide.session_id == deck.id).order_by(Slide.slide_index))).scalars()
-    return [{"index": s.slide_index, "title": titles.get(s.slide_index) or "", "text": (s.slide_text or "")[:1500],
-             "key_point": points.get(s.slide_index) or ""} for s in rows]
-
-
 @router.post("/{session_id}/script", dependencies=[Depends(rate_limit("script", 6))])
 async def write_deck_script(session_id: uuid.UUID, body: ScriptRequest, db: AsyncSession = Depends(get_db),
                             user: User = Depends(require_cloud_consent)):
     """Write (or rewrite) the deck's practice script for `minutes`; it replaces the previous one."""
-    session = await get_session_or_404(db, session_id, user)
+    session = await get_owned(db, Session, session_id, user, "Session")
     if not session.insights:
         raise HTTPException(status_code=409, detail="Wait until the deck has been read, then write its script")
-    slides = await deck_slides(db, session)
+    slides = await decks.slides(db, session)
     if not slides:
         raise HTTPException(status_code=409, detail="This deck has no slides")
     session.script = await write_script(slides, body.minutes, body.style, session.requirement_prompt, learner_brief(user))
@@ -127,32 +109,32 @@ async def write_deck_script(session_id: uuid.UUID, body: ScriptRequest, db: Asyn
 @router.post("/{session_id}/retry", response_model=SessionCreateResponse, status_code=202)
 async def retry_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User = Depends(require_cloud_consent)):
     """Prepare a failed (or completed) deck again."""
-    session = await get_session_or_404(db, session_id, user)
+    session = await get_owned(db, Session, session_id, user, "Session")
     if session.status in SESSION_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail=f"Session is still running ({session.status})")
     session.status = "queued"
     session.error_detail = None
     await db.commit()
-    tasks.spawn(run_ideal_presentation_pipeline(session_id), name=f"deck-retry-{session_id}")
+    tasks.spawn(prepare_deck(session_id), name=f"deck-retry-{session_id}")
     return SessionCreateResponse(session_id=session_id, status="queued")
 
 
 @router.delete("/{session_id}", status_code=204)
 async def delete_session(session_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """Delete a deck, its slides and all stored files."""
-    session = await get_session_or_404(db, session_id, user)
+    session = await get_owned(db, Session, session_id, user, "Session")
     if session.status in SESSION_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="Wait for the pipeline to finish before deleting")
     await db.delete(session)
     await db.commit()
-    storage_service.delete_session(str(session_id))
+    storage_service.delete_folder(deck_folder(session_id))
 
 
 @router.get("/{session_id}/slides/{slide_index}/image")
 async def get_slide_image(session_id: uuid.UUID, slide_index: int, db: AsyncSession = Depends(get_db),
                           user: User = Depends(get_current_user)):
     """A slide's rendered PNG (the frontend fetches it with the Bearer token: components/presentation/SlideImage)."""
-    await get_session_or_404(db, session_id, user)
+    await get_owned(db, Session, session_id, user, "Session")
     slide = (await db.execute(
         select(Slide).where(Slide.session_id == session_id, Slide.slide_index == slide_index)
     )).scalar_one_or_none()

@@ -3,7 +3,8 @@
 // Your privacy controls (PDPA): cloud-processing consent, keeping recordings, downloading all
 // your data, and deleting the account. On the Privacy & security page.
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
+import { useHydrated } from "@/hooks/useHydrated";
 import { Download, Loader2, Trash2 } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { authService } from "@/services/auth";
@@ -26,8 +27,7 @@ export function Row({ label, description, children }: { label: string; descripti
 export default function PrivacyControls() {
   const user = useUserStore((s) => s.user);
   const setUser = useUserStore((s) => s.setUser);
-  const clearUser = useUserStore((s) => s.logout);
-  const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const hydrated = useHydrated();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -73,7 +73,7 @@ export default function PrivacyControls() {
           <form className="flex flex-wrap items-center gap-2 w-full sm:w-auto"
             onSubmit={(e) => { e.preventDefault(); run("delete", async () => {
               await authService.deleteAccount(password);
-              await authService.logout(); clearUser(); window.location.href = "/login";
+              await authService.logout(); window.location.href = "/login";
             }); }}>
             <label className="sr-only" htmlFor="delete-password">Your password</label>
             <input id="delete-password" type="password" autoComplete="current-password" required placeholder="Your password"

@@ -1,4 +1,5 @@
-"""Shared helpers for external AI calls: client construction and retries."""
+"""External AI calls: the LLM (validated JSON or plain text, with token accounting and a fallback
+model), the speech clients, and retries."""
 
 import asyncio
 import contextlib
@@ -10,17 +11,18 @@ from contextvars import ContextVar
 from typing import TypeVar
 
 import httpx
+import openai
 from openai import AsyncOpenAI
+from pydantic import BaseModel, ValidationError
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
+M = TypeVar("M", bound=BaseModel)
 
 _openai_client: AsyncOpenAI | None = None
-
-
 _llm_client: AsyncOpenAI | None = None
 
 # ── LLM token usage ─────────────────────────────────────────────────────────
@@ -101,22 +103,24 @@ def llm_provider() -> str | None:
 
 
 def get_llm_client() -> AsyncOpenAI | None:
-    """Client for text + vision calls (chat, feedback, slide scripts), or None if no LLM is configured.
+    """Client for every LLM call, or None if no LLM is configured.
 
-    LLM_BASE_URL points these at any OpenAI-compatible server — Ollama, vLLM,
-    LM Studio, Gemini's or DashScope's compatible endpoints — independently of
-    speech, which stays on OpenAI / local models (see get_openai_client).
+    LLM_BASE_URL points it at any OpenAI-compatible server — Ollama, vLLM, LM Studio, Gemini's or
+    DashScope's compatible endpoints — independently of speech (get_openai_client). Without it the
+    LLM is OpenAI itself, still with token accounting and the fallback model.
     """
     global _llm_client
-    if not settings.llm_base_url:
-        return get_openai_client()
+    if llm_provider() is None:
+        return None
     if _llm_client is None:
         transport = httpx.AsyncHTTPTransport()
         if settings.llm_fallback_model:
             transport = _FallbackModelTransport(transport, settings.llm_fallback_model)
+        custom = llm_provider() == "custom"
         _llm_client = AsyncOpenAI(
-            api_key=settings.llm_api_key or "not-needed",  # Ollama ignores it, the SDK requires one
-            base_url=settings.llm_base_url,
+            # Ollama ignores the key, but the SDK requires one
+            api_key=(settings.llm_api_key or "not-needed") if custom else settings.openai_api_key,
+            base_url=settings.llm_base_url if custom else (settings.openai_base_url or None),
             timeout=settings.llm_timeout_sec,
             max_retries=0,
             http_client=httpx.AsyncClient(timeout=settings.llm_timeout_sec, transport=transport,
@@ -155,6 +159,10 @@ def get_openai_client() -> AsyncOpenAI | None:
     return _openai_client
 
 
+# Worth another try: the network, a timeout, a rate limit or a provider-side 5xx. A 4xx is final.
+TRANSIENT = (openai.APIConnectionError, openai.APITimeoutError, openai.RateLimitError, openai.InternalServerError)
+
+
 async def with_retries(
     fn: Callable[[], Awaitable[T]],
     *,
@@ -162,22 +170,18 @@ async def with_retries(
     base_delay: float = 1.5,
     label: str = "call",
 ) -> T:
-    """Run an async call with exponential backoff. Re-raises the last error."""
+    """Run an async provider call, retrying transient errors with exponential backoff. Re-raises the last error."""
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
             return await fn()
-        except Exception as e:  # noqa: BLE001 — every provider error should be retried
+        except TRANSIENT as e:
             last_error = e
             logger.warning("%s failed (attempt %d/%d): %s", label, attempt, attempts, e)
             if attempt < attempts:
                 await asyncio.sleep(base_delay * 2 ** (attempt - 1))
     assert last_error is not None
     raise last_error
-
-
-def count_words(text: str) -> int:
-    return len(re.findall(r"\b[\w'’-]+\b", text))
 
 
 def parse_json_object(text: str) -> dict:
@@ -190,3 +194,48 @@ def parse_json_object(text: str) -> dict:
     if not isinstance(data, dict):
         raise ValueError("Expected a JSON object")
     return data
+
+
+async def llm_json(system: str, payload: dict, model_cls: type[M], *, temperature: float = 0.4,
+                   check: Callable[[M], str | None] | None = None, tries: int = 2) -> M | None:
+    """The LLM's JSON answer to `payload`, validated against `model_cls` and `check(result) -> problem | None`,
+    re-prompted with the problem (`tries` attempts in all). None without an LLM or when no answer validates.
+    An answer that still fails `check` is returned as is: the caller decides whether to repair or drop it.
+    Transient provider errors are retried; others propagate (the caller has the fallback)."""
+    client = get_llm_client()
+    if client is None:
+        return None
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
+    result = None
+    for _ in range(tries):
+        resp = await with_retries(lambda: client.chat.completions.create(
+            model=settings.llm_model, messages=messages, response_format={"type": "json_object"}, temperature=temperature
+        ), label="LLM (JSON)")
+        content = resp.choices[0].message.content or ""
+        try:
+            result = model_cls.model_validate(parse_json_object(content))
+            problem = check(result) if check else None
+        except (ValueError, ValidationError) as e:
+            problem = f"That was invalid: {e}"
+        if not problem:
+            return result
+        logger.warning("LLM output rejected, re-prompting: %s", problem)
+        messages += [{"role": "assistant", "content": content},
+                     {"role": "user", "content": f"{problem}. Return corrected JSON only."}]
+    return result
+
+
+async def llm_text(system: str, messages: list[dict], *, max_tokens: int, temperature: float) -> str | None:
+    """A plain-text reply, or None without an LLM, on a provider error (logged) or an empty answer."""
+    client = get_llm_client()
+    if client is None:
+        return None
+    try:
+        resp = await client.chat.completions.create(
+            model=settings.llm_model, messages=[{"role": "system", "content": system}, *messages],
+            max_tokens=max_tokens, temperature=temperature,
+        )
+    except Exception as e:  # noqa: BLE001 — every caller has its own fallback
+        logger.warning("LLM text call failed: %s", e)
+        return None
+    return (resp.choices[0].message.content or "").strip().strip('"') or None

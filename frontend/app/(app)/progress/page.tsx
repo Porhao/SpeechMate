@@ -9,12 +9,14 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { liveService } from "@/services/live";
 import { authService } from "@/services/auth";
 import { Card, LinkButton, Notice, PageHeader, statusColor } from "@/components/ui/kit";
-import type { LiveSession, MetricStatus } from "@/types";
+import type { LiveSession } from "@/types";
 import { formatDate, formatDateTime, formatDay, formatDuration } from "@/lib/format";
 import { mascot } from "@/lib/mascot";
 import { useExit } from "@/hooks/useExit";
 import DeleteButton from "@/components/ui/DeleteButton";
 import { SearchBar, Highlight, matches } from "@/components/ui/SearchBar";
+import { sessionLabel, sessionSubtitle } from "@/lib/modes";
+import { overallScore, STRONG, statusOf } from "@/lib/scores";
 
 const TYPES = [
   { id: "all", label: "All" },
@@ -22,7 +24,6 @@ const TYPES = [
   { id: "Interview", label: "Interview" },
   { id: "Presentation", label: "Presentation Q&A" },
 ] as const;
-const TYPE_LABEL: Record<string, string> = { Conversation: "Conversation", Interview: "Mock interview", Presentation: "Presentation Q&A", Pronunciation: "Pronunciation" };
 const PILLARS = [
   { key: "voice", label: "Voice & delivery" },
   { key: "language", label: "Language & clarity" },
@@ -30,30 +31,15 @@ const PILLARS = [
   { key: "confidence", label: "Confidence & presence" },
 ] as const;
 
-const statusOf = (v: number | null): MetricStatus => (v == null ? null : v >= 75 ? "good" : v >= 55 ? "ok" : "work");
-
-function overall(s: LiveSession): number | null {
-  const a = s.analysis;
-  if (!a) return null;
-  if (a.communication_score.overall_score != null) return Math.round(a.communication_score.overall_score);
-  const vals = PILLARS.map((p) => a.pillars?.[p.key]?.score).filter((v): v is number => v != null);
-  return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null;
-}
-
-function subtitle(s: LiveSession) {
-  if (s.session_type === "Interview") return s.context?.setup?.position;
-  if (s.session_type === "Presentation") return s.context?.deck_title;
-  return s.context?.topic;
-}
+const overall = (s: LiveSession) => overallScore(s.analysis);
 
 /** A session's name in the list: its kind, plus the topic, role or deck. */
-const rowTitle = (s: LiveSession) =>
-  `${s.context?.kind === "talk" ? "Presentation" : TYPE_LABEL[s.session_type] ?? s.session_type}${subtitle(s) ? ` · ${subtitle(s)}` : ""}`;
+const rowTitle = (s: LiveSession) => [sessionLabel(s), sessionSubtitle(s)].filter(Boolean).join(" · ");
 
 type Point = { v: number; date: string; label?: string };  // label: shown in the tooltip instead of v
 
 // One score over time (oldest → newest, 0–100): a single 2px line in the accent ink, a dashed
-// "Strong" reference at 75, Best and Latest marked, a crosshair + tooltip on hover/focus, and a
+// "Strong" reference line, Best and Latest marked, a crosshair + tooltip on hover/focus, and a
 // table view for screen readers and anyone who prefers numbers.
 function Trend({ points, height = 140, title }: { points: Point[]; height?: number; title: string }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -119,8 +105,8 @@ function Trend({ points, height = 140, title }: { points: Point[]; height?: numb
                 <text x={left - 6} y={y(g) + 3} textAnchor="end" fontSize={10} fill="var(--muted)">{g}</text>
               </g>
             ))}
-            <line x1={left} x2={w - right} y1={y(75)} y2={y(75)} stroke="var(--line-strong)" strokeWidth={1} strokeDasharray="4 4" />
-            <text x={left + 4} y={y(75) + 12} fontSize={10} fill="var(--muted)">Strong (75)</text>
+            <line x1={left} x2={w - right} y1={y(STRONG)} y2={y(STRONG)} stroke="var(--line-strong)" strokeWidth={1} strokeDasharray="4 4" />
+            <text x={left + 4} y={y(STRONG) + 12} fontSize={10} fill="var(--muted)">Strong ({STRONG})</text>
             <path d={d} fill="none" stroke="var(--accent-ink)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
             {h && <line x1={x(hover!)} x2={x(hover!)} y1={top} y2={height - bottom} stroke="var(--line-strong)" strokeWidth={1} />}
             {points.map((p, i) => (

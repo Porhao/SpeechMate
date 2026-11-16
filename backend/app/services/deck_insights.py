@@ -11,13 +11,12 @@ outline is built from the slide text instead. Slides are read as text only: imag
 slides are flagged rather than interpreted.
 """
 
-import json
 import logging
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
-from app.config import settings
-from app.services.ai import count_words, get_llm_client, parse_json_object
+from app.services import ai
+from app.services.text import count_words
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +143,7 @@ def rule_based_insights(texts: list[str], stats: dict, requirement_prompt: str |
 async def analyse_deck(texts: list[str], requirement_prompt: str | None) -> tuple[dict, str | None]:
     """Returns (insights, warning). Insights always include `stats` and `source` (llm | rules)."""
     stats = deck_stats(texts)
-    client = get_llm_client()
+    client = ai.get_llm_client()
     if client is None or not any(t.strip() for t in texts):
         reason = None if client is None else "The deck has no readable text, so insights are limited to its structure."
         return {**rule_based_insights(texts, stats, requirement_prompt), "stats": stats, "source": "rules"}, reason
@@ -155,31 +154,22 @@ async def analyse_deck(texts: list[str], requirement_prompt: str | None) -> tupl
         "stats": {k: v for k, v in stats.items() if k != "per_slide"},
         "slides": [{"slide_index": i, "text": t[:MAX_CHARS_PER_SLIDE]} for i, t in enumerate(texts, start=1)],
     }
-    messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}]
+
+    def check(data: _Insights) -> str | None:
+        bad = sorted({i for s in data.structure for i in s.slides if not 1 <= i <= n}
+                     | {s.slide_index for s in data.slides if not 1 <= s.slide_index <= n})
+        return f"Slide numbers {bad} don't exist; the deck has slides 1-{n}" if bad else None
+
     try:
-        for _ in range(2):
-            resp = await client.chat.completions.create(
-                model=settings.llm_model, messages=messages, response_format={"type": "json_object"}, temperature=0.3
-            )
-            content = resp.choices[0].message.content or ""
-            try:
-                data = _Insights.model_validate(parse_json_object(content))
-                bad = sorted({i for s in data.structure for i in s.slides if not 1 <= i <= n}
-                             | {s.slide_index for s in data.slides if not 1 <= s.slide_index <= n})
-                if bad:
-                    raise ValueError(f"slide numbers {bad} don't exist; the deck has slides 1-{n}")
-                out = data.model_dump()
-                # Make sure every slide has a key point (fill gaps from its title)
-                have = {s["slide_index"] for s in out["slides"]}
-                for s in stats["per_slide"]:
-                    if s["slide_index"] not in have:
-                        out["slides"].append({"slide_index": s["slide_index"], "key_point": s["title"] or "—"})
-                out["slides"].sort(key=lambda s: s["slide_index"])
-                return {**out, "stats": stats, "source": "llm"}, None
-            except (ValueError, ValidationError) as e:
-                logger.warning("Deck insights JSON invalid, re-prompting: %s", e)
-                messages += [{"role": "assistant", "content": content},
-                             {"role": "user", "content": f"That was invalid: {e}. Return corrected JSON only."}]
+        data = await ai.llm_json(SYSTEM, payload, _Insights, temperature=0.3, check=check)
+        if data is not None and check(data) is None:
+            out = data.model_dump()
+            have = {s["slide_index"] for s in out["slides"]}
+            for s in stats["per_slide"]:  # a slide the model skipped gets its title as the key point
+                if s["slide_index"] not in have:
+                    out["slides"].append({"slide_index": s["slide_index"], "key_point": s["title"] or "—"})
+            out["slides"].sort(key=lambda s: s["slide_index"])
+            return {**out, "stats": stats, "source": "llm"}, None
         warning = "The AI deck analysis returned invalid results twice; showing a text-based outline instead."
     except Exception as e:  # noqa: BLE001
         logger.error("Deck insights failed: %s", e)

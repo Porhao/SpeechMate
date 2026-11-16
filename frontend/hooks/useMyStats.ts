@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { liveService } from "@/services/live";
 import { authService } from "@/services/auth";
 import type { LiveSession } from "@/types";
+import { overallScore } from "@/lib/scores";
 
 export interface MyStats {
   sessions: number;
@@ -22,7 +23,7 @@ export interface MyStats {
 const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 function compute(list: LiveSession[]): MyStats {
-  const scoreOf = (s: LiveSession) => s.analysis?.communication_score.overall_score ?? null;
+  const scoreOf = (s: LiveSession) => overallScore(s.analysis);
   const byMode: MyStats["byMode"] = {};
   for (const s of list) {
     const m = (byMode[s.session_type] ??= { sessions: 0, avgScore: null });

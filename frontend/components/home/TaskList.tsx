@@ -12,19 +12,18 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Check, Flag, Loader2 } from "lucide-react";
 import { mascot } from "@/lib/mascot";
-import { deckProgress } from "@/lib/deckPipeline";
-import { DECK_IN_PROGRESS } from "@/services/presentation";
+import { DECK_IN_PROGRESS, deckProgress, deckTitle } from "@/lib/deckPipeline";
 import type { DeckListItem, LiveSession } from "@/types";
 import { formatDay } from "@/lib/format";
+import { MODES } from "@/lib/modes";
 
 type Priority = "Urgent" | "High" | null;
-// Titles are dictionary keys plus their details, translated when shown
 interface Task { id: string; title: string; tag: keyof typeof TAGS; due: Date; priority: Priority; href: string }
 interface Pending { id: string; title: string; tag: keyof typeof TAGS; status: string; href: string }
 
 const TAGS = {
-  Conversation: { label: "Conversation", dot: "var(--pink)" },
-  Interview: { label: "Mock interview", dot: "var(--teal-ink)" },
+  Conversation: { label: MODES.Conversation.label, dot: "var(--pink)" },
+  Interview: { label: MODES.Interview.label, dot: "var(--teal-ink)" },
   Presentation: { label: "Presentation", dot: "var(--lavender)" },
   Daily: { label: "Daily practice", dot: "var(--peach)" },
 } as const;
@@ -71,7 +70,7 @@ function buildTasks(sessions: LiveSession[], decks: DeckListItem[]): { due: Task
   // Decks: present the ready ones, then rehearse their Q&A; fix the ones that failed
   for (const d of decks) {
     const p = deckProgress(d, sessions);
-    const name = d.original_filename.replace(/\.(pptx|pdf)$/i, "");
+    const name = deckTitle(d.original_filename);
     if (d.status === "failed") due.push({ id: `deck-failed-${d.session_id}`, title: `Retry preparing “${name}”`, tag: "Presentation", due: new Date(d.created_at), priority: "Urgent", href: `/presentations/${d.session_id}` });
     else if (p.stage === "ready") due.push({ id: `deck-present-${d.session_id}`, title: `Present “${name}”`, tag: "Presentation", due: plusDays(d.created_at, 2), priority: "High", href: `/presentations/${d.session_id}` });
     else if (p.stage === "presented") due.push({ id: `deck-qa-${d.session_id}`, title: `Rehearse the Q&A for “${name}”`, tag: "Presentation", due: plusDays(p.lastAt ?? d.created_at, 2), priority: null, href: `/presentations/${d.session_id}` });

@@ -1,6 +1,8 @@
 // The session's script and helpers: what the partner says when it has no LLM or plan,
 // and the live mood and pace read-outs. Plain data and pure functions (no React).
 
+import type { SessionType } from "@/types";
+
 // ── Random topics (RandomTopicGen-inspired) ───────────────────────────────────
 export const RANDOM_TOPICS = [
   "What technology will change the world most in the next decade?",
@@ -18,7 +20,7 @@ export const RANDOM_TOPICS = [
 ];
 
 // ── Mode content ──────────────────────────────────────────────────────────────
-export const MODE_PROMPTS: Record<string, string[]> = {
+export const MODE_PROMPTS: Record<SessionType, string[]> = {
   Conversation: [
     "Let's have a natural conversation. Tell me — what's been the most interesting thing in your week?",
     "What's one skill or hobby you've been trying to develop lately?",
@@ -40,13 +42,7 @@ export const MODE_PROMPTS: Record<string, string[]> = {
   ],
 };
 
-export const MODE_TITLES: Record<string, string> = {
-  Conversation: "Daily conversation",
-  Interview: "Mock interview",
-  Presentation: "Presentation Q&A",
-};
-
-export const MODE_ACKS: Record<string, string[]> = {
+export const MODE_ACKS: Record<SessionType, string[]> = {
   Conversation: [
     "That's a really interesting perspective! ",
     "I love that — tell me more about it. ",
@@ -76,7 +72,6 @@ export const CHECKIN_MESSAGES = [
 export const BACKCHANNEL_TEXTS = ["Mm-hmm.", "I see.", "Right.", "Yeah.", "Go on.", "Interesting."];
 // Hesitation sounds only: ordinary words ("like", "so", "right") and Manglish particles
 // aren't disfluencies (the server's analysis handles fillers in context)
-export const FILLER_WORDS = new Set(["um", "umm", "uh", "uhh", "er", "err", "erm", "ah", "hmm"]);
 
 export const clamp  = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
 export const ema    = (prev: number, next: number, a = 0.2) => prev * (1 - a) + next * a;

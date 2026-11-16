@@ -11,12 +11,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Copy, Download, Loader2, PenLine, Presentation } from "lucide-react";
 import { presentationService } from "@/services/presentation";
 import { liveService } from "@/services/live";
-import { authService } from "@/services/auth";
 import SlideImage from "@/components/presentation/SlideImage";
 import { Button, Card, Field, LinkButton, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import { mascot } from "@/lib/mascot";
 import { formatDuration } from "@/lib/format";
 import type { DeckListItem, DeckScript, DeckStatusResponse, ScriptStyle } from "@/types";
+import { sessionUrl } from "@/lib/modes";
+import { requireSignIn } from "@/hooks/useAuth";
+import { deckTitle } from "@/lib/deckPipeline";
 
 const STYLES: { id: ScriptStyle; label: string; hint: string }[] = [
   { id: "full", label: "Full script", hint: "Word for word: read it aloud a few times, then loosen it" },
@@ -24,7 +26,7 @@ const STYLES: { id: ScriptStyle; label: string; hint: string }[] = [
 ];
 
 const asText = (deck: DeckStatusResponse, s: DeckScript) =>
-  `${deck.original_filename.replace(/\.(pptx|pdf)$/i, "")}: ${s.minutes} min script\n\n` +
+  `${deckTitle(deck.original_filename)}: ${s.minutes} min script\n\n` +
   s.slides.map((p) => `Slide ${p.slide_index} (${formatDuration(p.seconds)})\n${p.text}`).join("\n\n");
 
 function ScriptWriter() {
@@ -41,7 +43,7 @@ function ScriptWriter() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authService.isSignedIn()) { router.push("/login?next=/script"); return; }
+    if (!requireSignIn(router)) return;
     presentationService.list()
       .then((all) => setDecks(all.filter((d) => d.status === "complete")))
       .catch((e: Error) => { setDecks([]); setError(e.message); });
@@ -77,7 +79,7 @@ function ScriptWriter() {
     setStarting(true); setError(null);
     try {
       const s = await liveService.start({ session_type: "Presentation", deck_id: deck.session_id, presentation_mode: "talk", use_script: true });
-      router.push(`/session?mode=Presentation&live=${s.id}`);
+      router.push(sessionUrl("Presentation", { live: s.id }));
     } catch (e) { setError(e instanceof Error ? e.message : "Couldn't start the session"); setStarting(false); }
   };
 
@@ -90,7 +92,7 @@ function ScriptWriter() {
   const download = () => {
     if (!deck?.script) return;
     const url = URL.createObjectURL(new Blob([asText(deck, deck.script)], { type: "text/plain" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: `${deck.original_filename.replace(/\.(pptx|pdf)$/i, "")} script.txt` });
+    const a = Object.assign(document.createElement("a"), { href: url, download: `${deckTitle(deck.original_filename)} script.txt` });
     a.click(); URL.revokeObjectURL(url);
   };
 

@@ -13,8 +13,8 @@ import pytest
 from app.config import settings
 from app.database import Base, engine
 from app.main import app
-from app.services import tasks
-from app.services.live import coaching, language, scoring, speech
+from app.services import ai, tasks
+from app.services.live import coaching, language, rules, scoring, speech
 from tests.conftest import sign_in
 from tests.test_e2e import _tone_wav
 
@@ -30,11 +30,20 @@ def test_language_detection_flags_manglish():
     assert language.detect_language_and_accent("saya suka makan nasi dengan kawan").primary_language == "ms"
 
 
-def test_accent_allowance_only_for_malaysian_english():
-    en = language.detect_language_and_accent("hello everyone")
-    ms = language.detect_language_and_accent("saya suka makan nasi dengan kawan")
-    assert language.adjust_pronunciation_for_accent(80.0, en) == 84.0
-    assert language.adjust_pronunciation_for_accent(80.0, ms) == 80.0
+def test_english_words_count_as_manglish_particles_only_at_the_end_of_a_clause():
+    assert language.manglish_particles("I eat already. So nice one! Can lah") == ["already", "lah", "one"]
+    assert language.manglish_particles("What do you think? Also, we got there early.") == []
+    assert language.detect_language_and_accent("What did you also get from the market?").primary_language == "en"
+
+
+def test_accent_allowance_only_for_the_word_level_scorer_on_malaysian_english():
+    from app.services.live.pronunciation import PHONE_GOP, PronunciationResult
+
+    word_level = PronunciationResult(score=80.0)
+    assert word_level.accent_fair_score(malaysian_english=True) > 80.0
+    assert word_level.accent_fair_score(malaysian_english=False) == 80.0
+    assert PronunciationResult(score=80.0, method=PHONE_GOP).accent_fair_score(True) == 80.0  # already accent-fair
+    assert language.detect_language_and_accent("hello everyone").accent_type == "Malaysian English"
 
 
 def test_fluency_from_word_timestamps():
@@ -117,7 +126,7 @@ def test_confidence_uses_every_cue_and_explains_itself():
     )
     assert c.coverage == 1.0 and len(c.cues) == 11
     by = {q["key"]: q["score"] for q in c.cues}
-    assert by["pace"] == 40.0                                # 40 wpm too slow x 1.5
+    assert by["pace"] < 50 and by["pace"] == rules.pace_score(80)  # the same rule as the Voice pillar
     assert by["repetitions"] == 55.0                         # 3 a minute x 15
     assert c.label == "Low" and c.confidence_score < 50
     calm = scoring.estimate_confidence(speaking_rate=140, talk_minutes=2, pause_frequency=8, repetition_count=0,
@@ -180,7 +189,7 @@ async def test_llm_plan_cannot_invent_unmeasured_issues(monkeypatch):
                          "why": "listeners notice this", "drill": "do the drill for five minutes daily", "target": "under 3/min"}
     invented = _json.dumps({"summary": "Good clear voice today.", "focus": [item("vocal_variety")]})
     valid = _json.dumps({"summary": "Good clear voice today.", "focus": [item("fillers"), item("pace")]})
-    monkeypatch.setattr(coaching, "get_llm_client", lambda: _FakeLLM([invented, valid]))
+    monkeypatch.setattr(ai, "get_llm_client", lambda: _FakeLLM([invented, valid]))
     plan = await coaching.build_plan(candidates=_candidates(), strengths=["Posture"], session_type="Presentation",
                                      user_goal=None, session_history_count=1, transcript_excerpt="", warnings=[])
     assert plan.source == "llm"
@@ -188,7 +197,7 @@ async def test_llm_plan_cannot_invent_unmeasured_issues(monkeypatch):
 
 
 async def test_llm_plan_falls_back_to_measured_plan(monkeypatch):
-    monkeypatch.setattr(coaching, "get_llm_client", lambda: _FakeLLM(["not json", "still not json"]))
+    monkeypatch.setattr(ai, "get_llm_client", lambda: _FakeLLM(["not json", "still not json"]))
     plan = await coaching.build_plan(candidates=_candidates(), strengths=[], session_type="Presentation",
                                      user_goal=None, session_history_count=1, transcript_excerpt="", warnings=[])
     assert plan.source == "rules"
@@ -234,8 +243,8 @@ async def test_auth_and_profile(client: httpx.AsyncClient):
     client.cookies.clear()
     assert (await client.post("/api/auth/refresh")).status_code == 401
     # An access token can't be used as a refresh token
-    r = await client.post("/api/auth/refresh", json={"refresh_token": login.json()["access_token"]})
-    assert r.status_code == 401
+    client.cookies.set("sm_refresh", login.json()["access_token"], path="/api/auth")
+    assert (await client.post("/api/auth/refresh")).status_code == 401
 
 
 async def test_login_is_rate_limited_per_account(client: httpx.AsyncClient):

@@ -7,12 +7,13 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 import { interviewService, liveService } from "@/services/live";
-import { authService } from "@/services/auth";
 import ClayArt from "@/components/three/ClayArt";
 import UploadCard, { type UploadPhase } from "@/components/ui/UploadCard";
 import { mascot } from "@/lib/mascot";
 import { Button, Card, Field, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import type { InterviewSetup, PracticePlan } from "@/types";
+import { sessionUrl } from "@/lib/modes";
+import { requireSignIn } from "@/hooks/useAuth";
 
 const LEVELS: { id: InterviewSetup["level"]; label: string }[] = [
   { id: "internship", label: "Internship" },
@@ -109,11 +110,11 @@ export default function InterviewSetupPage() {
   };
 
   const start = async () => {
-    if (!authService.isSignedIn()) { router.push("/login?next=/interview"); return; }
+    if (!requireSignIn(router)) return;
     setStarting(true); setError(null);
     try {
       const s = await liveService.start({ session_type: "Interview", interview: clean(), plan: plan ?? undefined });
-      router.push(`/session?mode=Interview&live=${s.id}`);
+      router.push(sessionUrl("Interview", { live: s.id }));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't start the interview");
       setStarting(false);

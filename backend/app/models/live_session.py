@@ -3,11 +3,10 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, Uuid, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
-from app.models.session import JSONType
+from app.database import Base, JSONType
 
 LIVE_IN_PROGRESS_STATUSES = ("analyzing",)
 
@@ -35,7 +34,7 @@ class LiveSession(Base):
     context: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     # What was said, turn by turn: [{role: user|assistant, text, t_sec}]
     turns: Mapped[list | None] = mapped_column(JSONType, nullable=True)
-    # Measured in the browser during the session (gaze tunneling, response latency, …)
+    # Measured in the browser during the session (schemas/live.py ClientMetrics)
     client_metrics: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -44,4 +43,13 @@ class LiveSession(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="live_sessions")  # noqa: F821
+
+
+# Opened (a row is created as soon as the practice page loads) but never ended or recorded: not an attempt
+NEVER_USED = and_(LiveSession.status == "active", LiveSession.duration_sec == 0, LiveSession.recording_storage_path.is_(None))
+
+
+def results_link(live_id) -> str:
+    """Where a session's notifications point (and how they're found again when it's deleted)."""
+    return f"/results/{live_id}"
 
