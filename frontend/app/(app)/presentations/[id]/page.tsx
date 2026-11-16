@@ -90,8 +90,9 @@ export default function PresentationWorkspace() {
         <Link href="/presentations" className="nav-pill w-10 h-10 rounded-full flex items-center justify-center" aria-label="Back to presentations">
           <ArrowLeft className="w-4 h-4" />
         </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="font-display text-3xl truncate" style={{ color: "var(--ink)" }}>{deck.original_filename.replace(/\.(pptx|pdf)$/i, "")}</h1>
+        {/* min width: on a phone the action pills wrap below instead of squeezing the title away */}
+        <div className="flex-1 min-w-[200px]">
+          <h1 className="font-display text-2xl sm:text-3xl truncate" style={{ color: "var(--ink)" }}>{deck.original_filename.replace(/\.(pptx|pdf)$/i, "")}</h1>
           <p className="text-sm" style={{ color: "var(--muted)" }}>
             {deck.slide_count ? `${deck.slide_count} slides` : "Presentation"}
             {deck.insights?.stats && ` · aim for about ${deck.insights.stats.estimated_minutes[0]}–${deck.insights.stats.estimated_minutes[1]} min`}

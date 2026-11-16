@@ -86,7 +86,9 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-11 w-[min(360px,calc(100vw-2rem))] z-50"
+        // Phone: pinned across the screen under the bar. Wider: hangs from the bell's right edge
+        // (the bell sits near the right side, so a left-aligned panel ran off the screen)
+        <div className="fixed inset-x-4 top-[76px] sm:absolute sm:inset-x-auto sm:right-0 sm:top-11 sm:w-[360px] z-50 rounded-lg overflow-hidden"
           style={{ background: "var(--surface)", border: "1px solid var(--line)", boxShadow: "var(--shadow-modal)" }}>
           <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--line)" }}>
             <p className="text-sm font-semibold text-[var(--ink)]">Notifications</p>

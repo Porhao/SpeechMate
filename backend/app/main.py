@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import settings
-from app.routers import assistant, auth, conversation, health, live, notifications, sessions
+from app.routers import assistant, auth, conversation, health, impromptu, live, notifications, sessions
 from app.services import tasks
 
 # Configure logging
@@ -59,3 +59,4 @@ app.include_router(live.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(conversation.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(impromptu.router, prefix="/api")

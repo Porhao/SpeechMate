@@ -10,7 +10,7 @@ import { useMyStats } from "@/hooks/useMyStats";
 import { authService } from "@/services/auth";
 import { Button, Card, Field, Notice, PageHeader, inputClass, inputStyle } from "@/components/ui/kit";
 import { mascot } from "@/lib/mascot";
-import type { FeedbackStyle, StudyLevel } from "@/types";
+import type { FeedbackStyle, StudyLevel, User } from "@/types";
 import { formatMonth } from "@/lib/format";
 
 const GOAL_OPTIONS = [
@@ -58,10 +58,27 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 }
 
 export default function ProfilePage() {
-  const { user, profile, setUser, setProfile } = useUserStore();
-  const { stats } = useMyStats();
+  const user = useUserStore((s) => s.user);
   // The signed-in user comes from localStorage, which the server render can't see
   const hydrated = useSyncExternalStore(() => () => {}, () => true, () => false);
+
+  if (!hydrated) return null;
+  if (!user) {
+    return (
+      <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto">
+        <PageHeader title="Profile" />
+        <Notice>Sign in to see and edit your profile.</Notice>
+      </div>
+    );
+  }
+  // Mounted only once the saved user is known, so the fields start from their details
+  // (the first render after a page load still sees no user and would leave the form blank)
+  return <ProfileForm key={user.id} user={user} />;
+}
+
+function ProfileForm({ user }: { user: User }) {
+  const { profile, setUser, setProfile } = useUserStore();
+  const { stats } = useMyStats();
 
   const [name,       setName]       = useState(user?.full_name ?? "");
   const [goal,       setGoal]       = useState(user?.communication_goal ?? profile?.communication_goal ?? "");
@@ -73,16 +90,6 @@ export default function ProfilePage() {
   const [saving,     setSaving]     = useState(false);
   const [saved,      setSaved]      = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
-
-  if (!hydrated) return null;
-  if (!user) {
-    return (
-      <div className="px-4 sm:px-6 py-6 max-w-[1100px] mx-auto">
-        <PageHeader title="Profile" />
-        <Notice>Sign in to see and edit your profile.</Notice>
-      </div>
-    );
-  }
 
   const toggleChallenge = (c: string) =>
     setChallenges((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);

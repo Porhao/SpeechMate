@@ -16,11 +16,11 @@ Confidence is an inner state; no sensor reads it. What can be measured is **perc
 | Time to start answering | voice | 5% | 100 up to 1.5 s, −12 per extra second | browser: end of AI turn → first sound |
 | Confident expression | face | 10% | the expression model's confidence level | facial-expression model on 12 frames |
 | Relaxed face | face | 8% | 100 − facial tension | share of fearful / angry / sad expressions |
-| Upright posture | body | 11% | posture score | MediaPipe Pose: head and shoulder alignment |
+| Upright posture | body | 11% | posture score | MediaPipe Pose: head/shoulder alignment × share of frames sitting upright, in view, camera at eye level |
 | Steady body | body | 7% | body stability | MediaPipe Pose: torso movement |
 | Eye contact | body | 14% | % of frames looking at the lens | MediaPipe Face Mesh iris position |
 
-**Score** = weighted average of the cues that were measured. **High** ≥ 75, **Medium** ≥ 50, else **Low**.
+**Score** = weighted average of the cues that were measured; a posture score under 50 caps it at 74 (so lying in bed or slumping out of view can't read as High however fluent the voice). **High** ≥ 75, **Medium** ≥ 50, else **Low**.
 
 ## Design decisions
 

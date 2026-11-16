@@ -212,19 +212,30 @@ def build_candidates(
 
     # ── Posture ──
     if posture and posture.get("posture_score") is not None and posture["posture_score"] < 75:
-        issues = []
-        if posture.get("head_alignment", 100) < 70:
-            issues.append(f"head tilted about {abs(posture.get('tilt_angle', 0)):.0f}°")
-        if posture.get("shoulder_alignment", 100) < 70:
+        issues = []  # older sessions lack the framing keys; a never-in-view one has None alignments
+
+        def v(key: str, default: float) -> float:
+            return default if posture.get(key) is None else posture[key]
+
+        if v("in_frame_pct", 100) < 80:
+            issues.append(f"shoulders out of view {100 - posture['in_frame_pct']:.0f}% of the time")
+        if v("slouched_pct", 0) >= 20:
+            issues.append(f"slumped or leaning back {posture['slouched_pct']:.0f}% of the time")
+        if v("camera_low_pct", 0) >= 20:
+            issues.append(f"camera below eye level {posture['camera_low_pct']:.0f}% of the time")
+        if v("head_alignment", 100) < 70:
+            issues.append(f"head tilted about {abs(v('tilt_angle', 0)):.0f}°")
+        if v("shoulder_alignment", 100) < 70:
             issues.append("uneven shoulders")
-        if posture.get("body_stability", 100) < 60:
+        if v("body_stability", 100) < 60:
             issues.append("frequent swaying")
         if issues:
             out.append(Recommendation(
                 "posture", "Steady, upright posture",
                 f"Posture score {posture['posture_score']:.0f}: {', '.join(issues)}.",
                 "A level, still posture makes you look composed and lets your voice project.",
-                "Before speaking: feet flat, shoulders back and level, chin parallel to the floor. Practise a "
+                "Sit on a chair at a table, camera at eye level, head and shoulders in view. Before speaking: feet "
+                "flat, shoulders back and level, chin parallel to the floor. Practise a "
                 "1-minute answer with your hands resting still, then check the recording.",
                 f"Posture above {min(85, int(posture['posture_score']) + 10)} next session.",
                 _clamp01((80 - posture["posture_score"]) / 40), "Presentation", 5))

@@ -353,6 +353,15 @@ async def test_silent_recording_fails_cleanly(client: httpx.AsyncClient):
     assert "No speech" in live["error_detail"]
 
 
+async def test_history_hides_sessions_that_were_opened_but_never_ended(client: httpx.AsyncClient):
+    headers = await sign_in(client)
+    opened = (await client.post("/api/live", headers=headers, json={"session_type": "Conversation"})).json()["id"]
+    ended = (await client.post("/api/live", headers=headers, json={"session_type": "Conversation"})).json()["id"]
+    await client.post(f"/api/live/{ended}/end", headers=headers, json={"duration_sec": 42})
+    assert [h["id"] for h in (await client.get("/api/live", headers=headers)).json()] == [ended]
+    assert (await client.get(f"/api/live/{opened}", headers=headers)).status_code == 200  # still usable while open
+
+
 async def test_learner_profile_fields_are_saved_and_validated(client: httpx.AsyncClient):
     headers = await sign_in(client)
     r = await client.put("/api/users/profile", headers=headers, json={
@@ -361,3 +370,38 @@ async def test_learner_profile_fields_are_saved_and_validated(client: httpx.Asyn
     assert (r.json()["study_level"], r.json()["field_of_study"], r.json()["feedback_style"]) == ("Postgraduate", "Data Science", "direct")
     assert (await client.put("/api/users/profile", headers=headers, json={"study_level": "Kindergarten"})).status_code == 422
     assert (await client.put("/api/users/profile", headers=headers, json={"feedback_style": "harsh"})).status_code == 422
+
+
+def test_posture_flags_out_of_view_slumped_and_filmed_from_below():
+    from types import SimpleNamespace as P
+
+    from app.services.live import vision
+
+    def pose(shoulder_y=0.75, nose_y=0.42, shoulder_vis=0.99):
+        lm = [P(x=0.5, y=0.5, visibility=0.99) for _ in range(33)]
+        lm[vision.NOSE] = P(x=0.5, y=nose_y, visibility=0.99)
+        lm[vision.LEFT_EAR], lm[vision.RIGHT_EAR] = P(x=0.55, y=0.4, visibility=0.99), P(x=0.45, y=0.4, visibility=0.99)
+        lm[vision.LEFT_SHOULDER] = P(x=0.62, y=shoulder_y, visibility=shoulder_vis)
+        lm[vision.RIGHT_SHOULDER] = P(x=0.38, y=shoulder_y, visibility=shoulder_vis)
+        return lm
+    # 16:9 frame: shoulder width 0.24 x 16/9 = 0.427 of the height; ear-to-ear 0.178
+    assert vision.posture_issue(pose()) is None                        # neck ratio 0.35/0.427 = 0.82, nose drop 0.11
+    assert vision.posture_issue(pose(shoulder_y=0.5)) == "slouched"    # 0.1/0.427 = 0.23 < 0.3
+    assert vision.posture_issue(pose(nose_y=0.37)) == "camera_low"     # -0.03/0.178 = -0.17 < -0.1
+    assert vision.posture_issue(pose(shoulder_vis=0.2)) == "out_of_frame"
+    assert vision.posture_issue(pose(shoulder_y=1.2)) == "out_of_frame"
+
+    # Never in view (lying back, face only): posture 0, not "unmeasured", so it can't be skipped
+    never = vision.posture_from(["out_of_frame"] * 4, [], [], [], [])
+    assert never.posture_score == 0 and never.in_frame_pct == 0 and never.body_stability is None
+    # Perfect alignment, upright 3 of 4 frames → 100 x 75%
+    half = vision.posture_from([None, None, None, "slouched"], [0] * 4, [0] * 4, [0.5] * 4, [0.7] * 4)
+    assert half.posture_score == 75.0 and half.slouched_pct == 25.0 and half.upright_pct == 75.0
+
+
+def test_poor_posture_caps_confidence_below_high():
+    calm = dict(speaking_rate=140, talk_minutes=2, pause_frequency=8, repetition_count=0,
+                block_count=0, fillers_per_minute=1, eye_contact_score=85)
+    assert scoring.estimate_confidence(**calm, posture_score=85).label == "High"
+    in_bed = scoring.estimate_confidence(**calm, posture_score=0)
+    assert in_bed.confidence_score == 74.0 and in_bed.label == "Medium"

@@ -27,6 +27,7 @@ const LINKS: { href: string; label: string; also?: string[] }[] = [
   { href: "/conversation", label: "Conversation" },
   { href: "/interview", label: "Interview" },
   { href: "/presentations", label: "Presentation" },
+  { href: "/impromptu", label: "Impromptu" },
   { href: "/script", label: "Script" },
   { href: "/progress", label: "Progress", also: ["/results"] },
 ];

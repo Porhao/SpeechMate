@@ -1,11 +1,11 @@
 "use client";
 
-// Home: the three things SpeechMate does, how each works in three steps, and
+// Home: the four things SpeechMate does, how each works in three steps, and
 // where you are (real stats, your latest focus, recent sessions).
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Briefcase, ChevronRight, MessageCircle, Presentation } from "lucide-react";
+import { ArrowRight, Briefcase, ChevronRight, Dices, MessageCircle, Presentation } from "lucide-react";
 import { useUserStore } from "@/store/useUserStore";
 import { useMyStats } from "@/hooks/useMyStats";
 import { Card, TiltCard } from "@/components/ui/kit";
@@ -37,6 +37,13 @@ const FUNCTIONS = [
     steps: ["Upload .pptx or .pdf: get a summary and insights", "Rehearse the talk, slide by slide", "Answer audience questions drawn from your deck"],
     cta: "Upload a deck",
   },
+  {
+    href: "/impromptu", icon: Dices, bg: "var(--teal)", fg: "#fff", kicker: "Think on your feet",
+    title: "Impromptu speaking",
+    desc: "Spin a random topic, research it fast, then explain it out loud.",
+    steps: ["Pick a theme and spin for a topic", "Research for 5 minutes, then talk for 1–2", "See how well you understood and explained it"],
+    cta: "Spin a topic",
+  },
 ] as const;
 
 const TYPE_LABEL: Record<string, string> = { Conversation: "Conversation", Interview: "Mock interview", Presentation: "Presentation Q&A", Pronunciation: "Pronunciation" };
@@ -50,7 +57,8 @@ export default function HomePage() {
   const { user } = useUserStore();
   const { stats, signedIn } = useMyStats();
   const firstName = user?.full_name?.split(" ")[0];
-  const latestDone = stats?.recent.find((s) => s.status === "complete" && s.analysis);
+  // The newest analysed session that has a drill (not only among the five most recent rows)
+  const latestDone = stats?.all.find((s) => s.status === "complete" && s.analysis?.recommendations.exercises[0]);
   const focus = latestDone?.analysis?.recommendations.exercises[0];
   // Decks feed the task list (present it, rehearse its Q&A)
   const [decks, setDecks] = useState<DeckListItem[] | null>(null);
@@ -76,7 +84,7 @@ export default function HomePage() {
       </div>
 
       {/* The three functions: saturated clay cards that lean towards the pointer */}
-      <div className="grid md:grid-cols-3 gap-5 mb-10">
+      <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
         {FUNCTIONS.map(({ href, icon: Icon, bg, fg, kicker, title, desc, steps, cta }) => (
           <TiltCard key={href} href={href} className="group flex flex-col rounded-xl p-6 sm:p-7" style={{ background: bg, color: fg }}>
             <span className="tilt-pop w-12 h-12 rounded-lg flex items-center justify-center clay" style={{ background: "rgba(255,255,255,0.22)" }}>

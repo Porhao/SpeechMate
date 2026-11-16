@@ -21,7 +21,7 @@ import {
   BACKCHANNEL_TEXTS, CHECKIN_MESSAGES, FILLER_WORDS, MODE_ACKS, MODE_PROMPTS, MODE_TITLES, MOOD_STATES, RANDOM_TOPICS,
   paceWpm, type MoodLabel,
 } from "./script";
-import { useAudioMeter, useFaceTracking } from "./hooks";
+import { POSTURE_TIPS, useAudioMeter, useFaceTracking } from "./hooks";
 import { HeaderPulse, LiveTranscript, PartnerBot, UserBubble, VoiceBeam, VolumeMeter, type OrbState } from "./widgets";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ function SessionContent() {
 
   // ── Mic level and face/pose tracking (hooks.ts) ──────────────────────────
   const { audioLevel, start: startMeter, stop: stopMeter } = useAudioMeter();
-  const { mpStatus, faceDetected, poseDetected, mood, faceNormRef,
+  const { mpStatus, faceDetected, poseDetected, mood, postureTip, faceNormRef,
           start: startTracking, stop: stopTracking, dispose: disposeTracking } =
     useFaceTracking(videoRef, canvasRef, activeRef,
       (now) => setWpm(paceWpm(wordListRef.current.length, (now - startTimeRef.current) / 1000)));
@@ -1033,6 +1033,13 @@ function SessionContent() {
       <span className="absolute top-3 right-3 text-[11px] font-semibold px-2 py-1" style={{ ...chip, color: stateColor }}>
         {stateLabel}
       </span>
+      {/* Seat check: the posture the analysis will score, flagged while it can still be fixed */}
+      {sessionStarted && isCameraOn && postureTip && (
+        <span role="status" className="absolute top-12 left-1/2 -translate-x-1/2 max-w-[90%] text-center text-xs font-semibold px-3 py-1.5 rounded-md"
+          style={{ ...chip, color: "#fbbf24" }}>
+          {POSTURE_TIPS[postureTip]}
+        </span>
+      )}
 
       {/* Mic + camera controls */}
       <div className="absolute bottom-3 left-3 flex items-center gap-2">
@@ -1072,9 +1079,10 @@ function SessionContent() {
 
   const current = talkSlides.find((t) => t.index === slideIdx);
   const talkBody = (
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-4 flex-1 min-h-0">
-      <div className="flex flex-col gap-3 min-w-0">
-        <div className="clay relative rounded-xl overflow-hidden bg-black aspect-video">
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[minmax(0,1fr)] gap-4 flex-1 min-h-0">
+      <div className="flex flex-col gap-3 min-w-0 min-h-0">
+        {/* Desktop: the slide takes only the height left after the controls, cue and thumbnails */}
+        <div className="clay relative rounded-xl overflow-hidden bg-black aspect-video lg:aspect-auto lg:flex-1 lg:min-h-0">
           {deckId && (
             <SlideImage deckId={deckId} n={slideIdx} alt={`Slide ${slideIdx}${current?.title ? `: ${current.title}` : ""}`}
               className="absolute inset-0 w-full h-full object-contain" />
@@ -1123,7 +1131,7 @@ function SessionContent() {
           ))}
         </div>
       </div>
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 min-h-0 lg:overflow-y-auto">
         {cameraStage}
         {!sessionStarted ? <div className="glass-card p-4">{startGuide}</div> : lightingPanel}
         {sessionStarted && (

@@ -1,0 +1,19 @@
+# Temporary sharing from this computer through two Cloudflare quick tunnels (no account, no domain).
+# The frontend and the API get different *.trycloudflare.com addresses, so the API must allow the
+# frontend's origin and send its sign-in cookie cross-site (HTTPS only, SameSite=None).
+#   SHARE_API=https://<api-tunnel>.trycloudflare.com SHARE_FRONTEND=https://<site-tunnel>.trycloudflare.com \
+#   docker compose -f docker-compose.yml -f docker-compose.share.yml --profile tts up -d --build backend frontend
+# Back to normal: docker compose --profile tts up -d --build backend frontend
+
+services:
+  backend:
+    environment:
+      - CORS_ORIGINS=["${SHARE_FRONTEND:?set SHARE_FRONTEND}"]
+      - COOKIE_SECURE=true
+      - COOKIE_SAMESITE=none
+      - FORWARDED_ALLOW_IPS=*
+
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: ${SHARE_API:?set SHARE_API}/api

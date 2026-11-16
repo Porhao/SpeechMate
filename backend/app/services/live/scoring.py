@@ -104,6 +104,7 @@ def confidence_cue_scores(
     return out
 
 
+POOR_POSTURE, POOR_POSTURE_CAP = 50, 74.0  # posture under 50 → confidence at most 74 (Medium)
 MIN_CONFIDENCE_COVERAGE = 0.3  # below this share of the evidence, there's no honest confidence score
 
 
@@ -121,6 +122,10 @@ def estimate_confidence(**measured) -> ConfidenceResult | None:
                           if name is None or CONFIDENCE_CUES[k][1] == name])
 
     score = round(channel(None), 1)
+    # Lying in bed, slumping or sitting out of view doesn't come across as highly confident, however
+    # fluent the voice: poor posture caps the score just under "High".
+    if measured.get("posture_score") is not None and measured["posture_score"] < POOR_POSTURE:
+        score = min(score, POOR_POSTURE_CAP)
     voice, face, body = channel("voice"), channel("face"), channel("body")
     return ConfidenceResult(
         confidence_score=score,

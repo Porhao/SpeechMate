@@ -12,21 +12,25 @@ export function useAuth() {
   const router = useRouter();
   const { setUser, setProfile, logout: storeLogout } = useUserStore();
 
+  const signIn = async (data: LoginPayload) => {
+    await authService.login(data);
+    const user = await authService.me();
+    setUser(user);
+    setProfile({
+      id: user.id,
+      user_id: user.id,
+      age_group: user.age_group ?? "",
+      communication_goal: user.communication_goal ?? "",
+      skill_level: (user.skill_level as "Beginner" | "Intermediate" | "Advanced") ?? "Beginner",
+      challenges: user.challenges,
+    });
+  };
+
   const login = async (data: LoginPayload) => {
     setLoading(true);
     setError(null);
     try {
-      await authService.login(data);
-      const user = await authService.me();
-      setUser(user);
-      setProfile({
-        id: user.id,
-        user_id: user.id,
-        age_group: user.age_group ?? "",
-        communication_goal: user.communication_goal ?? "",
-        skill_level: (user.skill_level as "Beginner" | "Intermediate" | "Advanced") ?? "Beginner",
-        challenges: user.challenges,
-      });
+      await signIn(data);
       // Back to where sign-in was asked for; same-origin paths only (no open redirect)
       const next = new URLSearchParams(window.location.search).get("next");
       router.push(next?.startsWith("/") && !next.startsWith("//") ? next : "/home");
@@ -37,12 +41,14 @@ export function useAuth() {
     }
   };
 
+  // A new account is signed in straight away and asked for its goal, level and challenges
   const register = async (data: RegisterPayload) => {
     setLoading(true);
     setError(null);
     try {
       await authService.register(data);
-      router.push("/login");
+      await signIn({ email: data.email, password: data.password });
+      router.push("/onboarding");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Registration failed");
     } finally {

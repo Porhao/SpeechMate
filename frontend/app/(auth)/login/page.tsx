@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
-import AuthShell, { useOrbPulse } from "@/components/auth/AuthShell";
+import AuthShell from "@/components/auth/AuthShell";
 import { useAuth } from "@/hooks/useAuth";
 import { authService } from "@/services/auth";
 
@@ -17,14 +17,11 @@ const inputClass =
   "w-full px-4 py-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--ink)] text-sm outline-none " +
   "focus:border-[var(--accent-ink)] focus:ring-4 focus:ring-[var(--accent-ink)]/10 transition-all placeholder:text-[var(--faint)]";
 
-function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
+function LoginForm() {
   const { login, loading, error } = useAuth();
-  const pulse = useOrbPulse();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => { onBusy(loading); }, [loading, onBusy]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +30,7 @@ function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
 
   return (
     <>
-      <h1 className="font-display text-[28px] leading-tight text-[var(--ink)] mt-6 lg:mt-0">Sign in</h1>
+      <h1 className="font-display text-[28px] leading-tight text-[var(--ink)] ">Sign in</h1>
       <p className="text-sm text-[var(--muted)] mt-1.5 mb-8">Welcome back. Pick up your practice where you left off.</p>
 
       {error && (
@@ -87,7 +84,7 @@ function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
           </p>
           <button
             type="button"
-            onClick={() => { setEmail(DEMO.email); setPassword(DEMO.password); pulse(); }}
+            onClick={() => { setEmail(DEMO.email); setPassword(DEMO.password); }}
             className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
             style={{ color: "var(--accent-ink)", border: "1px solid var(--line-strong)", background: "var(--surface)" }}
           >
@@ -106,7 +103,6 @@ function LoginForm({ onBusy }: { onBusy: (busy: boolean) => void }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
 
   // Already signed in: go straight into the app
   useEffect(() => {
@@ -114,8 +110,8 @@ export default function LoginPage() {
   }, [router]);
 
   return (
-    <AuthShell busy={busy}>
-      <LoginForm onBusy={setBusy} />
+    <AuthShell>
+      <LoginForm />
     </AuthShell>
   );
 }

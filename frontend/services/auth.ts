@@ -7,7 +7,6 @@ export interface RegisterPayload {
   full_name: string;
   email: string;
   password: string;
-  communication_goal: string;
 }
 
 export interface LoginPayload {

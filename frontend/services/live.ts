@@ -71,9 +71,9 @@ export const conversationService = {
 
   /** Transcribe one spoken turn on the backend (cloud Whisper). 503 = not available. */
   /** `context` (the AI's last line, the role or deck…) helps the model hear topic words right. */
-  transcribe: async (audio: Blob, context?: string): Promise<string> => {
+  transcribe: async (audio: Blob, context?: string, filename = "turn.wav"): Promise<string> => {
     const form = new FormData();
-    form.append("file", audio, "turn.wav");
+    form.append("file", audio, filename);
     if (context) form.append("context", context.slice(-1000));
     // Retry a dropped request, a rate limit or a provider hiccup; 503 (no STT configured) and other 4xx are final
     for (let attempt = 0; ; attempt++) {
@@ -130,4 +130,15 @@ export const conversationService = {
     if (!res.ok) throw new Error(`TTS ${res.status}`);
     return res.blob();
   },
+};
+
+// Impromptu speaking: judge a 1-2 minute talk on a random topic (transcribe it first)
+export type ImpromptuResult = {
+  words: number; duration_sec: number; wpm: number; fillers: number; judged: boolean; summary: string;
+  understanding?: number; accuracy?: number; depth?: number; coverage?: number; relevance?: number; structure?: number;
+  understood?: string[]; missed?: string[]; mistakes?: string[]; outline?: string[];
+};
+export const impromptuService = {
+  evaluate: (topic: string, transcript: string, duration_sec: number) =>
+    api.post<ImpromptuResult>("/impromptu/evaluate", { topic, transcript, duration_sec }),
 };

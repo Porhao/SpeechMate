@@ -20,7 +20,7 @@ const SUGGESTIONS = [
   "How do I prepare for a presentation?",
   "What does the confidence score mean?",
 ];
-const PAGE = /(\/(?:home|conversation|interview|presentations|script|progress|profile|settings|privacy|methodology|results\/[\w-]+))\b/g;
+const PAGE = /(\/(?:home|conversation|interview|presentations|impromptu|script|progress|profile|settings|privacy|methodology|results\/[\w-]+))\b/g;
 
 const load = (): Msg[] => { try { return JSON.parse(sessionStorage.getItem(KEY) ?? "[]"); } catch { return []; } };
 const save = (m: Msg[]) => { try { sessionStorage.setItem(KEY, JSON.stringify(m.slice(-40))); } catch { /* private mode */ } };

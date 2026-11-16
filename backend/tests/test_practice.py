@@ -88,6 +88,21 @@ async def test_partner_follows_the_interview_plan_without_an_llm(client):
     assert "That's all the questions" in (await say(msgs))["reply"]
 
 
+def test_partner_answers_the_candidates_questions():
+    ctx = {"plan": {"questions": [{"question": "Tell me about yourself."}, {"question": "Do you have any questions for us?"}]}}
+    practice_plans.next_step(ctx, None)
+    # A clarifying question mid-interview: answered, the plan doesn't move, the question is put back
+    step = practice_plans.next_step(ctx, "Sorry, do you mean my studies or my work?")
+    assert step == {"action": "answer", "question": "Tell me about yourself."} and ctx["progress"]["asked"] == 1
+    long = " ".join(["I studied computing and built a booking app for my club last year"] * 3)
+    assert practice_plans.next_step(ctx, long)["action"] == "ask"
+    # "Any questions for us?" → their question is answered (not "thank you", not "give an example")
+    assert practice_plans.next_step(ctx, "What does a typical day look like for the team?") == {"action": "answer", "question": None}
+    assert practice_plans.next_step(ctx, "No, that's all. Thank you.")["action"] == "close"
+    assert not practice_plans.asks_question("What did I do? I organised the whole event.")
+    assert practice_plans.asks_question("how big is the team")
+
+
 def test_qa_plan_from_deck_insights_fallback():
     insights = {"summary": "Time management for students", "main_message": "Plan your week",
                 "likely_questions": ["How do I start?", "What if I fall behind?"],
@@ -203,3 +218,25 @@ def test_question_labels_are_removed():
     assert practice_plans._clean_question("Can you share an example? (Role-Specific Problem Solving)") == "Can you share an example?"
     assert practice_plans._clean_question("Do you have any questions for us? (Mixed)") == "Do you have any questions for us?"
     assert practice_plans._clean_question("Why do you use R (not Python) at work?") == "Why do you use R (not Python) at work?"
+
+
+async def test_impromptu_judges_understanding(client, monkeypatch):
+    from app.routers import impromptu
+
+    h = await _sign_in(client, "impromptu@example.com")
+    short = await client.post("/api/impromptu/evaluate", headers=h,
+                              json={"topic": "Why the sky is blue", "transcript": "Um the sky is blue.", "duration_sec": 10})
+    assert short.status_code == 200 and short.json()["judged"] is False and short.json()["fillers"] == 1
+
+    async def judge(system, payload, model_cls, **kw):
+        assert payload["topic"] == "Why the sky is blue"
+        return model_cls(accuracy=5, depth=4, coverage=3, relevance=5, structure=2, summary="Clear start on scattering.",
+                         understood=["sunlight scatters"], missed=["why sunsets are red"], mistakes=[], outline=["Light", "Air"])
+    monkeypatch.setattr(impromptu, "_llm_json", judge)
+    monkeypatch.setattr(impromptu, "get_llm_client", lambda: object())
+    talk = "Sunlight is made of many colours and the air scatters blue light the most so we see blue " * 3
+    r = await client.post("/api/impromptu/evaluate", headers=h,
+                          json={"topic": "Why the sky is blue", "transcript": talk, "duration_sec": 60})
+    body = r.json()
+    assert r.status_code == 200 and body["judged"] and body["words"] == 54 and body["wpm"] == 54
+    assert body["understanding"] == 81.2      # (5 + 4 + 3 + 5 - 4) / 16 = 13/16; structure isn't counted

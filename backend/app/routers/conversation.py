@@ -90,6 +90,11 @@ async def partner_reply(
     system = with_brief(PARTNER_PROMPTS.get(body.mode, PARTNER_PROMPTS["Conversation"]) + SPOKEN_STYLE, learner_brief(user))
     if body.topic:
         system += f"\n\nThe current conversation topic is: {body.topic}"
+    # Models drift back into interviewing: after two questions in a row, the next turn is a comment
+    recent = [m.content.rstrip() for m in body.messages if m.role == "assistant"][-2:]
+    if body.mode == "Conversation" and len(recent) == 2 and all(r.endswith("?") for r in recent):
+        system += ("\n\nYour last two replies both ended with a question. This time do NOT ask anything: react, then share "
+                   "your own opinion, a short story or a playful comment they can respond to.")
     try:
         with track_llm_usage() as used:
             resp = await client.chat.completions.create(

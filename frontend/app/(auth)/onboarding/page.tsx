@@ -95,7 +95,7 @@ function StepDot({ step, current }: { step: number; current: number; total: numb
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setProfile } = useUserStore();
+  const { setUser, setProfile } = useUserStore();
 
   const [step,        setStep]        = useState(1);
   const [goal,        setGoal]        = useState("");
@@ -117,7 +117,7 @@ export default function OnboardingPage() {
   const handleFinish = () => {
     // Saved on the server when signed in (the coaching plan uses the goal), and locally either way
     if (authService.isSignedIn()) {
-      authService.updateProfile({ communication_goal: goal, skill_level: skill, challenges }).catch(() => null);
+      authService.updateProfile({ communication_goal: goal, skill_level: skill, challenges }).then(setUser).catch(() => null);
     }
     setProfile({
       id: "local",
@@ -323,7 +323,7 @@ export default function OnboardingPage() {
               onClick={handleFinish}
               className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[#0A0A0A] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all"
             >
-              <CheckCircle2 className="w-4 h-4" /> Start Practicing!
+              <CheckCircle2 className="w-4 h-4" /> Start practising
             </button>
           )}
         </div>

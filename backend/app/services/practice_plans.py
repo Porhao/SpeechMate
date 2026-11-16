@@ -257,16 +257,43 @@ CLOSING = {
 }
 
 
+_QUESTION_START = re.compile(
+    r"^(what|how|why|when|where|who|which|could|can|do|does|did|is|are|was|will|would|should|may)\b", re.I)
+
+
+def asks_question(text: str | None) -> bool:
+    """Did the learner end their turn by asking the partner something? ("What does the team work on?")
+    Whisper punctuates, so a final "?" is the main signal; a question-word start covers a missed "?"."""
+    # ponytail: heuristic on the last sentence; ask the LLM to classify if rhetorical questions misfire
+    sentences = [x for x in re.split(r"(?<=[.!?])\s+", (text or "").strip()) if x]
+    if not sentences:
+        return False
+    last = sentences[-1]
+    return last.endswith("?") or (bool(_QUESTION_START.match(last)) and not last.endswith("."))
+
+
+def invites_questions(question: str) -> bool:
+    """The planned "Do you have any questions for us?" turn."""
+    return bool(re.search(r"\bany questions\b|\banything you'?d like to ask\b", question, re.I))
+
+
 def next_step(context: dict, last_answer: str | None) -> dict:
-    """What the partner does next: {"action": "intro"|"ask"|"followup"|"close", "question": ...}.
-    Mutates context["progress"]; the caller saves the context."""
+    """What the partner does next: {"action": "intro"|"ask"|"followup"|"answer"|"close", "question": ...}.
+    "answer": the learner asked something; reply to it without moving on, then `question` (the one
+    still open) is put back to them. Mutates context["progress"]; the caller saves the context."""
     plan = context["plan"]
     qs = plan["questions"]
     prog = context.setdefault("progress", {"asked": 0, "followups": 0})
     if last_answer is None or prog["asked"] == 0:
         prog.update(asked=1, followups=0)
         return {"action": "intro", "question": qs[0]["question"]}
-    if count_words(last_answer) < FOLLOWUP_WORDS and prog["followups"] == 0 and prog["asked"] <= len(qs):
+    current = qs[min(prog["asked"], len(qs)) - 1]["question"]
+    open_floor = prog["asked"] > len(qs) or invites_questions(current)
+    if asks_question(last_answer):
+        # Their question to us ("Do you have any questions for us?"): answer, then invite another one
+        return {"action": "answer", "question": None if open_floor else current}
+    if (count_words(last_answer) < FOLLOWUP_WORDS and prog["followups"] == 0 and prog["asked"] <= len(qs)
+            and not open_floor):  # "No, that's all" needs no "give me an example"
         prog["followups"] = 1
         return {"action": "followup", "question": qs[prog["asked"] - 1]["question"]}
     if prog["asked"] >= len(qs):
@@ -294,7 +321,14 @@ async def planned_reply(session_type: str, context: dict, messages: list[dict]) 
     client = get_llm_client()
     role = _role(session_type, context)
     last_q = next((m["content"] for m in reversed(messages) if m["role"] == "assistant"), "")
-    if step["action"] == "followup":
+    if step["action"] == "answer":
+        who = "the interviewer" if session_type == "Interview" else "the moderator, speaking for the audience"
+        instruction = (f"They asked you a question. Answer it directly and helpfully as {who}, in 2-3 sentences, like a "
+                       "real person would. Speak generally about the role, team, culture, growth and next steps; never invent "
+                       "specific facts such as salaries, names, numbers or dates. If it asks you to repeat or explain your "
+                       "question, do that instead. Don't ask a question back.")
+        fallback = "That's a good question. It really depends on the team, and it's something to explore further in the next round."
+    elif step["action"] == "followup":
         instruction = ("Their answer was short. Ask ONE brief, specific follow-up question that helps them expand "
                        "(ask for an example, a result, or their own role). One sentence, no feedback, no scores.")
         fallback = "Could you give me a specific example of that, and what the result was?"
@@ -309,13 +343,16 @@ async def planned_reply(session_type: str, context: dict, messages: list[dict]) 
                 model=settings.llm_model,
                 messages=[{"role": "system", "content": f"{role} {instruction} Plain spoken sentence only, no markdown."},
                           {"role": "user", "content": f"You asked: {last_q}\nThey answered: {last_answer}"}],
-                max_tokens=70, temperature=0.6,
+                max_tokens=160 if step["action"] == "answer" else 70, temperature=0.6,
             )
             text = (resp.choices[0].message.content or "").strip().strip('"') or fallback
         except Exception as e:  # noqa: BLE001
             logger.warning("Partner reaction failed, using fallback: %s", e)
     if step["action"] == "followup":
         return text
+    if step["action"] == "answer":
+        # An open planned question goes back to them; at the end, invite another question
+        return f"{text} {'So, back to my question: ' + step['question'] if step['question'] else 'Is there anything else you would like to ask?'}"
     if step["action"] == "close":
         return f"{text} {CLOSING.get(session_type, CLOSING['Interview'])}"
     return f"{text} {step['question']}"

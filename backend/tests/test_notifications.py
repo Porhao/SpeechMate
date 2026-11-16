@@ -45,6 +45,10 @@ async def test_finished_live_analysis_notifies_its_owner_only(client):
     assert (await client.post(f"/api/notifications/{item['id']}/read", headers=me)).json()["read"] is True
     assert (await client.get("/api/notifications", headers=me)).json()["unread"] == 0
 
+    # Deleting the session removes its notification: the link would open a page that's gone
+    assert (await client.delete(f"/api/live/{lid}", headers=me)).status_code == 204
+    assert (await client.get("/api/notifications", headers=me)).json()["items"] == []
+
 
 async def test_mark_all_read_and_deck_ownership(client):
     me, other = await sign_in(client, "me@example.com"), await sign_in(client, "other@example.com")

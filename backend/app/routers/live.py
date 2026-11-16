@@ -2,15 +2,17 @@
 recording and run the multimodal analysis."""
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, require_cloud_consent
 from app.database import get_db
 from app.models.live_session import LIVE_IN_PROGRESS_STATUSES, LiveSession
+from app.models.notification import Notification
 from app.models.session import Session as Deck
 from app.models.user import User
 from app.schemas.live import (
@@ -174,7 +176,15 @@ def _summary(s: LiveSession) -> LiveSessionResponse:
 async def list_live_sessions(deck_id: uuid.UUID | None = None, user: User = Depends(get_current_user),
                              db: AsyncSession = Depends(get_db)):
     """The user's live sessions as summaries, most recent first; `deck_id` keeps one deck's attempts."""
-    q = select(LiveSession).where(LiveSession.user_id == user.id)
+    # A row is created as soon as the practice page opens. One that was never ended (no duration,
+    # no recording) is not an attempt: it stays out of the lists and is removed after a day.
+    never_used = and_(LiveSession.status == "active", LiveSession.duration_sec == 0,
+                      LiveSession.recording_storage_path.is_(None))
+    await db.execute(delete(LiveSession).where(
+        LiveSession.user_id == user.id, never_used,
+        LiveSession.created_at < datetime.now(timezone.utc) - timedelta(days=1)))
+    await db.commit()
+    q = select(LiveSession).where(LiveSession.user_id == user.id, ~never_used)
     if deck_id:
         q = q.where(LiveSession.context["deck_id"].as_string() == str(deck_id))
     result = await db.execute(q.order_by(LiveSession.created_at.desc()))
@@ -248,6 +258,8 @@ async def delete_live_session(
     if s.status in LIVE_IN_PROGRESS_STATUSES:
         raise HTTPException(status_code=409, detail="Wait for the analysis to finish before deleting")
     await db.delete(s)
+    # Its notifications ("results are ready", "analysis failed") would open a page that's gone
+    await db.execute(delete(Notification).where(Notification.user_id == user.id, Notification.link == f"/results/{live_id}"))
     await db.commit()
     storage_service.delete_session(f"{LIVE_STORAGE_PREFIX}/{live_id}")
 

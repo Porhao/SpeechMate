@@ -1,23 +1,14 @@
 "use client";
 
-// Shared layout for the sign-in and sign-up screens: the 3D voice orb on the left
-// (a compact header on small screens) and the form on the right. Typing in the form
-// makes the orb "listen"; `useOrbPulse()` lets other actions trigger it too.
+// Shared layout for the sign-in and sign-up screens: one centred card with the 3D clay
+// microphone on top and the form below. No marketing panel: the app opens straight on the form.
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Mic2 } from "lucide-react";
 
-const VoiceOrb = dynamic(() => import("./VoiceOrb"), {
-  ssr: false,
-  loading: () => (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="w-1/3 aspect-square rounded-full animate-pulse" style={{ background: "radial-gradient(circle, #5A547033, transparent 70%)" }} />
-    </div>
-  ),
-});
+const ClayScene = dynamic(() => import("@/components/three/ClayScene"), { ssr: false });
 
-// Only one orb is mounted (desktop panel or mobile header), so there's one WebGL context
 const DESKTOP_QUERY = "(min-width: 1024px)";
 export function useIsDesktop(): boolean | null {
   return useSyncExternalStore(
@@ -31,82 +22,26 @@ export function useIsDesktop(): boolean | null {
   );
 }
 
-const OrbPulseContext = createContext<() => void>(() => {});
-
-/** Call the returned function (e.g. on every keystroke) to make the orb react. */
-export function useOrbPulse() {
-  return useContext(OrbPulseContext);
-}
-
-function Wordmark({ light = false }: { light?: boolean }) {
+export default function AuthShell({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="clay w-9 h-9 rounded-sm flex items-center justify-center" style={{ background: "var(--pink)" }}>
-        <Mic2 className="w-[18px] h-[18px] text-white" />
-      </div>
-      <span className="font-display text-[19px]" style={{ color: light ? "var(--bg)" : "var(--ink)" }}>
-        SpeechMate
-      </span>
-    </div>
-  );
-}
-
-export default function AuthShell({ children, busy = false }: { children: ReactNode; busy?: boolean }) {
-  const energyRef = useRef(0);
-  const [listening, setListening] = useState(false);
-  const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const pulse = useCallback(() => {
-    energyRef.current = Math.min(1, energyRef.current + 0.35);
-    setListening(true);
-    if (quietTimer.current) clearTimeout(quietTimer.current);
-    quietTimer.current = setTimeout(() => setListening(false), 900);
-  }, []);
-  useEffect(() => () => { if (quietTimer.current) clearTimeout(quietTimer.current); }, []);
-
-  const isDesktop = useIsDesktop();
-  const status = busy ? "Signing you in…" : listening ? "Listening…" : "Ready when you are";
-
-  return (
-    <OrbPulseContext.Provider value={pulse}>
-      <div className="min-h-dvh grid lg:grid-cols-[minmax(0,1.15fr)_minmax(440px,1fr)]" style={{ background: "var(--bg)" }}>
-
-        {/* ── Orb panel (desktop) ────────────────────────────────────────── */}
-        <aside
-          className="relative hidden lg:block overflow-hidden"
-          style={{ background: "radial-gradient(120% 90% at 50% 45%, var(--surface-2) 0%, var(--surface-3) 60%, var(--line) 100%)" }}
-        >
-          <div className="absolute top-8 left-10 z-10"><Wordmark /></div>
-          {isDesktop && <VoiceOrb energyRef={energyRef} busy={busy} className="absolute inset-0" />}
-          <div className="absolute bottom-10 left-0 right-0 flex justify-center z-10">
-            <div
-              className="flex items-center gap-2 text-xs font-medium px-3 py-1.5"
-              style={{ background: "var(--bg)", border: "1px solid var(--line-strong)", color: "var(--ink-2)" }}
-              aria-live="polite"
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: busy ? "#A8620F" : listening ? "#2F7A4F" : "var(--faint)" }}
-              />
-              {status}
-            </div>
+    <main className="min-h-dvh flex items-center justify-center px-4 py-10" style={{ background: "var(--bg)" }}>
+      <div className="w-full max-w-[420px]">
+        <div className="flex items-center justify-center gap-2.5 mb-5">
+          <div className="clay w-9 h-9 rounded-sm flex items-center justify-center" style={{ background: "var(--pink)" }}>
+            <Mic2 className="w-[18px] h-[18px] text-white" />
           </div>
-        </aside>
+          <span className="font-display text-[19px] text-[var(--ink)]">SpeechMate</span>
+        </div>
 
-        {/* ── Form ───────────────────────────────────────────────────────── */}
-        {/* Any typing in the form makes the orb react ("listening") */}
-        <main className="flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-10" onInputCapture={pulse}>
-          <div className="w-full max-w-[400px] mx-auto">
-            <div className="lg:hidden">
-              <Wordmark />
-              {isDesktop === false
-                ? <VoiceOrb energyRef={energyRef} busy={busy} className="h-44 -mx-6 sm:mx-0 my-2" />
-                : <div className="h-44 my-2" />}
-            </div>
-            {children}
+        <div className="glass-card rounded-2xl overflow-hidden">
+          {/* Click the mic to squash it like clay */}
+          <div className="relative h-48 cursor-pointer" title="Click me"
+            style={{ background: "radial-gradient(90% 90% at 50% 40%, #FFE3CF, var(--peach))" }}>
+            <ClayScene variant="mic" className="absolute inset-0" />
           </div>
-        </main>
+          <div className="p-6 sm:p-8">{children}</div>
+        </div>
       </div>
-    </OrbPulseContext.Provider>
+    </main>
   );
 }

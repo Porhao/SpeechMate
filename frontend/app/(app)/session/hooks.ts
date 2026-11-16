@@ -54,6 +54,28 @@ export function useAudioMeter() {
   return { audioLevel, start, stop };
 }
 
+// ── Seated posture, live ──────────────────────────────────────────────────────────
+// The same rules as posture_issue in backend/app/services/live/vision.py (keep the numbers in sync):
+// the analysis scores them afterwards, this tells the user to fix their seat while it still helps.
+export type PostureIssue = "out_of_frame" | "slouched" | "camera_low";
+export const POSTURE_TIPS: Record<PostureIssue, string> = {
+  out_of_frame: "Sit back so your head and both shoulders are in view.",
+  slouched: "Sit up straight: you look slumped or leaned back.",
+  camera_low: "Raise your camera to eye level: it's looking up at you.",
+};
+type Lm = { x: number; y: number; visibility?: number };
+export function postureIssue(lm: Lm[], aspect: number): PostureIssue | null {
+  const [ls, rs, le, re, nose] = [lm[11], lm[12], lm[7], lm[8], lm[0]];
+  if ([ls, rs].some((p) => (p.visibility ?? 1) < 0.5 || p.y < 0 || p.y > 1)) return "out_of_frame";
+  const earY = (le.y + re.y) / 2;
+  const shoulderW = Math.abs(ls.x - rs.x) * aspect;
+  if (shoulderW > 0 && ((ls.y + rs.y) / 2 - earY) / shoulderW < 0.3) return "slouched";
+  const earW = Math.hypot((le.x - re.x) * aspect, le.y - re.y);
+  if (earW > 0 && (nose.y - earY) / earW < -0.1) return "camera_low";
+  return null;
+}
+const POSTURE_HOLD_MS = 2000; // a problem (or its fix) must last this long before the tip changes
+
 // ── Face and pose tracking (MediaPipe, in the browser) ─────────────────────────
 // Draws the face mesh, a mood tag and the pose skeleton on `canvasRef` over `videoRef`, while
 // `activeRef` is true. `onTick` runs every ~500 ms (the page updates its live pace there).
@@ -67,6 +89,8 @@ export function useFaceTracking(
   const [faceDetected, setFaceDetected] = useState(false);
   const [poseDetected, setPoseDetected] = useState(false);
   const [mood, setMood] = useState<Mood | null>(null);
+  const [postureTip, setPostureTip] = useState<PostureIssue | null>(null);
+  const rawIssueRef = useRef<{ issue: PostureIssue | null; since: number }>({ issue: null, since: 0 });
   const mpRef = useRef<any>(null);
   const animRef = useRef(0);
   const lastTsRef = useRef(0);
@@ -123,10 +147,11 @@ export function useFaceTracking(
         ctx.clearRect(0, 0, w, h); lastTsRef.current = now;
         if (!mp._du) mp._du = new mp.DrawingUtils(ctx);
         const du = mp._du;
+        let faceSeen = false, poseLm: Lm[] | null = null;
         try {
           const fr = mp.faceLandmarker.detectForVideo(video, now);
           if (fr.faceLandmarks.length > 0) {
-            setFaceDetected(true); const fl = fr.faceLandmarks[0];
+            setFaceDetected(true); faceSeen = true; const fl = fr.faceLandmarks[0];
             du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "#FFFFFF10", lineWidth: 0.4 });
             du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "#00E5FF", lineWidth: 1.5 });
             du.drawConnectors(fl, mp.FaceLandmarker.FACE_LANDMARKS_LEFT_EYE,  { color: "#00E5FF", lineWidth: 1.5 });
@@ -184,16 +209,19 @@ export function useFaceTracking(
         try {
           const pr = mp.poseLandmarker.detectForVideo(video, now);
           if (pr.landmarks.length > 0) {
-            setPoseDetected(true); const pl = pr.landmarks[0];
+            setPoseDetected(true); const pl = pr.landmarks[0]; poseLm = pl;
             du.drawConnectors(pl, mp.PoseLandmarker.POSE_CONNECTIONS, { color: "#5C729B60", lineWidth: 2.5 });
             du.drawLandmarks(pl.slice(0, 25), { color: "#60EFFF", fillColor: "#1060FF80", radius: 3 });
           } else { setPoseDetected(false); }
         } catch { /* transient */ }
+        const issue = poseLm ? postureIssue(poseLm, video.videoWidth / video.videoHeight) : faceSeen ? "out_of_frame" : null;
+        if (issue !== rawIssueRef.current.issue) rawIssueRef.current = { issue, since: now };
       }
     }
     if (now - lastUpdateRef.current > 500) {
       onTickRef.current(now);
       setMood(moodRef.current);
+      if (now - rawIssueRef.current.since >= POSTURE_HOLD_MS) setPostureTip(rawIssueRef.current.issue);
       lastUpdateRef.current = now;
     }
   }, [videoRef, canvasRef]);
@@ -211,5 +239,5 @@ export function useFaceTracking(
 
   const stop = useCallback(() => cancelAnimationFrame(animRef.current), []);
 
-  return { mpStatus, faceDetected, poseDetected, mood, faceNormRef, start, stop, dispose };
+  return { mpStatus, faceDetected, poseDetected, mood, postureTip, faceNormRef, start, stop, dispose };
 }

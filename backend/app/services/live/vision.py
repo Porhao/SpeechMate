@@ -33,7 +33,11 @@ H_CENTER_LO, H_CENTER_HI = 0.35, 0.65
 V_DOWN_THRESHOLD = 0.62
 
 # Pose landmark indices
-LEFT_EAR, RIGHT_EAR, LEFT_SHOULDER, RIGHT_SHOULDER = 7, 8, 11, 12
+NOSE, LEFT_EAR, RIGHT_EAR, LEFT_SHOULDER, RIGHT_SHOULDER = 0, 7, 8, 11, 12
+# Seated-posture checks (calibration knobs: ratios, so the distance to the camera doesn't matter)
+VISIBLE = 0.5            # pose landmark visibility needed to count a shoulder as in view
+MIN_NECK_RATIO = 0.3     # (shoulder line y − ear line y) ÷ shoulder width: ~0.45–0.6 sitting upright; slumped or lying back sinks the head into the shoulders
+MIN_NOSE_DROP = -0.1     # (nose y − ear line y) ÷ ear-to-ear distance: ~0.1–0.25 with the camera at eye level; below that the camera looks up from below (laptop on the lap, in bed)
 
 EMOTION_MODEL = "trpakov/vit-face-expression"
 # How much each expression contributes to perceived speaking confidence
@@ -61,12 +65,16 @@ class EyeContactResult:
 @dataclass
 class PostureResult:
     posture_score: float
-    head_alignment: float
-    shoulder_alignment: float
-    body_stability: float
+    head_alignment: float | None       # None when you were never in view
+    shoulder_alignment: float | None
+    body_stability: float | None
     excessive_movement: bool
     tilt_angle: float
     recommendations: list[str] = field(default_factory=list)
+    in_frame_pct: float = 100.0          # % of frames with both shoulders in view
+    upright_pct: float | None = None     # % of in-view frames sitting upright with the camera at eye level
+    slouched_pct: float = 0.0            # % of in-view frames slumped / lying back
+    camera_low_pct: float = 0.0          # % of in-view frames filmed from below (laptop on lap, in bed)
 
 
 @dataclass
@@ -242,27 +250,71 @@ def _pose():
     return mp.solutions.pose.Pose(static_image_mode=True, model_complexity=1, min_detection_confidence=0.5)
 
 
+def posture_issue(lm, aspect: float = 16 / 9) -> str | None:
+    """One frame's seated-posture problem, or None when upright and in view:
+    "out_of_frame" (shoulders not in view: too close, or lying down), "slouched", "camera_low".
+    `lm`: pose landmarks (x, y in 0-1 of the frame, visibility); `aspect`: frame width ÷ height."""
+    shoulders = (lm[LEFT_SHOULDER], lm[RIGHT_SHOULDER])
+    if any(getattr(p, "visibility", 1.0) < VISIBLE or not 0 <= p.y <= 1 for p in shoulders):
+        return "out_of_frame"
+    ear_y = (lm[LEFT_EAR].y + lm[RIGHT_EAR].y) / 2
+    shoulder_w = abs(shoulders[0].x - shoulders[1].x) * aspect
+    if shoulder_w > 0 and ((shoulders[0].y + shoulders[1].y) / 2 - ear_y) / shoulder_w < MIN_NECK_RATIO:
+        return "slouched"
+    ear_w = math.hypot((lm[LEFT_EAR].x - lm[RIGHT_EAR].x) * aspect, lm[LEFT_EAR].y - lm[RIGHT_EAR].y)
+    if ear_w > 0 and (lm[NOSE].y - ear_y) / ear_w < MIN_NOSE_DROP:
+        return "camera_low"
+    return None
+
+
 def analyze_posture(frames: list) -> PostureResult | None:
-    tilts, shoulder_diffs, torso_x, torso_y = [], [], [], []
+    """Alignment (head, shoulders, steadiness) on the frames where you're in view, scaled by the share
+    of the session you sat upright, in view, with the camera at eye level: lying in bed, slumping, or
+    sitting so close that your shoulders are cut off can't score well. None when no body was seen."""
+    tilts, shoulder_diffs, torso_x, torso_y, issues = [], [], [], [], []
     for frame in frames:
         result = _pose().process(frame)
         if not result.pose_landmarks:
             continue
         lm = result.pose_landmarks.landmark
+        issue = posture_issue(lm, frame.shape[1] / frame.shape[0])
+        issues.append(issue)
+        if issue == "out_of_frame":
+            continue
         tilts.append(math.degrees(math.atan2(lm[RIGHT_EAR].y - lm[LEFT_EAR].y, lm[RIGHT_EAR].x - lm[LEFT_EAR].x)))
         shoulder_diffs.append(abs(lm[LEFT_SHOULDER].y - lm[RIGHT_SHOULDER].y))
         torso_x.append((lm[LEFT_SHOULDER].x + lm[RIGHT_SHOULDER].x) / 2)
         torso_y.append((lm[LEFT_SHOULDER].y + lm[RIGHT_SHOULDER].y) / 2)
-    if not tilts:
-        return None
+    return posture_from(issues, tilts, shoulder_diffs, torso_x, torso_y)
 
+
+def posture_from(issues: list[str | None], tilts: list[float], shoulder_diffs: list[float],
+                 torso_x: list[float], torso_y: list[float]) -> PostureResult | None:
+    """The score from per-frame measurements (split out so it's testable without video)."""
+    if not issues:
+        return None
+    pct = lambda n, of: round(n / of * 100, 1) if of else 0.0  # noqa: E731
+    in_view = [i for i in issues if i != "out_of_frame"]
+    in_frame = pct(len(in_view), len(issues))
+    good = pct(in_view.count(None), len(issues))       # upright, in view, camera level: share of ALL frames
+    recs = []
+    if in_frame < 80:
+        recs.append("Sit back so your head and both shoulders are in view, like a video interview.")
+    if not tilts:  # never in view: alignment can't be judged, and the score reflects that
+        return PostureResult(posture_score=0.0, head_alignment=None, shoulder_alignment=None, body_stability=None,
+                             excessive_movement=False, tilt_angle=0.0, recommendations=recs,
+                             in_frame_pct=in_frame, upright_pct=None)
     avg_tilt = statistics.mean(tilts)
     head = round(max(0.0, 100 - abs(avg_tilt) * 4), 1)
     shoulders = round(max(0.0, 100 - statistics.mean(shoulder_diffs) * 500), 1)
     movement = statistics.pstdev(torso_x) + statistics.pstdev(torso_y) if len(torso_x) > 1 else 0.0
     stability = round(max(0.0, 100 - movement * 800), 1)
+    slouched, camera_low = pct(in_view.count("slouched"), len(in_view)), pct(in_view.count("camera_low"), len(in_view))
 
-    recs = []
+    if slouched >= 20:
+        recs.append("Sit up straight on a chair: you were slumped or leaning back for part of the session.")
+    if camera_low >= 20:
+        recs.append("Raise the camera to eye level (stack books under the laptop); filming from below looks like lounging.")
     if head < 70:
         recs.append("Keep your head upright and avoid excessive nodding.")
     if shoulders < 70:
@@ -271,13 +323,17 @@ def analyze_posture(frames: list) -> PostureResult | None:
         recs.append("Reduce body swaying to appear more composed.")
 
     return PostureResult(
-        posture_score=round((head + shoulders + stability) / 3, 1),
+        posture_score=round((head + shoulders + stability) / 3 * good / 100, 1),
         head_alignment=head,
         shoulder_alignment=shoulders,
         body_stability=stability,
         excessive_movement=stability < 50,
         tilt_angle=round(avg_tilt, 1),
         recommendations=recs,
+        in_frame_pct=in_frame,
+        upright_pct=pct(in_view.count(None), len(in_view)),
+        slouched_pct=slouched,
+        camera_low_pct=camera_low,
     )
 
 

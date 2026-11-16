@@ -6,7 +6,7 @@ Read this before changing anything. It's the rules and the workflow that are eas
 
 1. **No git commands** (status, commit, checkout, anything) unless the author explicitly allows it in the current conversation.
 2. **Never invent data**: no placeholder names, scores or sample stats in the UI. Unmeasured = unavailable.
-3. **Scope is three functions**: Conversation, Mock interview, Presentation practice (+ Q&A). Don't bring back pronunciation mode, coach chat, dashboard or reports pages.
+3. **Scope is four functions**: Conversation, Mock interview, Presentation practice (+ Q&A), Impromptu speaking (added 2026-11-16 on request). Don't bring back pronunciation mode, coach chat, dashboard or reports pages.
 4. **Next.js 16 is not the Next.js you know**: read `frontend/node_modules/next/dist/docs/` before using an API (see `frontend/AGENTS.md`).
 5. **Don't restart the backend while an analysis is running**: it kills in-process background jobs. Check first:
    `docker compose exec -T db psql -U speechmate -d speechmate_db -c "select id from live_sessions where status='analyzing'"`.
